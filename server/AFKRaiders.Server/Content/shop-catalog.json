@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "weapons": [
+    { "id": "tea_kettle", "name": "Tea Kettle", "damage": 5, "damageMultiplier": 1.0, "damageMin": 3, "damageMax": 6, "value": 0, "rarity": 1, "durabilityMax": 8, "repairCost": 0, "flavor": "Standard issue in Desperanza: whistles under pressure and occasionally during combat." },
+    { "id": "aspperigo", "name": "Aspperigo", "damage": 6, "damageMultiplier": 1.08, "damageMin": 4, "damageMax": 7, "value": 65, "rarity": 2, "durabilityMax": 10, "repairCost": 18, "flavor": "Eddie's favorite and we don't know why." },
+    { "id": "vernerider", "name": "Vernerider", "damage": 7, "damageMultiplier": 1.18, "damageMin": 5, "damageMax": 9, "value": 140, "rarity": 3, "durabilityMax": 12, "repairCost": 30, "flavor": "No one can pronounce it right." },
+    { "id": "temptrest_ar", "name": "Temptrest AR", "damage": 9, "damageMultiplier": 1.32, "damageMin": 7, "damageMax": 11, "value": 280, "rarity": 4, "durabilityMax": 14, "repairCost": 55, "flavor": "The favorite among Raiders. The most prized possession." }
+  ],
+  "supplies": [
+    { "id": "bandage_white", "name": "White Bandage", "category": "Medical", "value": 8, "healAmount": 5, "reviveAmount": 0, "chargeAmount": 0, "rarity": 1, "flavor": "A little strip of hope. Mostly adhesive." },
+    { "id": "bandage_green", "name": "Green Bandage", "category": "Medical", "value": 18, "healAmount": 10, "reviveAmount": 0, "chargeAmount": 0, "rarity": 2, "flavor": "Better than white. Still applied with panic." },
+    { "id": "bandage_blue", "name": "Blue Bandage", "category": "Medical", "value": 42, "healAmount": 25, "reviveAmount": 0, "chargeAmount": 0, "rarity": 3, "flavor": "Professional-looking enough to inspire misplaced confidence." },
+    { "id": "bandage_purple", "name": "Purple Bandage", "category": "Medical", "value": 75, "healAmount": 50, "reviveAmount": 0, "chargeAmount": 0, "rarity": 4, "flavor": "Premium medical tape for premium mistakes." },
+    { "id": "panic_paddles", "name": "Panic Paddles", "category": "Medical", "value": 90, "healAmount": 0, "reviveAmount": 25, "chargeAmount": 0, "rarity": 4, "flavor": "Two questionable paddles and one laminated apology. For when 'walk it off' has lost the debate." },
+    { "id": "fizz_cell", "name": "Fizz Cell", "category": "ShieldRecharger", "value": 12, "healAmount": 0, "reviveAmount": 0, "chargeAmount": 20, "rarity": 1, "flavor": "A pocket battery making brave little snapping noises." },
+    { "id": "duct_taped_capacitor", "name": "Duct-Taped Capacitor", "category": "ShieldRecharger", "value": 28, "healAmount": 0, "reviveAmount": 0, "chargeAmount": 35, "rarity": 2, "flavor": "Technically a recharge kit. Spiritually a cry for help." },
+    { "id": "panic_capacitor", "name": "Panic Capacitor", "category": "ShieldRecharger", "value": 70, "healAmount": 0, "reviveAmount": 0, "chargeAmount": 50, "rarity": 4, "flavor": "Emergency confidence in a handheld brick." }
+  ]
+}

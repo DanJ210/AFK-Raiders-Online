@@ -1,0 +1,776 @@
+{
+  "schemaVersion": 1,
+  "contentVersion": "desperanza-narration-v1",
+  "pools": [
+    {
+      "id": "survival.downed",
+      "lines": [
+        "Raider is down but still on comms. Breathing: yes. Pride: complicated.",
+        "Using the backpack as a pillow while waiting for consequences to finish loading.",
+        "Comms reduced to breathing, static, and one very judgmental backpack buckle.",
+        "Raider requested a revive. Signal accounting immediately opened a fresh invoice.",
+        "Attempted to negotiate with the floor for a less judgmental angle. Floor countered with gravel.",
+        "Permit Choir put the revive request on hold. The hold music is just someone stamping forms off-beat.",
+        "Exit Strategy Unlimited map says nearest safe route is six meters left and several life choices ago."
+      ]
+    },
+    {
+      "id": "survival.knocked-out",
+      "lines": [
+        "Medbay stamped me RETURNED MOSTLY, then sent the stamp to Security for emotional verification.",
+        "Recovery form asked for cause of failure. Wrote 'overconfidence with accessories.' Hatch Authority accepted it immediately.",
+        "Recovery crew note said 'found face down near obvious warning sign.' Rude, but complete enough for filing.",
+        "Held a brief eulogy for the backpack. Attendance: me, regret, and one recovered button.",
+        "Recovery shower ran cold. Water Ration Desk called this a character-building allocation.",
+        "Medbay punched my loyalty card. One more disaster and the ice pack is free.",
+        "Checked the Secret Hidden Pocket first. Priorities remain legally concerning but emotionally correct.",
+        "Hatch Authority scheduled an exit interview about your entrance decisions."
+      ]
+    },
+    {
+      "id": "survival.robot-progress",
+      "lines": [
+        "Round report: {weapon_name} dealt {raider_damage} damage to {robot_name}. Robot HP: {robot_hp}/{robot_max_hp}. {robot_damage_summary}",
+        "Combat note: {robot_name} absorbed {raider_damage} damage and filed a steam-related complaint. Robot HP: {robot_hp}/{robot_max_hp}. {robot_damage_summary}",
+        "Exchange logged: Raider bonked {robot_name} for {raider_damage}. Robot HP: {robot_hp}/{robot_max_hp}. {robot_damage_summary}"
+      ]
+    },
+    {
+      "id": "tasks.surveying",
+      "lines": [
+        "compares exit signs with the actual connected paths",
+        "sketches a route on the back of a warranty",
+        "checks the approach from behind existing cover",
+        "studies sightlines without opening another container",
+        "reviews the route notes and rejects optimism as a compass",
+        "checks the same exit from a less judgmental angle"
+      ]
+    },
+    {
+      "id": "tasks.checking",
+      "lines": [
+        "tests the backpack straps",
+        "checks boot grip against the existing floor",
+        "tightens a buckle without improving any combat stats",
+        "checks that the cargo manifest matches the backpack",
+        "rehearses moving to cover with the present load",
+        "checks the radio casing without spending Signal"
+      ]
+    },
+    {
+      "id": "tasks.market",
+      "lines": [
+        "reads an expired shop directory",
+        "examines an empty shelf label",
+        "studies a departure notice with no departure authority",
+        "compares two useless route diagrams",
+        "investigates the existing fittings without finding stock",
+        "takes notes on retail archaeology"
+      ]
+    },
+    {
+      "id": "tasks.general",
+      "lines": [
+        "reads a worn route label",
+        "examines empty fittings",
+        "rechecks the route notes",
+        "studies a warranty nobody will honor",
+        "catalogs existing warning signs",
+        "inspects an empty mounting bracket"
+      ]
+    },
+    {
+      "id": "voice.diary-surveying",
+      "lines": [
+        "I consider north a suggestion with excellent branding.",
+        "My route notes need an optimism disclaimer.",
+        "I prefer exits with fewer philosophical requirements.",
+        "My sense of direction is on probation.",
+        "I distrust confidence sold without a map.",
+        "My clipboard deserves hazard pay.",
+        "I consider signage a complicated relationship.",
+        "My reservations have acquired their own appendix."
+      ]
+    },
+    {
+      "id": "voice.diary-checking",
+      "lines": [
+        "My zipper has retained opposing counsel.",
+        "I consider stitching more reliable than promises.",
+        "My socks deserve a grievance procedure.",
+        "I distrust buckles with management ambitions.",
+        "My baggage relationship needs firmer boundaries.",
+        "I prefer warranties without emotional exclusions.",
+        "My confidence is held together by adhesive.",
+        "I consider preventive embarrassment a sound investment."
+      ]
+    },
+    {
+      "id": "voice.diary-general",
+      "lines": [
+        "I consider empty shelves an aggressive sales strategy.",
+        "My curiosity has terrible credit.",
+        "I resent the retail markup on disappointment.",
+        "My priorities need a returns policy.",
+        "I consider nostalgia a poorly labeled aisle.",
+        "My ambition exceeds the shelving specification.",
+        "I prefer directions without a subscription.",
+        "My patience qualifies as antique stock."
+      ]
+    },
+    {
+      "id": "voice.consumable",
+      "lines": [
+        "I consider adhesive a bedside manner.",
+        "My treatment plan needs a laminated apology.",
+        "I prefer medical tape without motivational quotes.",
+        "My confidence comes in questionable packaging.",
+        "I consider premium panic a billing category.",
+        "My dignity is not covered by the warranty."
+      ]
+    },
+    {
+      "id": "voice.condition",
+      "lines": [
+        "I consider this forecast a workplace grievance.",
+        "My socks oppose the atmospheric agenda.",
+        "I prefer weather without administrative ambition.",
+        "My optimism needs a waterproof case."
+      ]
+    },
+    {
+      "id": "voice.start-surveying",
+      "lines": [
+        "I'm surveying the exits. Optimism is not a route marker.",
+        "I'm reading the signage. My confidence has filed an appeal.",
+        "I'm evaluating this route as an exit strategy, not a lifestyle.",
+        "I consider this floor plan a strongly worded suggestion.",
+        "I'm checking the sightlines. My dignity prefers an unobstructed escape.",
+        "I'm taking field notes. The margins are mostly reservations."
+      ]
+    },
+    {
+      "id": "voice.start-checking",
+      "lines": [
+        "I'm checking my straps. I prefer my baggage attached.",
+        "I'm checking the footing. My socks deserve legal representation.",
+        "I'm arguing with my backpack zipper like it has legal standing.",
+        "I'm inspecting the buckles. Trust is good; industrial stitching is better.",
+        "I'm reviewing my equipment's commitment to remaining equipment.",
+        "I'm treating this inspection as preventive embarrassment."
+      ]
+    },
+    {
+      "id": "voice.start-rummaging",
+      "lines": [
+        "I'm rummaging for route clues, not another payday. Could be useful.",
+        "I'm inspecting empty fittings. Even my greed needs directions.",
+        "I'm approaching this empty shelf with professionally unreasonable expectations.",
+        "I consider a suspiciously philosophical label useful route intelligence.",
+        "I'm conducting a clipboard-free study of salvageable regret.",
+        "I'm calling this reconnaissance so my priorities look respectable."
+      ]
+    },
+    {
+      "id": "voice.complete-surveying",
+      "lines": [
+        "I'm filing the route notes under optimism with supporting evidence.",
+        "I consider this survey adequate. Adequate is a generous department.",
+        "I'm ready to stop reading the signs and start disputing the implications.",
+        "I'm promoting my reservations to a formal travel advisory."
+      ]
+    },
+    {
+      "id": "voice.complete-checking",
+      "lines": [
+        "I'm concluding the inspection before the zipper requests counsel.",
+        "I consider my baggage relationship functional, pending appeal.",
+        "I'm signing off on the straps. My signature carries no warranty.",
+        "I'm ready to proceed with a reasonable amount of unreasonable confidence."
+      ]
+    },
+    {
+      "id": "voice.complete-rummaging",
+      "lines": [
+        "I'm calling this a thorough review of empty-space management.",
+        "I consider my curiosity satisfied. My greed has submitted a dissent.",
+        "I'm leaving the empty fittings off the souvenir manifest.",
+        "I'm filing this under useful directions, questionable priorities."
+      ]
+    },
+    {
+      "id": "voice.travel",
+      "lines": [
+        "I'm calling this cardio. Desperanza can dispute the invoice.",
+        "I'm following the route. My instincts are strictly advisory.",
+        "I consider walking away a premium survival feature.",
+        "I'm budgeting my optimism for the return journey.",
+        "I'm traveling light, if emotional baggage doesn't count.",
+        "I'm treating every step as a small investment in dry socks."
+      ]
+    },
+    {
+      "id": "voice.search",
+      "lines": [
+        "I have a system. The system involves suspicious containers.",
+        "I'm taking this search seriously. My dignity can wait outside.",
+        "I'm listening for the hum. I prefer my bad decisions with a soundtrack.",
+        "I'm offering the zipper a brief prayer and no bargaining rights.",
+        "I consider this locker a patience seminar with hinges.",
+        "I'm conducting research. The clipboard would only introduce bias."
+      ]
+    },
+    {
+      "id": "voice.allocation",
+      "lines": [
+        "I call it strategic infrastructure. Don't ask.",
+        "I'm putting this on the manifest, not on a pedestal. Yet.",
+        "I consider sentimental value a perfectly legitimate accounting category.",
+        "I'm keeping my justification brief: could be useful.",
+        "I can defend this decision in writing. Please don't request the writing.",
+        "I'm treating this as the foundation of a very specific future strategy."
+      ]
+    },
+    {
+      "id": "voice.robot",
+      "lines": [
+        "I'm not arguing with a chassis. I'm lodging a very loud complaint.",
+        "I would like to speak to the machine's warranty department.",
+        "I'm entering strategic denial mode. It's a recognized posture.",
+        "I consider confidence a defense strategy with disappointing peer review.",
+        "I'm requesting that this be classified as a workplace disagreement.",
+        "I'm reserving my dignity for the performance review."
+      ]
+    },
+    {
+      "id": "voice.exit",
+      "lines": [
+        "I'm ready for Desperanza. My dignity can take the next shuttle.",
+        "I consider leaving a tactical investment in future rummaging.",
+        "I'm making small talk with the timer. Strictly professional small talk.",
+        "I consider boarding priority worth precisely none of my remaining dignity.",
+        "I'm keeping my panic optional and my paperwork accessible.",
+        "I'm rating this exit strategy above the alternative."
+      ]
+    },
+    {
+      "id": "voice.hoarder",
+      "lines": [
+        "I have a system. Please don't audit it.",
+        "I can justify this in writing. My handwriting is classified.",
+        "I consider restraint an optional accessory.",
+        "I'm emotionally invested in the phrase 'could be useful'.",
+        "I prefer to call it inventory ambition.",
+        "I'm budgeting for regret. It's a renewable resource."
+      ]
+    },
+    {
+      "id": "voice.general",
+      "lines": [
+        "I'm filing that under cautiously optimistic.",
+        "I'm treating this as routine. Routine has declined to comment.",
+        "I would like my paperwork waterproof.",
+        "I consider my confidence provisional, like the flooring.",
+        "I'm submitting my concerns in the form of continued movement.",
+        "I'm maintaining a professional distance from my own judgment."
+      ]
+    },
+    {
+      "id": "style.checking",
+      "lines": [
+        "zippers",
+        "buckles",
+        "backpacks"
+      ]
+    },
+    {
+      "id": "style.surveying",
+      "lines": [
+        "signs",
+        "clipboards",
+        "maps"
+      ]
+    },
+    {
+      "id": "style.rummaging",
+      "lines": [
+        "empty shelves",
+        "labels",
+        "dust"
+      ]
+    },
+    {
+      "id": "style.search",
+      "lines": [
+        "containers",
+        "hinges",
+        "latches"
+      ]
+    },
+    {
+      "id": "style.robot",
+      "lines": [
+        "machinery",
+        "warranties",
+        "rust"
+      ]
+    },
+    {
+      "id": "style.exit",
+      "lines": [
+        "timers",
+        "tickets",
+        "luggage"
+      ]
+    },
+    {
+      "id": "style.general",
+      "lines": [
+        "paperwork",
+        "socks",
+        "compasses"
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "id": "narrator.the-operative",
+      "text": "The operative"
+    },
+    {
+      "id": "narrator.checks-in-the-handler-is",
+      "text": "{0} checks in. The Handler is optional. The paperwork is not."
+    },
+    {
+      "id": "narrator.enters-the-ongoing-raid-from",
+      "text": "{0} enters the ongoing raid from Desperanza. Transit was bumpy; survival expectations remain realistic."
+    },
+    {
+      "id": "narrator.departs-from-entry-tunnel-into",
+      "text": "{0} departs from Entry Tunnel into Scrapyard Sector 4. First objective: salvage. Secondary objective: returning with same number of limbs."
+    },
+    {
+      "id": "narrator.leaves-for-eta-s-navigation",
+      "text": "{0} leaves {1} for {2}. ETA {3}s. Navigation guided by questionable instinct and blind faith."
+    },
+    {
+      "id": "narrator.arrives-at-area-looks-structurally",
+      "text": "{0} arrives at {1}. Area looks structurally questionable and rich in salvageable regret."
+    },
+    {
+      "id": "narrator.searches-staycation-locker-at-market",
+      "text": "{0} searches STAYCATION locker at Market. Locker hums with the faint scent of someone who planned to relax and then didn't."
+    },
+    {
+      "id": "narrator.searches-humming-crate-at-salvage",
+      "text": "{0} searches humming crate at Salvage Yard. Crate vibrates with the promise of something valuable or aggressively loud."
+    },
+    {
+      "id": "narrator.searches-locker-at-service-depot",
+      "text": "{0} searches locker at Service Depot. Spare parts detected alongside an expired warranty on optimism."
+    },
+    {
+      "id": "narrator.searches-at-standard-operating-procedure",
+      "text": "{0} searches at {1}. Standard operating procedure: rifle through containers and hope nothing hums."
+    },
+    {
+      "id": "narrator.crosses-paths-with-another-operative",
+      "text": "{0} crosses paths with another operative at {1}. Eye contact made; neither looks pleased."
+    },
+    {
+      "id": "narrator.finds-already-emptied-no-consolation",
+      "text": "{0} finds {1} already emptied. No consolation loot has materialized."
+    },
+    {
+      "id": "narrator.recovered-value-securing-cargo-with",
+      "text": "{0} recovered {1} (+{2} value). Securing cargo with industrial tape."
+    },
+    {
+      "id": "narrator.begins-packing-salvage-into-backpack",
+      "text": "{0} begins packing salvage into backpack (+{1} value)."
+    },
+    {
+      "id": "narrator.finished-packing-backpack-now-slightly",
+      "text": "{0} finished packing. Backpack now slightly heavier and substantially louder."
+    },
+    {
+      "id": "narrator.catching-breath-and-recovering-from",
+      "text": "{0} catching breath and recovering from the contest. Dignity slowly recharging."
+    },
+    {
+      "id": "narrator.recovered-composure-ready-to-proceed",
+      "text": "{0} recovered composure. Ready to proceed."
+    },
+    {
+      "id": "narrator.encounters-roomba-prime-at-it",
+      "text": "{0} encounters Roomba Prime at {1}. It emits a high-pitched warning tone that is somehow worse than silence."
+    },
+    {
+      "id": "narrator.joins-combat-against-roomba-prime",
+      "text": "{0} joins combat against Roomba Prime. Strength in numbers, assuming everyone hits the chassis."
+    },
+    {
+      "id": "narrator.roomba-prime-is-disabled-the",
+      "text": "Roomba Prime is disabled! The Service Depot locker is now accessible. Petty administrative revenge achieved."
+    },
+    {
+      "id": "narrator.roomba-prime-escapes-after-rounds",
+      "text": "Roomba Prime escapes after 3 rounds! The Service Depot locker is lost for this raid. Machine pettiness prevails."
+    },
+    {
+      "id": "narrator.calls-extraction-the-shuttle-requests",
+      "text": "{0} calls extraction. The shuttle requests exact change and no emotional baggage."
+    },
+    {
+      "id": "narrator.extracts-the-loot-made-it",
+      "text": "{0} extracts. The loot made it home; the dignity remains unaccounted for."
+    },
+    {
+      "id": "narrator.secret-hidden-pocket-check-x",
+      "text": "Secret Hidden Pocket check: 1x {0} (Val: {1}) salvaged. The dark safe spot delivers."
+    },
+    {
+      "id": "narrator.secret-hidden-pocket-check-empty",
+      "text": "Secret Hidden Pocket check: Empty. All unpocketed salvage lost to the ruins."
+    },
+    {
+      "id": "narrator.used-field-supplies",
+      "text": "{0} used field supplies."
+    },
+    {
+      "id": "narrator.acknowledged-handler-transmission",
+      "text": "{0} acknowledged Handler transmission."
+    },
+    {
+      "id": "narrator.autonomous-duty-is-enabled-the",
+      "text": "Autonomous duty is enabled. The Raider will join an eligible raid without a Handler deployment."
+    },
+    {
+      "id": "narrator.duty-paused-the-raider-will",
+      "text": "Duty paused. The Raider will finish any current raid and skip future admissions."
+    },
+    {
+      "id": "narrator.returns-to-desperanza-with-secured",
+      "text": "{0} returns to Desperanza with {1} secured items. Paperwork awaiting Handler stamp."
+    },
+    {
+      "id": "narrator.the-ongoing-raid-closes-after",
+      "text": "The ongoing raid closes after its last Raider returns to Desperanza."
+    },
+    {
+      "id": "narrator.reports-event-at",
+      "text": "{0} reports event: {1} at {2}."
+    },
+    {
+      "id": "narrator.recovered",
+      "text": "{0} recovered {1}"
+    },
+    {
+      "id": "narrator.no-items-recovered",
+      "text": "No items recovered"
+    },
+    {
+      "id": "narrator.solosearch-only-one-eligible-raider",
+      "text": "SoloSearch: {0}. Only one eligible Raider was present at the shared deadline. No opponent was invented; they recover both items."
+    },
+    {
+      "id": "narrator.cooperation-both-raiders-cooperate-lower",
+      "text": "Cooperation: {0}. Both Raiders cooperate. Lower backpack value receives the first, higher-value item; the other receives the second."
+    },
+    {
+      "id": "narrator.contest-a-hoarder-contests-the",
+      "text": "Contest: {0}. A hoarder contests the salvage. Score = greed + aptitude * 3 + initiative - backpack value / 5 (integer division). Highest score wins; exact ties use stable identity order, never request arrival."
+    },
+    {
+      "id": "narrator.search-resolved-at",
+      "text": "Search resolved at {0}."
+    },
+    {
+      "id": "narrator.roomba-prime-has-health-it",
+      "text": "Roomba Prime has {0}/70 health. It deals {1} damage to each fighter."
+    },
+    {
+      "id": "simulation.enters-the-ongoing-raid-from",
+      "text": "{0} enters the ongoing raid from Desperanza."
+    },
+    {
+      "id": "simulation.shared-zone-danger-world-closes",
+      "text": "Shared zone: {0}. {1} ({2} danger). {3} World closes at {4:HH:mm:ss}."
+    },
+    {
+      "id": "simulation.departs-from-entry-tunnel-into",
+      "text": "{0} departs from Entry Tunnel into Scrapyard Sector 4."
+    },
+    {
+      "id": "simulation.arrives-at",
+      "text": "{0} arrives at {1}."
+    },
+    {
+      "id": "simulation.completed-at-no-loot-or",
+      "text": "{0} completed {1} at {2}. No loot or stat changes."
+    },
+    {
+      "id": "simulation.area-check-complete-no-rewards",
+      "text": "Area check complete. No rewards."
+    },
+    {
+      "id": "simulation.succumbed-to-trauma-and-was",
+      "text": "{0} succumbed to trauma and was knocked out."
+    },
+    {
+      "id": "simulation.was-knocked-out-cause",
+      "text": "{0} was KNOCKED OUT. {1} Cause: {2}."
+    },
+    {
+      "id": "simulation.secret-hidden-pocket-preserved-value",
+      "text": "Secret Hidden Pocket preserved {0} (Value: {1})! Medbay drones recovered the concealed salvage."
+    },
+    {
+      "id": "simulation.secret-hidden-pocket-was-empty",
+      "text": "Secret Hidden Pocket was empty or unassigned. All field salvage ({0} items, {1} scrap value) was lost."
+    },
+    {
+      "id": "simulation.finished-packing-salvage",
+      "text": "{0} finished packing salvage."
+    },
+    {
+      "id": "simulation.caught-their-breath",
+      "text": "{0} caught their breath."
+    },
+    {
+      "id": "simulation.has-recovered-and-is-ready",
+      "text": "{0} has recovered and is ready to move."
+    },
+    {
+      "id": "simulation.a-locker-labeled-staycation-hums",
+      "text": "A locker labeled STAYCATION hums with the faint scent of someone who planned to relax and then didn't."
+    },
+    {
+      "id": "simulation.a-humming-crate-sits-in",
+      "text": "A humming crate sits in the open, vibrating with the promise of something valuable or very loud."
+    },
+    {
+      "id": "simulation.the-service-depot-locker-contains",
+      "text": "The Service Depot locker contains spare parts and an expired warranty on optimism."
+    },
+    {
+      "id": "simulation.searches-at",
+      "text": "{0} searches at {1}. {2}"
+    },
+    {
+      "id": "simulation.cross-paths-at-the-existing",
+      "text": "{0} cross paths at {1}. The existing search deadline does not move."
+    },
+    {
+      "id": "simulation.encounters-at",
+      "text": "{0} encounters {1} at {2}. {3}"
+    },
+    {
+      "id": "simulation.joins-the-fight-against-the",
+      "text": "{0} joins the fight against {1}. The shared health pool is {2}/{3}."
+    },
+    {
+      "id": "simulation.has-no-remaining-fighters-no",
+      "text": "{0} has no remaining fighters. No reward is awarded."
+    },
+    {
+      "id": "simulation.is-disabled-the-service-depot",
+      "text": "{0} is disabled. The Service Depot locker is now accessible."
+    },
+    {
+      "id": "simulation.has-health-it-deals-raw",
+      "text": "{0} has {1}/{2} health. It deals {3} raw damage to each fighter before resilience/shields."
+    },
+    {
+      "id": "simulation.overran-all-fighters-the-service",
+      "text": "{0} overran all fighters. The Service Depot locker is lost for this raid."
+    },
+    {
+      "id": "simulation.escapes-after-rounds-the-service",
+      "text": "{0} escapes after {1} rounds. The Service Depot locker is lost for this raid."
+    },
+    {
+      "id": "simulation.search-completed",
+      "text": "{0} search completed: {1}."
+    },
+    {
+      "id": "simulation.a-hoarder-contests-the-salvage",
+      "text": "A hoarder contests the salvage. Score = greed + aptitude * 3 + initiative - backpack value / 5 (integer division). Highest score wins; exact ties use stable identity order, never request arrival."
+    },
+    {
+      "id": "simulation.only-one-eligible-raider-was",
+      "text": "Only one eligible Raider was present at the shared deadline. No opponent was invented; they recover both items."
+    },
+    {
+      "id": "simulation.both-raiders-cooperate-lower-backpack",
+      "text": "Both Raiders cooperate. Lower backpack value receives the first, higher-value item; the other receives the second."
+    },
+    {
+      "id": "simulation.surveying-the-approach-and-exit",
+      "text": "surveying the approach and exit markings"
+    },
+    {
+      "id": "simulation.checking-footing-straps-and-cover",
+      "text": "checking footing, straps, and cover"
+    },
+    {
+      "id": "simulation.rummaging-through-empty-fittings-for",
+      "text": "rummaging through empty fittings for route clues"
+    },
+    {
+      "id": "simulation.begins-at-s-reconnaissance-only",
+      "text": "{0} begins {1} at {2} ({3}s). Reconnaissance only; no new loot opportunity."
+    },
+    {
+      "id": "simulation.leaves-for-eta-s-navigation",
+      "text": "{0} leaves {1} for {2}. ETA {3}s. Navigation by questionable instinct."
+    },
+    {
+      "id": "simulation.greed-mood-resilience",
+      "text": "{0}: Greed {1} -> {2}; Mood {3} -> {4}; resilience {5}."
+    },
+    {
+      "id": "simulation.world-deadline-expired-before-extraction",
+      "text": "World deadline expired before extraction completed"
+    },
+    {
+      "id": "simulation.exposed-footing-at-impact-in",
+      "text": "{0}: exposed footing at {1}. Impact in 10s; {2} raw damage before resilience/shields."
+    },
+    {
+      "id": "simulation.affects-actual-occupants-of-raw",
+      "text": "{0} affects actual occupants of {1}; {2} raw damage each."
+    },
+    {
+      "id": "simulation.exit-chance-greed",
+      "text": "{0}: {1:P0} exit chance; {2}. Greed {3}."
+    },
+    {
+      "id": "simulation.interrupted-by-extraction-decision-no",
+      "text": "Interrupted by extraction decision; no reward for unfinished activity."
+    },
+    {
+      "id": "simulation.interrupted-for-extraction-shared-deadlines",
+      "text": "{0} interrupted for extraction; shared deadlines and other Raiders continue."
+    },
+    {
+      "id": "simulation.is-also-actually-present-here",
+      "text": " {0} is also actually present here."
+    },
+    {
+      "id": "simulation.at-no-loot-damage-or",
+      "text": "{0} {1} at {2}.{3} No loot, damage or new actor created."
+    },
+    {
+      "id": "simulation.no-new-rewards-greed-check",
+      "text": "No new rewards. Greed Check every 30s; deadline urgency is fallible."
+    },
+    {
+      "id": "simulation.nonreward-reconnaissance-shared-loot-remains",
+      "text": "Nonreward reconnaissance. Shared loot remains finite."
+    },
+    {
+      "id": "simulation.eta-s-navigation-guided-by",
+      "text": "ETA {0}s. Navigation guided by questionable instinct."
+    },
+    {
+      "id": "simulation.salvage-search-staycation-locker",
+      "text": "Salvage Search: STAYCATION Locker"
+    },
+    {
+      "id": "simulation.salvage-search-humming-crate",
+      "text": "Salvage Search: Humming Crate"
+    },
+    {
+      "id": "simulation.salvage-search-service-depot-locker",
+      "text": "Salvage Search: Service Depot Locker"
+    },
+    {
+      "id": "simulation.searching-container-deadline-in-s",
+      "text": "Searching container. Deadline in {0}s."
+    },
+    {
+      "id": "simulation.combat-round",
+      "text": "Combat: {0} (Round {1}/3)"
+    },
+    {
+      "id": "simulation.round-in-s-hp",
+      "text": "Round {0}/3 in {1}s. {2} HP: {3}/{4}."
+    },
+    {
+      "id": "simulation.packing-backpack-complete-in-s",
+      "text": "Packing backpack. Complete in {0}s."
+    },
+    {
+      "id": "simulation.recovering-breath-after-salvage-contest",
+      "text": "Recovering breath after salvage contest. Complete in {0}s."
+    },
+    {
+      "id": "simulation.extraction-shuttle-landing-in-s",
+      "text": "Extraction shuttle landing in {0}s."
+    },
+    {
+      "id": "simulation.vital-signs-failing-medbay-recovery",
+      "text": "Vital signs failing. Medbay recovery drones deploying in {0}s."
+    },
+    {
+      "id": "simulation.terminal-raider-knocked-out",
+      "text": "TERMINAL: Raider Knocked Out"
+    },
+    {
+      "id": "simulation.chassis-recovered-by-medbay-terminal",
+      "text": "Chassis recovered by Medbay. Terminal debriefing filed."
+    },
+    {
+      "id": "simulation.handler-broadcast-calm-radio-transmission",
+      "text": "Handler broadcast CALM radio transmission. Greed {0} -> {1}; Mood {2}; resilience {3} raw damage trim; exit chance {4:P0}."
+    },
+    {
+      "id": "simulation.handler-broadcast-pressure-radio-transmission",
+      "text": "Handler broadcast PRESSURE radio transmission. Greed {0} -> {1}; Mood {2}; valuable-item appetite {3:F2}; exit chance {4:P0}."
+    },
+    {
+      "id": "simulation.handler-issued-call-extract-natural",
+      "text": "Handler issued CALL EXTRACT. Natural checks bypassed; rerouting to Extraction Platform without teleporting."
+    },
+    {
+      "id": "simulation.positive-mood-trimmed-raw-damage",
+      "text": "Positive mood trimmed {0} raw damage from {1}."
+    },
+    {
+      "id": "simulation.shield-lost-charge-hp-got",
+      "text": "Shield lost {0} charge, {1} HP got through. Raider called that 'a learning invoice.'"
+    },
+    {
+      "id": "simulation.shield-depleted-chassis-takes-unmitigated",
+      "text": "Shield depleted! Chassis takes {0} unmitigated kinetic damage from {1}."
+    },
+    {
+      "id": "simulation.panic-paddle-discharged-defibrillated-back",
+      "text": "Panic paddle discharged! {0} defibrillated back to {1} HP with scorched insulation."
+    },
+    {
+      "id": "simulation.is-downed",
+      "text": "{0} is DOWNED! {1}"
+    },
+    {
+      "id": "simulation.autonomously-applied-recovering-hp-hp",
+      "text": "{0} autonomously applied {1}, recovering {2} HP ({3}/{4} HP)."
+    },
+    {
+      "id": "simulation.autonomously-triggered-restoring-shield-charge",
+      "text": "{0} autonomously triggered {1}, restoring {2} shield charge ({3}/{4})."
+    },
+    {
+      "id": "simulation.it-emits-a-high-pitched",
+      "text": "It emits a high-pitched warning tone that is somehow worse than silence."
+    }
+  ],
+  "enrichmentEventKinds": [
+    "AreaActivityStarted",
+    "Search",
+    "RobotRound",
+    "Travel",
+    "ExtractionStarted"
+  ]
+}

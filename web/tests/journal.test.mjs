@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { enrichmentExplanation, mergeJournal, narrationLabel } from '../src/journal.ts'
+
+test('narration badges distinguish authored content from accepted AI without treating unrequested entries as failures', () => {
+  assert.equal(narrationLabel(), 'Authored')
+  assert.equal(narrationLabel('CanonFallback'), 'Authored')
+  assert.equal(narrationLabel('ArchivalLog'), 'Authored')
+  assert.equal(narrationLabel('Generated'), 'AI-enhanced')
+  assert.equal(narrationLabel('FutureSource'), 'FutureSource')
+  assert.match(enrichmentExplanation(), /not requested.*not a generation failure/)
+  assert.match(enrichmentExplanation('Pending'), /queued or running/)
+  assert.match(enrichmentExplanation('Ready'), /accepted AI aside/)
+  assert.match(enrichmentExplanation('Fallback'), /rejection, timeout or queue saturation/)
+  assert.match(enrichmentExplanation('Expired'), /became stale/)
+  assert.match(enrichmentExplanation('FutureStatus'), /Unrecognized.*FutureStatus/)
+  assert.match(enrichmentExplanation('NotRequested', 'LiveBudgetBusy'), /avoid an inference backlog/)
+})
+
+test('enrichment replaces an existing source without duplicate entries or losing older raids', () => {
+  const existing = [
+    { sourceEventId: 'raid:old:1', sequence: 1, text: 'old facts' },
+    { sourceEventId: 'raid:current:1', sequence: 2, text: 'original facts', enrichmentStatus: 'Pending' },
+  ]
+  const incoming = [
+    { sourceEventId: 'raid:current:1', sequence: 2, text: 'original facts', flavor: 'I feel quietly hopeful about my dignity.', narrativeSource: 'Generated', enrichmentStatus: 'Ready', enrichmentReason: null },
+    { sourceEventId: 'raid:current:2', sequence: 3, text: 'next facts' },
+  ]
+  const merged = mergeJournal(existing, incoming)
+  assert.equal(merged.length, 3)
+  assert.equal(merged[0].text, 'old facts')
+  assert.equal(merged[1].text, 'original facts')
+  assert.equal(merged[1].flavor, incoming[0].flavor)
+  assert.equal(merged[1].enrichmentStatus, 'Ready')
+  assert.equal(merged[1].enrichmentReason, null)
+  assert.deepEqual(mergeJournal(merged, incoming), merged)
+})
+
+test('failure reason updates survive source-id merging without changing facts', () => {
+  const before = { sourceEventId: 'event:1', sequence: 1, text: 'facts', enrichmentStatus: 'Pending' }
+  const after = { ...before, enrichmentStatus: 'Fallback', enrichmentReason: 'InferenceDeadlineExceeded' }
+  assert.deepEqual(mergeJournal([before], [after]), [after])
+})

@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 3,
+  "contentVersion": "desperanza-shared-loot-v3",
+  "items": [
+    { "id": "scrap_metal_basic", "name": "Basic Scrap Metal", "value": 8, "rarity": 1, "category": "scrap_components", "flavor": "Sharp, rusty, and eager to give you tetanus.", "eligibilityCategories": ["Salvage", "Residential"] },
+    { "id": "scrap_metal_bent", "name": "Bent Scrap Metal", "value": 10, "rarity": 1, "category": "scrap_components", "flavor": "Bent at a perfect 37\u00b0 angle. Useless but stylish.", "eligibilityCategories": ["Salvage", "Residential"] },
+    { "id": "scrap_metal_twisted", "name": "Twisted Scrap Metal", "value": 12, "rarity": 1, "category": "scrap_components", "flavor": "Looks like modern art. Feels like regret.", "eligibilityCategories": ["Salvage"] },
+    { "id": "robot_toe", "name": "Robot Toe", "value": 15, "rarity": 2, "category": "scrap_components", "flavor": "You don't want to know how you got this.", "eligibilityCategories": ["Robot", "Salvage"] },
+    { "id": "robot_finger", "name": "Robot Finger", "value": 18, "rarity": 2, "category": "scrap_components", "flavor": "Points accusingly no matter how you hold it.", "eligibilityCategories": ["Robot", "Salvage"] },
+    { "id": "robot_knuckle_joint", "name": "Robot Knuckle Joint", "value": 20, "rarity": 2, "category": "scrap_components", "flavor": "Clicks ominously when shaken.", "eligibilityCategories": ["Robot", "Salvage"] },
+    { "id": "circuit_bundle_messy", "name": "Messy Circuit Bundle", "value": 35, "rarity": 3, "category": "scrap_components", "flavor": "A tangled knot of wires. Might work. Might explode.", "eligibilityCategories": ["Technology", "Salvage"] },
+    { "id": "circuit_board_cracked", "name": "Cracked Circuit Board", "value": 18, "rarity": 2, "category": "scrap_components", "flavor": "Still lights up. Shouldn't.", "eligibilityCategories": ["Technology", "Salvage"] },
+    { "id": "single_sock", "name": "Single Sock", "value": 5, "rarity": 1, "category": "personal_junk", "flavor": "Its partner is out there somewhere. Probably thriving.", "eligibilityCategories": ["Residential"] },
+    { "id": "battery_half_full", "name": "Half-Full Battery", "value": 20, "rarity": 2, "category": "scrap_components", "flavor": "Optimistically labeled '50%'.", "eligibilityCategories": ["Salvage", "Technology"] },
+    { "id": "arc_data_shard_corrupted", "name": "Chassis Data Shard (Corrupted)", "value": 25, "rarity": 2, "category": "arc_tech", "flavor": "Contains 98% static and 2% screaming.", "eligibilityCategories": ["Robot", "Technology"] }
+  ],
+  "pool": [
+    { "catalogId": "scrap_metal_basic", "dropWeight": 35 },
+    { "catalogId": "scrap_metal_bent", "dropWeight": 30 },
+    { "catalogId": "scrap_metal_twisted", "dropWeight": 25 },
+    { "catalogId": "robot_toe", "dropWeight": 20 },
+    { "catalogId": "robot_finger", "dropWeight": 18 },
+    { "catalogId": "robot_knuckle_joint", "dropWeight": 15 },
+    { "catalogId": "circuit_bundle_messy", "dropWeight": 22 },
+    { "catalogId": "circuit_board_cracked", "dropWeight": 18 },
+    { "catalogId": "single_sock", "dropWeight": 25 },
+    { "catalogId": "battery_half_full", "dropWeight": 18 },
+    { "catalogId": "arc_data_shard_corrupted", "dropWeight": 20 }
+  ],
+  "opportunities": [
+    {
+      "id": "market-locker", "location": "Market", "durationSeconds": 10,
+      "fixedItemIds": ["scrap_metal_basic", "robot_toe"],
+      "drawCount": 2,
+      "eligibleCategories": ["Residential", "Salvage"]
+    },
+    {
+      "id": "humming-crate", "location": "Salvage Yard", "durationSeconds": 12,
+      "fixedItemIds": ["circuit_bundle_messy", "robot_finger"],
+      "drawCount": 2,
+      "eligibleCategories": ["Salvage", "Technology"]
+    },
+    {
+      "id": "depot-locker", "location": "Service Depot", "durationSeconds": 10,
+      "fixedItemIds": ["scrap_metal_basic", "robot_toe"],
+      "drawCount": 2,
+      "eligibleCategories": ["Robot", "Technology"]
+    }
+  ]
+}

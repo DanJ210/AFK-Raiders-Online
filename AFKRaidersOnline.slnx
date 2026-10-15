@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/server/">
+    <Project Path="server/AFKRaiders.Server/AFKRaiders.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AFKRaiders.Server.Tests/AFKRaiders.Server.Tests.csproj" />
+  </Folder>
+</Solution>
