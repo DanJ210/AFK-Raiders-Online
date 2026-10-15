@@ -8,13 +8,13 @@ namespace AFKRaiders.Server.Tests;
 public sealed class NarrationCompatibilityTests
 {
     [Fact]
-    public void BundledNarrationPreservesPreMigrationTextOrderingAndSimulation()
+    public void BundledNarrationAndCurrentSimulationHaveAStableCompatibilityFingerprint()
     {
         var kinds = new[] { "Deployment", "DutyAdmission", "Departure", "Travel", "Arrived", "Search",
             "SearchStarted", "CrossedPaths", "SearchJoined", "OpportunityExhausted", "SearchCompleted",
             "EncounterResolved", "ItemAllocated", "ItemAwarded", "PackingStarted", "PackingCompleted",
             "RecoveryStarted", "RecoveryCompleted", "RobotCombatStarted", "RobotJoined", "RobotParticipantJoined",
-            "RobotRound", "RobotDefeated", "RobotEscaped", "ExtractionStarted", "Extracted", "ExtractionCompleted",
+            "RobotRound", "RobotDefeated", "RobotEscaped", "ExtractionStarted", "ExtractionVehicleArrived", "Extracted", "ExtractionCompleted",
             "Downed", "KnockedOut", "HiddenPocketSalvaged", "HiddenPocketEmpty", "ConsumableUsed", "HandlerAction",
             "CallExtract", "Calm", "Pressure", "DutyEnabled", "DutyPaused", "ReturnedHome", "RaidWorldClosed",
             "AreaDiary", "AreaActivityStarted", "AreaActivityCompleted", "WorldCondition", "Unknown" };
@@ -49,7 +49,9 @@ public sealed class NarrationCompatibilityTests
         foreach (var risk in new[] { false, true })
             for (var seed = 0; seed < 16; seed++)
             {
-                var sim = new RaidSimulation("compatibility", start, seed, fastPacing: false, riskReward: risk);
+                // Freeze C4's original loot inputs; later loot expansions deliberately change outcomes.
+                var sim = new RaidSimulation("compatibility", start, seed,
+                    catalog: CatalogCompatibilityTests.C3Baseline(), fastPacing: false, riskReward: risk);
                 sim.AddAutonomousRaider("one", "raider-one", start);
                 sim.AddAutonomousRaider("two", "raider-two", start);
                 sim.Advance(start.AddHours(1));
@@ -57,6 +59,6 @@ public sealed class NarrationCompatibilityTests
                 lines.Add(JsonSerializer.Serialize(sim.Project("two", start.AddHours(1))));
             }
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
-        Assert.Equal("20E1569D4BB57C2A4038EC9C38B47074921DA48677763CE5127ED9CDECC5CC69", hash);
+        Assert.Equal("D3CEE7D5A778472D44C1C126A3C570A02D246DD82D8D2E972315002B7E254D87", hash);
     }
 }

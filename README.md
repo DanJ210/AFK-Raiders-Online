@@ -26,9 +26,11 @@ Read these alongside this README before extending the game. The progress ledger 
 
 ## Current implementation: Desperanza duty and shared autonomous raids
 
-This is a clean server-owned implementation. It does not load prototype saves or run the prototype's browser simulation. In Development, each of the two development identities can enroll once for autonomous duty. The first enrollment starts a solo raid immediately; another eligible Raider can join the ongoing world on an admission pulse. Each Raider returns to Desperanza independently, and the world remains open while any admitted Raider is still active.
+This is a clean server-owned implementation. It does not load prototype saves or run the prototype's browser simulation. In Development, each of the two development identities can enroll once for autonomous duty. The first enrollment starts a solo raid; another eligible Raider can join the ongoing world on an admission pulse. Between raids, each Raider is at home in Desperanza. Deployment begins in a single-person pod for a 60-second tunnel-to-surface trip. Each Raider returns to Desperanza independently, and the world remains open while any admitted Raider is still active.
 
-The Handler console shows home/on-duty, cooling-down, paused, and in-raid status; current raid activity, shared comms/receipts, and private health, backpack, and extracted results. Pausing stops future admissions only. Existing journeys, searches, the salvage encounter, robot combat, and extraction continue if the Handler closes the browser or does not respond. There is no invite or explicit deployment step in this S5 flow.
+The Handler console shows home/on-duty, cooling-down, paused, and in-raid status; current raid activity, shared comms/receipts, and private health, backpack, and extracted results. Pausing stops future admissions only. Existing journeys, searches, the salvage encounter, robot combat, and extraction continue if the Handler closes the browser or does not respond. There is no invite or manual per-raid deployment decision; autonomous admission starts the pod trip.
+
+Item cards and rows use a left-edge rarity bar from authoritative catalog metadata, independent of price: **1 Uncommon - gray, 2 Common - green, 3 Rare - blue, 4 Epic - purple, 5 Legendary - yellow, 6 Augmented - orange**. This applies to loot, safe-pocket contents, stash, equipment, supplies/staging, and item summaries/dialogs. Hover text names the rarity; equipment badges also show its name. Augmented is a reserved display tier, not newly implemented loot. Missing/unsupported rarity uses a dashed neutral bar and an unavailable tooltip; catalog loading failures show a retryable warning. Pocket protection remains a separate shield/tag, not a rarity.
 
 ## Run locally
 
@@ -54,16 +56,17 @@ Development identities, enrollment, raid creation, and the in-memory raid servic
 
 ## G6: autonomous risk, residence and shared conditions (2026-10-14)
 
-Current rules version: **`desperanza-g6-v1`**. Mechanics run on the server without inference or Handler input.
+Current rules version: **`desperanza-g6-v2`**. Core mechanics and return settlement run on the server without inference or mandatory Handler input.
 
 - One world-scoped zone/condition/danger profile: Light Fog (Low), Apology Weather (Medium), or Overtime Red (High). Greed carried by eligible Raiders affects the next world's condition pool, not individual weather copies. Forecasts precede environmental impacts by 10 seconds; only actual living, nontraveling occupants at impact time are affected.
 - Greed grows while staying and searching; mood changes with damage/healing/support. Positive mood trims up to 5 raw damage before shields. Calm lowers greed by 12 and raises mood by 3; Pressure raises greed by 10 and lowers mood by 2. These change extraction willingness, valuable-item appetite and resilience, not just dialogue.
-- Natural extraction rolls every 30 seconds, ordinarily after 900/960/1020 seconds on Low/Medium/High. Distress and deadline urgency can bypass the ordinary guard. Raiders can still ignore urgency and fail. The world closes at 1320 seconds; admission stops after 300 seconds. CallExtract interrupts unfinished activities/search without inventing rewards, follows connected paths and finishes existing travel before rerouting.
+- Natural extraction rolls every 30 seconds, ordinarily after 900/960/1020 seconds on Low/Medium/High. Distress and deadline urgency can bypass the ordinary guard. Raiders can still ignore urgency and fail. The world closes at 1320 seconds; admission stops after 300 seconds. CallExtract interrupts unfinished activities/search without inventing rewards, follows connected paths and finishes existing travel before rerouting. At the extraction platform, calling a train or service elevator takes 60 seconds; its doors open on all four sides. A Handler can confirm departure once it arrives, or the Raider leaves autonomously after a 30-second boarding window. The vehicle sequence therefore takes 60-90 seconds and never waits for a connected Handler.
+- **Hub travel and vehicle timing are experimental:** only the initial pod ride to the surface takes 60 seconds; in-zone route legs retain their existing seeded timings. The extraction-platform route is separate from the 60-90-second vehicle sequence.
 - **Long stays are retained:** three 60-65-second nonreward activities at each arrival, including Market revisits, with diary beats every 20 seconds. At the exit, an unready Raider stays and writes diary entries rather than magically finding more loot. Actual co-present Raiders may be mentioned; fictional visitors are not generated. Movement still follows the connected seeded itinerary; random wandering/revisits are explicitly deferred, not forgotten.
 - Elapsed world exposure and danger increase both environmental risk and the weighted chance of valuable items from still-finite shared opportunities. Catalog prices and item counts do not inflate. Robots vary by danger but remain one shared state per world. Early extraction or knockout can be much shorter than the experimental 15-20-minute ordinary target.
 - Authored medical, robot, condition and ambient pools rotate without replacement; per-Handler voice continuity survives returns. Shared asides are identical for actual recipients. Phi now uses compact object cues and an `I consider` prefill to reduce fragment/opening rejections, without weakening factual guards.
 
-**Verification:** 157 server tests, 5 frontend journal/lifecycle tests and production TypeScript/Vite build passed. Frozen seed/policy audits and full accounting are in the [G6 ledger](docs/IMPLEMENTATION_PROGRESS.md#g6-autonomous-riskreward-conditions-and-broader-parody-content). Low starter unattended extracted 100%; Medium improved from 88.33% to 97.08% with the fixed attended policy. **High remains severe experimental tuning:** starter unattended extracted only 1.67%, attended 53.33%; staged High unattended mean net was -13.49. Sparse ordinary High successes do not establish robust pacing. Passing the frozen slice thresholds is not general balance approval.
+**Historical G6 verification:** 157 server tests, 5 frontend journal/lifecycle tests and production TypeScript/Vite build passed. Frozen seed/policy audits and full accounting are in the [G6 ledger](docs/IMPLEMENTATION_PROGRESS.md#g6-autonomous-riskreward-conditions-and-broader-parody-content). Low starter unattended extracted 100%; Medium improved from 88.33% to 97.08% with the fixed attended policy. **High remains severe experimental tuning:** starter unattended extracted only 1.67%, attended 53.33%; staged High unattended mean net was -13.49. Sparse ordinary High successes do not establish robust pacing. Passing the frozen slice thresholds is not general balance approval. The [C5 ledger](docs/IMPLEMENTATION_PROGRESS.md#c5---bounded-reviewed-legacy-loot-intake-2026-10-14) records the current expanded-catalog rerun: all 290 server tests passed, but staged High mean net remains negative (-16.06 unattended).
 
 The final six-output native Phi smoke accepted six distinct sentences in 12.60-23.48 seconds after 32.58 seconds initialization; earlier candidates accepted 0/6 and 1/6. This is a small local sample, not a promised acceptance rate, latency or comedy quality. Authored fallback remains essential. **The human comedy/pacing playtest gate is still open.**
 
@@ -85,7 +88,7 @@ $env:AFK_AI_MODEL_PATH = 'C:\Users\DanJ2\Models\Phi-3.5-mini-onnx'
 dotnet run --project server\AFKRaiders.Server
 ```
 
-Reload and re-enroll after startup; check for `desperanza-g6-v1`. Restart clears in-memory duty, inventory and results. Model initialization may take a minute; authored gameplay/narration does not wait on inference.
+Reload and re-enroll after startup; check for `desperanza-g6-v2`. Restart clears in-memory duty, inventory and results. Model initialization may take a minute; authored gameplay/narration does not wait on inference.
 
 ### Historical pre-G6 Comms and area residence (2026-10-13)
 
@@ -183,22 +186,33 @@ C3 imports no additional item definitions or flavor. The existing `scrap_metal_t
 
 C4 relocates existing online authored text without importing new lines. Its source correspondence review used the same original revision above and these clean paths: `src/content/downed_events.json`, `src/content/knocked_out_events.json`, `src/content/raiding-events/robot_encounter_activities.json`, `src/content/raiding-events/ambient_events.json`, `src/content/raiding-events/search_activities.json`, and `src/content/flavor.json`. This records the review revision, not proof that every earlier online adaptation was copied verbatim from that revision. The legacy robot-progress pool is preserved but remains unused by authoritative robot resolution; moving it to JSON does not invent combat events or drops.
 
+C5 adds eight ordinary sellable items from the same original revision `f62d088a41da951a1fbe9ed7215d2957a933ce50`, rechecked on 2026-10-14 with no working-tree differences under `src/content/loot-tables/`:
+
+| Source path under `src/content/loot-tables/` | Imported IDs | Online eligibility |
+|---|---|---|
+| `personal_junk.json` | `lost_diary_page`, `crumpled_memo` | Residential |
+| `apparel_accessories.json` | `left_boot`, `fingerless_gloves` | Residential |
+| `valuables.json` | `rusted_spork`, `vintage_comic_book` | Residential |
+| `arc_tech.json` | `energy_core_spent`, `prototype_chip_faulty` | Robot, Technology |
+
+Selected names, flavor, values (10-20), rarity (1-2) and weights are retained from those specialized documents; legacy `weight` becomes shared-pool `dropWeight`. Overlapping `loot.json` definitions are not imported (in particular, memo/boot weights come from their specialized files). `stackSize` is intentionally omitted: each draw is a unique item instance. Apparel remains sellable loot, not equipment; cores/chips add no charge, healing, crafting or other effects. No legendary, cursed or new usable-supply definitions are enabled. Source weights are experimental online tuning, not inherited balance approval.
+
 ### Editing bundled catalogs
 
-- [Loot and opportunities](server/AFKRaiders.Server/Content/loot-catalog.json) use schema version 3 and content version `desperanza-shared-loot-v3`. The catalog retains the ordered S5 fixed fixture; weighted generation uses one shared catalog-level `pool`, not duplicated per-opportunity item lists.
+- [Loot and opportunities](server/AFKRaiders.Server/Content/loot-catalog.json) use schema version 3 and content version `desperanza-shared-loot-v4` (C5 content expansion; schema unchanged). The catalog has 19 items/shared entries and retains the ordered S5 fixed fixture; weighted generation uses one shared catalog-level `pool`, not duplicated per-opportunity item lists.
 - [Weapons and supplies](server/AFKRaiders.Server/Content/shop-catalog.json) contain the existing ordered Outfitter definitions. The zero-price `tea_kettle` remains standard issue; staging limits and all resolution rules remain C#.
 - The loot file's `eligibilityCategories` vocabulary is `Residential`, `Salvage`, `Robot`, and `Technology`. Each opportunity declares `eligibleCategories` and a finite `drawCount`. The shared pool defines each candidate's `catalogId` and `dropWeight` once; both generators filter it by category intersection, retaining shared-pool order. Eligibility, drop weight, item rarity, and value are distinct fields. Supply behavior still uses the separate `Medical` and `ShieldRecharger` categories.
 - Experimental category mappings retained from C2: Market (`market-locker`) allows Residential/Salvage; Humming Crate (`humming-crate`) allows Salvage/Technology; the already-existing robot-gated Service Depot locker (`depot-locker`) allows Robot/Technology. Location is placement only, never a loot-selection conditional. The same opportunity configuration can describe a locker, crate or activity without its own item list. An item matching multiple allowed categories remains a single candidate. Robot defeat only makes the existing locker accessible; it does not grant an additional robot drop.
-- To add reviewed loot, add its catalog definition with eligibility categories and one shared pool entry. It is then eligible in every matching opportunity without editing those opportunities. C3 deliberately broadens Market/Crate pools to all matching shared entries, including twisted scrap; the depot retains its seven eligible items, though seeded outputs can change with shared ordering. Do not treat the new distributions as balance approval.
+- To add reviewed loot, add its catalog definition with eligibility categories and one shared pool entry. It is then eligible in every matching opportunity without editing those opportunities. C5 appends entries without changing prior definitions, weights or order: Market/Crate/Depot now have 16/12/9 eligible candidates, still two finite draws each. Relative probabilities and value-sensitive autonomous decisions can change even with unchanged old weights; no location conditionals or additional robot reward grant are introduced. Do not treat the new distributions as balance approval.
 - Catalog fields are case-sensitive camelCase and required. Schema 1/2 and per-opportunity `pool` fields are rejected rather than migrated silently. Unknown/duplicate properties or categories, duplicate IDs/shared-pool entries, missing references, empty category-filtered pools, invalid draw counts, and non-positive/overflowing drop weights fail startup with catalog context. Invalid tables do not fall back to fixed loot.
 - All catalog files are embedded into the server assembly at build time. Edit source JSON, validate, then rebuild and redeploy. There is no file watching, hot reload, client-supplied content or community-package loader. Published execution does not depend on the working directory or loose JSON files.
-- Array order is significant for deterministic loot selection and presentation; do not sort during loading. The C1 pre-expansion fingerprint `52392C0BB009F79A680F03AAC5C9C46BF2387CB4AD98B7F7D9A39EDD3A4540C0` remains recorded as a legacy baseline, not a target for C2/C3's intentionally changed content and outcomes. The exact fixed S5 compatibility fixture remains unchanged.
+- Array order is significant for deterministic loot selection and presentation; do not sort during loading. The C1 pre-expansion fingerprint `52392C0BB009F79A680F03AAC5C9C46BF2387CB4AD98B7F7D9A39EDD3A4540C0` remains recorded as a legacy baseline, not a target for later intentionally changed content and outcomes. The exact fixed S5 compatibility fixture remains unchanged.
 - C1 itself introduced no additional legacy content. C2's three selected item definitions and their source paths are recorded above; the sibling revision and C2-relevant worktree state are explicit. Older weapon/supply definition comments still do not establish an exact source revision for those imports.
 
 Focused validation from the workspace root:
 
 ```powershell
-dotnet test tests\AFKRaiders.Server.Tests\AFKRaiders.Server.Tests.csproj --filter "FullyQualifiedName~CatalogContentTests|FullyQualifiedName~CatalogCompatibilityTests|FullyQualifiedName~LootCatalogTests|FullyQualifiedName~EquipmentAndShopTests"
+dotnet test tests\AFKRaiders.Server.Tests\AFKRaiders.Server.Tests.csproj --filter "FullyQualifiedName~ReviewedLootIntakeTests|FullyQualifiedName~CatalogContentTests|FullyQualifiedName~CatalogCompatibilityTests|FullyQualifiedName~LootCatalogTests|FullyQualifiedName~EquipmentAndShopTests"
 ```
 
 ### Editing authored narration and AI cues
@@ -220,8 +234,8 @@ Focused narration validation:
 dotnet test tests\AFKRaiders.Server.Tests\AFKRaiders.Server.Tests.csproj --filter "FullyQualifiedName~NarrationContentTests|FullyQualifiedName~NarrationCompatibilityTests|FullyQualifiedName~NarrativeEnrichmentTests|FullyQualifiedName~CommsAndPacingTests"
 ```
 
-The pre-migration text/simulation fingerprint `20E1569D4BB57C2A4038EC9C38B47074921DA48677763CE5127ED9CDECC5CC69` remains frozen in [NarrationCompatibilityTests.cs](tests/AFKRaiders.Server.Tests/NarrationCompatibilityTests.cs). Future intentional wording changes require an explicitly reviewed compatibility update, not blindly replacing the hash.
+The pre-migration text/simulation fingerprint `20E1569D4BB57C2A4038EC9C38B47074921DA48677763CE5127ED9CDECC5CC69` remains frozen in [NarrationCompatibilityTests.cs](tests/AFKRaiders.Server.Tests/NarrationCompatibilityTests.cs). Its simulations use the explicit original 11-item C3 inputs in [CatalogCompatibilityTests.cs](tests/AFKRaiders.Server.Tests/CatalogCompatibilityTests.cs), so C5's deliberate loot expansion does not redefine the narration baseline. Current expanded-catalog behavior is covered separately by [ReviewedLootIntakeTests.cs](tests/AFKRaiders.Server.Tests/ReviewedLootIntakeTests.cs). Future intentional wording changes require an explicitly reviewed compatibility update, not blindly replacing the hash.
 
-See the [implementation progress ledger](docs/IMPLEMENTATION_PROGRESS.md) for C2-C4 status, verification evidence, and limitations. Weights and category mappings are experimental; automated coverage is not human comedy or balance approval.
+See the [implementation progress ledger](docs/IMPLEMENTATION_PROGRESS.md) for C2-C5 status, verification evidence, and limitations. Weights and category mappings are experimental; automated coverage is not human comedy or balance approval.
 
 Run the server tests with `dotnet test AFKRaidersOnline.slnx`.

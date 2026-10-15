@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { enrichmentExplanation, mergeJournal, narrationLabel } from './journal'
 import { clearLiveWarning, liveClosedMessage, stopOwnedConnection } from './liveConnection'
+import { rarityAttributes, rarityName } from './rarity'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { HubConnectionBuilder, type HubConnection } from '@microsoft/signalr'
 
@@ -57,6 +58,7 @@ type StagedSupplyItem = {
 type ShopCatalogView = {
   weapons: WeaponDefinition[]; supplies: SupplyDefinition[]
 }
+type LootCatalogView = { items: { id: string; rarity: number }[] }
 type ItemAppraisalView = {
   catalogId: string; itemName: string; appraisal: string
   strategicClassification: string; source: string; generatedAt: string
@@ -136,6 +138,7 @@ type HandlerProjection = {
   ownedWeapons?: OwnedWeapon[] | null
   ownedSupplies?: OwnedSupplyStack[] | null
   stagedSupplies?: StagedSupplyItem[] | null
+  shopCatalog?: ShopCatalogView | null
   lastTopItemAppraisal?: ItemAppraisalView | null
   signalCurrent?: number
   signalMax?: number
@@ -161,7 +164,7 @@ type SellStashResponse = {
 }
 type EnrollResponse = { accessToken: string; projection: HandlerProjection }
 
-const expectedRulesVersion = 'desperanza-g6-v1'
+const expectedRulesVersion = 'desperanza-g6-v2'
 const requestedIdentity = new URLSearchParams(window.location.search).get('handler')
 const slot = ref<'raider-one' | 'raider-two'>(requestedIdentity === 'two' ? 'raider-two' : 'raider-one')
 const session = shallowRef<HandlerAccess | null>(null)
@@ -226,7 +229,7 @@ const myHiddenPocketInstanceId = computed(() => projection.value?.myHiddenPocket
 const pocketedItem = computed(() => loot.value.find(item => item.instanceId === myHiddenPocketInstanceId.value) ?? null)
 const activeFieldSupplies = computed(() => projection.value?.myFieldSupplies ?? [])
 
-async function triggerSupportAction(actionType: 'CallExtract' | 'Calm' | 'Pressure') {
+async function triggerSupportAction(actionType: 'CallExtract' | 'DepartExtraction' | 'Calm' | 'Pressure') {
   const access = session.value
   if (!access || supportActionPending.value) return
   supportActionPending.value = true
@@ -338,7 +341,19 @@ async function executeSell(group: StashGroupView, qty: number) {
 }
 
 // OUTFITTER, ARMORY & APPRAISAL STATE (G4 & AI-3)
-const shopCatalog = ref<ShopCatalogView | null>(null)
+const shopCatalog = computed(() => handlerProjection.value?.shopCatalog ?? null)
+const lootCatalog = ref<LootCatalogView | null>(null)
+const catalogError = ref('')
+const catalogLoading = ref(false)
+const catalogRarities = computed(() => new Map([
+  ...(lootCatalog.value?.items ?? []),
+  ...(shopCatalog.value?.weapons ?? []),
+  ...(shopCatalog.value?.supplies ?? []),
+].map(item => [item.id, item.rarity])))
+
+function itemRarity(catalogId: string) {
+  return rarityAttributes(catalogRarities.value.get(catalogId))
+}
 const outfitterTab = ref<'armory' | 'supplies' | 'staging'>('armory')
 const outfitterMessage = ref('')
 const outfitterActionPending = ref(false)
@@ -387,14 +402,20 @@ function getOwnedSupplyQuantity(catalogId: string): number {
   return ownedSupplies.value.find(s => s.catalogId === catalogId)?.quantity ?? 0
 }
 
-async function fetchShopCatalog() {
+async function fetchItemCatalogs() {
+  if (catalogLoading.value) return
+  catalogLoading.value = true
+  catalogError.value = ''
   try {
-    const res = await fetch('/api/dev/shop/catalog')
-    if (res.ok) {
-      shopCatalog.value = await res.json() as ShopCatalogView
+    const lootResponse = await fetch('/api/dev/catalog')
+    if (!lootResponse.ok) {
+      throw new Error(`Loot catalog HTTP ${lootResponse.status}`)
     }
-  } catch {
-    // optional catalog fetch
+    lootCatalog.value = await lootResponse.json() as LootCatalogView
+  } catch (cause) {
+    catalogError.value = `Loot catalog could not be loaded. Loot rarity may be unavailable. ${cause instanceof Error ? cause.message : 'Unable to contact the local server'}`
+  } finally {
+    catalogLoading.value = false
   }
 }
 
@@ -798,7 +819,7 @@ async function startDuty() {
     acceptProjection(result.projection, access)
     localStorage.setItem(accessStorageKey(access.slot), JSON.stringify(access))
     sessionStorage.removeItem(enrollmentRequestKey(access.slot))
-    void fetchShopCatalog()
+    void fetchItemCatalogs()
     if (result.projection.raid) await connectLive()
   } catch (cause) {
     const reason = cause instanceof Error ? cause.message : 'Unable to enter raid'
@@ -890,7 +911,7 @@ onMounted(async () => {
   }
   serverReady.value = true
   serverStatus.value = `SERVER READY / ${expectedRulesVersion}`
-  void fetchShopCatalog()
+  void fetchItemCatalogs()
   await restoreHandler(slot.value)
 })
 
@@ -924,7 +945,7 @@ onBeforeUnmount(() => {
         <div>
           <p class="eyebrow">HANDLER CONSOLE / DESPERANZA</p>
           <h1>Home is a stop,<br /><span>not the end.</span></h1>
-          <p class="intro">Enroll your Raider in autonomous duty once. They join ongoing raids, return to Desperanza, and repeat without per-raid deployment or an invite.</p>
+          <p class="intro">Desperanza is home between raids. Enroll once for autonomous duty: a single-person pod carries each Raider through the tunnel to the surface in 60 seconds, then they return by train or service elevator.</p>
         </div>
         <div class="server-status" :class="{ ready: serverReady }" role="status">
           <span class="status-dot"></span>
@@ -996,7 +1017,7 @@ onBeforeUnmount(() => {
         <section class="panel">
           <p class="eyebrow">DESPERANZA / DUTY BOARD</p>
           <h2>{{ handlerProjection?.status }}</h2>
-          <p class="panel-note">The Raider is home. When duty is enabled, the server admits them to an eligible ongoing raid without an invite or per-raid deployment.</p>
+          <p class="panel-note">The Raider is home in Desperanza. When duty is enabled, the server admits them to an eligible raid and launches a single-person surface pod; travel takes 60 seconds.</p>
           <p v-if="handlerProjection?.homeAvailableAt" class="privacy-note">Next re-entry eligibility: {{ new Date(handlerProjection.homeAvailableAt).toLocaleTimeString() }} server time.</p>
           <p class="privacy-note">A world stays open while any admitted Raider is active, then closes when the last returns.</p>
         </section>
@@ -1032,12 +1053,12 @@ onBeforeUnmount(() => {
             <div class="outfitter-subheading">
               <p class="eyebrow">ACTIVE ARMAMENT</p>
             </div>
-            <div v-if="equippedWeapon" class="weapon-card equipped-weapon-card">
+            <div v-if="equippedWeapon" class="weapon-card equipped-weapon-card" v-bind="rarityAttributes(equippedWeapon.rarity)">
               <div class="weapon-main-info">
                 <div class="weapon-title-row">
                   <span class="equipped-tag">EQUIPPED</span>
                   <strong>{{ equippedWeapon.name }}</strong>
-                  <span class="rarity-badge" :class="`rarity-${equippedWeapon.rarity}`">Tier {{ equippedWeapon.rarity }}</span>
+                  <span class="rarity-badge">{{ rarityName(equippedWeapon.rarity) }}</span>
                 </div>
                 <small class="weapon-flavor">{{ equippedWeapon.flavor }}</small>
                 <div class="weapon-stats-row">
@@ -1079,12 +1100,12 @@ onBeforeUnmount(() => {
               <p class="eyebrow">OWNED ARSENAL ({{ ownedWeapons.length }} weapons)</p>
             </div>
             <div v-if="ownedWeapons.length" class="weapons-grid">
-              <div v-for="wpn in ownedWeapons" :key="wpn.instanceId" class="weapon-card" :class="{ 'is-equipped': equippedWeapon?.instanceId === wpn.instanceId }">
+              <div v-for="wpn in ownedWeapons" :key="wpn.instanceId" class="weapon-card" :class="{ 'is-equipped': equippedWeapon?.instanceId === wpn.instanceId }" v-bind="rarityAttributes(wpn.rarity)">
                 <div class="weapon-main-info">
                   <div class="weapon-title-row">
                     <span v-if="equippedWeapon?.instanceId === wpn.instanceId" class="equipped-tag">ACTIVE</span>
                     <strong>{{ wpn.name }}</strong>
-                    <span class="rarity-badge" :class="`rarity-${wpn.rarity}`">T{{ wpn.rarity }}</span>
+                    <span class="rarity-badge">{{ rarityName(wpn.rarity) }}</span>
                   </div>
                   <div class="weapon-stats-row">
                     <span>Dmg: {{ wpn.damageMin }}–{{ wpn.damageMax }}</span>
@@ -1130,11 +1151,11 @@ onBeforeUnmount(() => {
               <p class="eyebrow">DESPERANZA QUARTERMASTER / WEAPON REQUISITIONS</p>
             </div>
             <div v-if="shopCatalog?.weapons.length" class="weapons-grid">
-              <div v-for="shopWpn in shopCatalog.weapons" :key="shopWpn.id" class="weapon-card shop-weapon-card">
+              <div v-for="shopWpn in shopCatalog.weapons" :key="shopWpn.id" class="weapon-card shop-weapon-card" v-bind="rarityAttributes(shopWpn.rarity)">
                 <div class="weapon-main-info">
                   <div class="weapon-title-row">
                     <strong>{{ shopWpn.name }}</strong>
-                    <span class="rarity-badge" :class="`rarity-${shopWpn.rarity}`">T{{ shopWpn.rarity }}</span>
+                    <span class="rarity-badge">{{ rarityName(shopWpn.rarity) }}</span>
                     <strong class="shop-price">{{ shopWpn.value === 0 ? 'FREE' : `${shopWpn.value} ¢` }}</strong>
                   </div>
                   <small class="weapon-flavor">{{ shopWpn.flavor }}</small>
@@ -1170,7 +1191,7 @@ onBeforeUnmount(() => {
               <p class="eyebrow">FIELD CONSUMABLES CATALOG (STORED IN HOME PREP)</p>
             </div>
             <div v-if="shopCatalog?.supplies.length" class="supplies-grid">
-              <div v-for="item in shopCatalog.supplies" :key="item.id" class="supply-card">
+              <div v-for="item in shopCatalog.supplies" :key="item.id" class="supply-card" v-bind="rarityAttributes(item.rarity)">
                 <div class="supply-card-header">
                   <div>
                     <strong>{{ item.name }}</strong>
@@ -1238,7 +1259,7 @@ onBeforeUnmount(() => {
             <p class="panel-note">Consumables staged here are packed into the Raider's loadout for field encounters. Unused supplies remain safe in inventory across returns.</p>
 
             <div v-if="shopCatalog?.supplies.length" class="staging-items-list">
-              <div v-for="supply in shopCatalog.supplies" :key="supply.id" class="staging-row">
+              <div v-for="supply in shopCatalog.supplies" :key="supply.id" class="staging-row" v-bind="rarityAttributes(supply.rarity)">
                 <div class="staging-row-info">
                   <strong>{{ supply.name }}</strong>
                   <span class="supply-cat-tag" :class="supply.category.toLowerCase()">{{ supply.category === 'Medical' ? 'MED' : 'SHIELD' }}</span>
@@ -1300,7 +1321,7 @@ onBeforeUnmount(() => {
           <p v-if="sellSuccessMessage" class="success-notice">{{ sellSuccessMessage }}</p>
 
           <div v-if="stashGroups.length" class="stash-groups-list">
-            <div v-for="group in stashGroups" :key="group.catalogId" class="stash-group-row">
+            <div v-for="group in stashGroups" :key="group.catalogId" class="stash-group-row" v-bind="itemRarity(group.catalogId)">
               <div class="group-info">
                 <strong>{{ group.name }}</strong>
                 <span class="group-qty-badge">x{{ group.quantity }}</span>
@@ -1347,7 +1368,7 @@ onBeforeUnmount(() => {
                 <strong class="highlight-loss">-{{ handlerProjection.lastReturnSummary.lostHaulValue }} scrap</strong>
                 <small>Unshielded backpack items destroyed/scavenged</small>
               </div>
-              <div class="ko-stat-card preserved">
+              <div class="ko-stat-card preserved" v-bind="handlerProjection.lastReturnSummary.pocketSalvagedItem ? itemRarity(handlerProjection.lastReturnSummary.pocketSalvagedItem.catalogId) : {}">
                 <span class="label">SECRET HIDDEN POCKET SALVAGE</span>
                 <template v-if="handlerProjection.lastReturnSummary.pocketSalvagedItem">
                   <strong class="highlight-salvage">+{{ handlerProjection.lastReturnSummary.pocketSalvagedItem.value }} scrap</strong>
@@ -1393,7 +1414,7 @@ onBeforeUnmount(() => {
           </div>
 
           <!-- TOP ITEM APPRAISAL (AI SYSTEMS DESIGN STEP 3) -->
-          <div v-if="handlerProjection.lastReturnSummary.topItemAppraisal" class="appraisal-card-highlight">
+          <div v-if="handlerProjection.lastReturnSummary.topItemAppraisal" class="appraisal-card-highlight" v-bind="itemRarity(handlerProjection.lastReturnSummary.topItemAppraisal.catalogId)">
             <div class="appraisal-card-header">
               <p class="eyebrow">OBJECT OVERVALUATION // AI STRATEGIC APPRAISAL</p>
               <span class="aar-source-badge" :class="handlerProjection.lastReturnSummary.topItemAppraisal.source.toLowerCase()">
@@ -1439,7 +1460,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="debrief-items">
             <p class="eyebrow">SECURED MANIFEST</p>
-            <div v-for="item in handlerProjection.lastReturnSummary.items" :key="item.instanceId" class="item-row">
+            <div v-for="item in handlerProjection.lastReturnSummary.items" :key="item.instanceId" class="item-row" v-bind="itemRarity(item.catalogId)">
               <span><strong>{{ item.name }} / {{ item.value }}</strong><small>{{ item.flavor }}</small></span>
               <button class="secondary mini-btn appraise-btn" :disabled="appraising" @click="requestAppraisal(item.catalogId, item.name, item.value)">Appraise</button>
             </div>
@@ -1448,7 +1469,7 @@ onBeforeUnmount(() => {
         <section v-else class="panel">
           <p class="eyebrow">LAST SECURED RESULT / PRIVATE</p>
           <h2>{{ handlerProjection?.myLastExtractedLoot.length ?? 0 }} items / {{ handlerProjection?.myLastExtractedLoot.reduce((sum, item) => sum + item.value, 0) ?? 0 }} value</h2>
-          <div v-for="item in handlerProjection?.myLastExtractedLoot ?? []" :key="item.instanceId" class="item-row">
+          <div v-for="item in handlerProjection?.myLastExtractedLoot ?? []" :key="item.instanceId" class="item-row" v-bind="itemRarity(item.catalogId)">
             <span><strong>{{ item.name }} / {{ item.value }}</strong><small>{{ item.flavor }}</small></span>
           </div>
           <p v-if="!handlerProjection?.myLastExtractedLoot.length" class="empty">No secured raid result yet.</p>
@@ -1521,7 +1542,7 @@ onBeforeUnmount(() => {
           <div v-if="activeFieldSupplies.length" class="field-supplies-banner">
             <span class="label">DEPLOYED FIELD SUPPLIES:</span>
             <div class="supply-chips-list">
-              <span v-for="s in activeFieldSupplies" :key="s.catalogId" class="supply-chip" :class="s.category.toLowerCase()">
+              <span v-for="s in activeFieldSupplies" :key="s.catalogId" class="supply-chip" :class="s.category.toLowerCase()" v-bind="itemRarity(s.catalogId)">
                 {{ s.name }} (x{{ s.quantity }})
               </span>
             </div>
@@ -1551,14 +1572,28 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="support-btn extract-btn"
-              :disabled="supportActionPending || signalCurrent < 3 || me?.activity === 'Extracted' || me?.activity === 'KnockedOut'"
+              :disabled="supportActionPending || signalCurrent < 3 || me?.activity === 'Extracted' || me?.activity === 'KnockedOut' || me?.activity === 'CallingExtraction' || me?.activity === 'WaitingToDepart' || me?.activity === 'Extracting'"
               @click="triggerSupportAction('CallExtract')"
             >
               <div class="btn-top">
                 <strong>CALL EXTRACT</strong>
                 <span class="cost-tag">3 ⚡</span>
               </div>
-              <p>Override greed checks &amp; immediately route Raider toward Extraction Platform.</p>
+              <p>Call a train or service elevator. It arrives after 60 seconds; if you do not confirm departure, your Raider leaves after a 30-second boarding window.</p>
+            </button>
+
+            <button
+              v-if="me?.activity === 'WaitingToDepart'"
+              type="button"
+              class="support-btn extract-btn"
+              :disabled="supportActionPending"
+              @click="triggerSupportAction('DepartExtraction')"
+            >
+              <div class="btn-top">
+                <strong>BOARD &amp; LEAVE NOW</strong>
+                <span class="cost-tag">0 ⚡</span>
+              </div>
+              <p>The vehicle is here. Board and return to Desperanza now, or let your Raider leave automatically when the 30-second window ends.</p>
             </button>
 
             <button
@@ -1665,7 +1700,7 @@ onBeforeUnmount(() => {
           <h2>{{ loot.length }} items / {{ lootValue }} value</h2>
 
           <!-- G5 SECRET HIDDEN POCKET -->
-          <div class="hidden-pocket-box">
+          <div class="hidden-pocket-box" v-bind="pocketedItem ? itemRarity(pocketedItem.catalogId) : {}">
             <div class="pocket-top">
               <div>
                 <span class="pocket-badge">SECRET HIDDEN POCKET</span>
@@ -1682,7 +1717,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <p class="pocket-desc">Exactly one designated item safely extracts to Home Stash even if your Raider is <strong>KNOCKED OUT</strong>.</p>
-            <div v-if="pocketedItem" class="pocket-protected-item">
+            <div v-if="pocketedItem" class="pocket-protected-item" v-bind="itemRarity(pocketedItem.catalogId)">
               <span class="pocket-icon">🛡️</span>
               <div class="pocket-item-details">
                 <strong>{{ pocketedItem.name }} ({{ pocketedItem.value }} scrap)</strong>
@@ -1695,7 +1730,7 @@ onBeforeUnmount(() => {
             <p v-if="pocketFeedback" class="pocket-feedback-note">{{ pocketFeedback }}</p>
           </div>
 
-          <div v-for="item in loot" :key="item.instanceId" class="item-row" :class="{ 'pocket-selected-row': item.instanceId === myHiddenPocketInstanceId }">
+          <div v-for="item in loot" :key="item.instanceId" class="item-row" :class="{ 'pocket-selected-row': item.instanceId === myHiddenPocketInstanceId }" v-bind="itemRarity(item.catalogId)">
             <span>
               <strong>{{ item.name }} / {{ item.value }}</strong>
               <span v-if="item.instanceId === myHiddenPocketInstanceId" class="pocket-item-tag">🛡️ IN SAFE POCKET</span>
@@ -1802,7 +1837,7 @@ onBeforeUnmount(() => {
 
       <!-- SELL STASH MODAL DIALOG -->
       <div v-if="sellingGroup" class="modal-backdrop" @click.self="closeSellModal">
-        <div class="modal-card">
+        <div class="modal-card" v-bind="itemRarity(sellingGroup.catalogId)">
           <p class="eyebrow">DESPERANZA SCRAP EXCHANGE / LIQUIDATION</p>
           <h3>Sell {{ sellingGroup.name }}</h3>
           <p class="panel-note">Unit price: <strong>{{ sellingGroup.unitValue }} ¢</strong> | Stored: <strong>{{ sellingGroup.quantity }} units</strong></p>
@@ -1846,7 +1881,7 @@ onBeforeUnmount(() => {
 
       <!-- ITEM APPRAISAL MODAL DIALOG (AI SYSTEMS DESIGN STEP 3) -->
       <div v-if="appraisalModal" class="modal-backdrop" @click.self="closeAppraisalModal">
-        <div class="modal-card appraisal-modal-card">
+        <div class="modal-card appraisal-modal-card" v-bind="itemRarity(appraisalModal.catalogId)">
           <div class="appraisal-modal-header">
             <p class="eyebrow">DESPERANZA APPRAISAL DESK // OVERVALUATION AUDIT</p>
             <span class="aar-source-badge" :class="appraisalModal.source.toLowerCase()">
@@ -1873,6 +1908,10 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </section>
+    <div v-if="catalogError" class="error" role="alert">
+      {{ catalogError }}
+      <button class="secondary mini-btn" :disabled="catalogLoading" @click="fetchItemCatalogs">Retry item catalogs</button>
+    </div>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
   </main>
 </template>

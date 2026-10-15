@@ -115,7 +115,9 @@
         "I consider nostalgia a poorly labeled aisle.",
         "My ambition exceeds the shelving specification.",
         "I prefer directions without a subscription.",
-        "My patience qualifies as antique stock."
+        "My patience qualifies as antique stock.",
+        "The Before-ish survives best on labels. The labels have very optimistic historians.",
+        "Hydroponic Arguments reached a lettuce agreement. The minutes remain leafy."
       ]
     },
     {
@@ -206,7 +208,8 @@
         "I consider walking away a premium survival feature.",
         "I'm budgeting my optimism for the return journey.",
         "I'm traveling light, if emotional baggage doesn't count.",
-        "I'm treating every step as a small investment in dry socks."
+        "I'm treating every step as a small investment in dry socks.",
+        "Tube Routes taught me that direct is an aspiration, not a measurement."
       ]
     },
     {
@@ -217,7 +220,8 @@
         "I'm listening for the hum. I prefer my bad decisions with a soundtrack.",
         "I'm offering the zipper a brief prayer and no bargaining rights.",
         "I consider this locker a patience seminar with hinges.",
-        "I'm conducting research. The clipboard would only introduce bias."
+        "I'm conducting research. The clipboard would only introduce bias.",
+        "OopsAll Logistics defines delivered as the point at which nobody can find the package."
       ]
     },
     {
@@ -228,7 +232,8 @@
         "I consider sentimental value a perfectly legitimate accounting category.",
         "I'm keeping my justification brief: could be useful.",
         "I can defend this decision in writing. Please don't request the writing.",
-        "I'm treating this as the foundation of a very specific future strategy."
+        "I'm treating this as the foundation of a very specific future strategy.",
+        "The Pawn Desk says every object has a future. Mine appears to involve paperwork."
       ]
     },
     {
@@ -239,7 +244,8 @@
         "I'm entering strategic denial mode. It's a recognized posture.",
         "I consider confidence a defense strategy with disappointing peer review.",
         "I'm requesting that this be classified as a workplace disagreement.",
-        "I'm reserving my dignity for the performance review."
+        "I'm reserving my dignity for the performance review.",
+        "A.R.C. means Aggressively Roaming Chassis. I am hoping the aggression has office hours."
       ]
     },
     {
@@ -250,7 +256,8 @@
         "I'm making small talk with the timer. Strictly professional small talk.",
         "I consider boarding priority worth precisely none of my remaining dignity.",
         "I'm keeping my panic optional and my paperwork accessible.",
-        "I'm rating this exit strategy above the alternative."
+        "I'm rating this exit strategy above the alternative.",
+        "The Exit Strategy Booth uses nearby as a unit of distance."
       ]
     },
     {
@@ -261,7 +268,8 @@
         "I consider restraint an optional accessory.",
         "I'm emotionally invested in the phrase 'could be useful'.",
         "I prefer to call it inventory ambition.",
-        "I'm budgeting for regret. It's a renewable resource."
+        "I'm budgeting for regret. It's a renewable resource.",
+        "I consider hoarding a form of long-term strategic planning."
       ]
     },
     {
@@ -499,11 +507,27 @@
     },
     {
       "id": "simulation.departs-from-entry-tunnel-into",
-      "text": "{0} departs from Entry Tunnel into Scrapyard Sector 4."
+      "text": "{0} leaves Desperanza in a single-person pod bound for the surface."
     },
     {
       "id": "simulation.arrives-at",
       "text": "{0} arrives at {1}."
+    },
+    {
+      "id": "simulation.pod-launches-from-desperanza",
+      "text": "{0} launches alone in a Desperanza pod. The tunnel-to-surface trip takes {1}s."
+    },
+    {
+      "id": "simulation.calls-vehicle-with-four-sided-doors",
+      "text": "A {0} is called to the platform; the large doors open on all four sides when it arrives in {1}s."
+    },
+    {
+      "id": "simulation.extraction-vehicle-arrived",
+      "text": "{0}'s {1} arrives, opening its large doors on all four sides. Depart automatically in {2}s unless the Handler confirms leaving."
+    },
+    {
+      "id": "simulation.boards-vehicle-and-confirms-departure",
+      "text": "{0} boards the {1} and confirms departure for Desperanza."
     },
     {
       "id": "simulation.completed-at-no-loot-or",
@@ -708,6 +732,14 @@
     {
       "id": "simulation.extraction-shuttle-landing-in-s",
       "text": "Extraction shuttle landing in {0}s."
+    },
+    {
+      "id": "simulation.extraction-vehicle-landing-in-s",
+      "text": "Waiting for the {1}. Arrival in {0}s."
+    },
+    {
+      "id": "simulation.extraction-departure-window-s",
+      "text": "The {1} is at the platform. Confirm departure or the Raider leaves automatically in {0}s."
     },
     {
       "id": "simulation.vital-signs-failing-medbay-recovery",

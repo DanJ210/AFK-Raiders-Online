@@ -1063,7 +1063,7 @@ public sealed class RaidCoordinator
             throw new RaidCommandException("InvalidCommandId");
         }
 
-        if (request.ActionType is not ("CallExtract" or "Calm" or "Pressure"))
+        if (request.ActionType is not ("CallExtract" or "DepartExtraction" or "Calm" or "Pressure"))
         {
             throw new RaidCommandException("InvalidActionType");
         }
@@ -1084,9 +1084,23 @@ public sealed class RaidCoordinator
                 throw new RaidCommandException("RaiderNotInRaid");
             }
 
+            if (request.ActionType is "CallExtract" or "DepartExtraction")
+            {
+                world.Simulation.Advance(now);
+                if (request.ActionType == "CallExtract" && !world.Simulation.CanCallExtract(state.PlayerId))
+                {
+                    throw new RaidCommandException("ExtractionAlreadyInProgress");
+                }
+                if (request.ActionType == "DepartExtraction" && !world.Simulation.CanDepartExtraction(state.PlayerId))
+                {
+                    throw new RaidCommandException("ExtractionVehicleNotArrived");
+                }
+            }
+
             var cost = request.ActionType switch
             {
                 "CallExtract" => 3,
+                "DepartExtraction" => 0,
                 "Calm" => 1,
                 "Pressure" => 1,
                 _ => 1
@@ -1108,7 +1122,8 @@ public sealed class RaidCoordinator
 
             var msg = request.ActionType switch
             {
-                "CallExtract" => "Extraction order accepted (3 Signal spent). It bypasses natural checks when consumed; travel and extraction still take time.",
+                "CallExtract" => "Extraction vehicle called (3 Signal spent). It arrives after 60 seconds; your Raider departs automatically after a 30-second boarding window if you do not confirm.",
+                "DepartExtraction" => "Departure confirmed. Your Raider boards the arrived vehicle and returns to Desperanza.",
                 "Calm" => "Calm accepted (1 Signal spent). Greed -12, Mood +3: stronger exit willingness and positive-mood resilience.",
                 "Pressure" => "Pressure accepted (1 Signal spent). Greed +10, Mood -2: stronger valuable-item appetite, weaker exit willingness and resilience.",
                 _ => "Support action executed."

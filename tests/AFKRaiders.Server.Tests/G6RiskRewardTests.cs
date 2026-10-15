@@ -260,20 +260,65 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void CallExtractInterruptsResidenceButNeverTeleportsOrGrantsUnfinishedRewards()
+    public void PodDeploymentTakesSixtySecondsBeforeTheFirstSurfaceArrival()
+    {
+        var sim = new RaidSimulation("exit", Start, 1, danger: "Low");
+        sim.AddAutonomousRaider("one", "raider-one", Start);
+        sim.Advance(Start);
+        var departure = Assert.Single(sim.Project("one", Start).Events, e => e.Kind == "Travel");
+        Assert.Equal(60, departure.DurationSeconds);
+        Assert.Equal("Market", departure.Destination);
+        Assert.Equal("Traveling", sim.Project("one", Start.AddSeconds(59)).Players.Single().Activity);
+        sim.Advance(Start.AddSeconds(60));
+        Assert.Equal("Searching", sim.Project("one", Start.AddSeconds(60)).Players.Single().Activity);
+        Assert.Contains(sim.Project("one", Start).Events,
+            e => e.Kind == "Travel" && e.Text.Contains("Desperanza pod", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static (RaidSimulation Simulation, DateTimeOffset ExtractionStartedAt) BeginCalledExtraction()
     {
         var sim = new RaidSimulation("exit", Start, 1, danger: "Low");
         sim.AddAutonomousRaider("one", "raider-one", Start);
         sim.Advance(Start.AddSeconds(40));
         Assert.True(sim.QueueHandlerAction("extract", "CallExtract", "one", Start.AddSeconds(40)));
+        sim.Advance(Start.AddSeconds(40));
         sim.Advance(Start.AddSeconds(100));
-        var p = sim.Project("one", Start.AddSeconds(100));
-        Assert.Equal("Extracted", p.Players.Single().Activity);
-        Assert.Contains(p.Events, e => e.Kind == "ActivityInterrupted");
-        Assert.All(p.Events.Where(e => e.Kind == "Travel"),
-            e => Assert.Contains(e.Destination, p.Locations.Single(l => l.Name == e.Location).Neighbors));
-        Assert.Equal(2, p.MyExtractedLoot.Count);
-        Assert.DoesNotContain(p.Events, e => e.Kind == "AreaActivityCompleted");
+        var startedAt = Assert.Single(sim.Project("one", Start).Events, e => e.Kind == "ExtractionStarted").At;
+        return (sim, startedAt);
+    }
+
+    [Fact]
+    public void VehicleArrivalOffersAHandlerLeaveButtonAndDoesNotWaitForAHandler()
+    {
+        var (sim, startedAt) = BeginCalledExtraction();
+        Assert.Equal("CallingExtraction",
+            sim.Project("one", startedAt.AddSeconds(59)).Players.Single().Activity);
+        sim.Advance(startedAt.AddSeconds(60));
+        var arrived = Assert.Single(sim.Project("one", startedAt.AddSeconds(60)).Events,
+            e => e.Kind == "ExtractionVehicleArrived");
+        Assert.Equal("WaitingToDepart", sim.Project("one", startedAt.AddSeconds(60)).Players.Single().Activity);
+        Assert.Equal(startedAt.AddSeconds(90),
+            sim.Project("one", startedAt.AddSeconds(60)).Players.Single().ActivityEndsAt);
+
+        var leaveAt = startedAt.AddSeconds(65);
+        Assert.True(sim.QueueHandlerAction("leave", "DepartExtraction", "one", leaveAt));
+        sim.Advance(leaveAt);
+        var result = sim.Project("one", leaveAt);
+        Assert.Equal("Extracted", result.Players.Single().Activity);
+        Assert.Equal(leaveAt, Assert.Single(result.Events, e => e.Kind == "Extracted").At);
+        Assert.Single(result.Events, e => e.Kind == "HandlerAction" && e.Reason == "HandlerSupport:DepartExtraction");
+        Assert.Contains("four sides", arrived.Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void VehicleDepartsAutonomouslyAtNinetySecondsWhenHandlerIsAbsent()
+    {
+        var (sim, startedAt) = BeginCalledExtraction();
+        sim.Advance(startedAt.AddSeconds(90));
+        var result = sim.Project("one", startedAt.AddSeconds(90));
+        Assert.Equal("Extracted", result.Players.Single().Activity);
+        Assert.Equal(startedAt.AddSeconds(90), Assert.Single(result.Events, e => e.Kind == "Extracted").At);
+        Assert.DoesNotContain(result.Events, e => e.Kind == "HandlerAction" && e.Reason == "HandlerSupport:DepartExtraction");
     }
 
     [Fact]
@@ -352,7 +397,14 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
                         if (!calledWorlds.Contains(key) && p.SignalCurrent >= 3 && raid.MyInventory.Count > 0 &&
                             (raid.MyHealth <= 18 || (clock.Now - raid.Events.First(e => e.Kind == "DutyAdmission").At).TotalSeconds >= 1080))
                         {
-                            coordinator.ExecuteSupportAction(handler.AccessToken, new($"exit:{t}", "CallExtract"));
+                            try
+                            {
+                                coordinator.ExecuteSupportAction(handler.AccessToken, new($"exit:{t}", "CallExtract"));
+                            }
+                            catch (RaidCommandException exception) when (exception.Message == "ExtractionAlreadyInProgress")
+                            {
+                                // The autonomous exit decision can win the same-tick race.
+                            }
                             calledWorlds.Add(key);
                         }
                         else if (!calledWorlds.Contains(key) && p.SignalCurrent >= 1 && raid.MyGreed >= 35 &&
@@ -418,18 +470,39 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
         {
             t++;
             sim.Advance(Start.AddSeconds(t));
-            Assert.InRange(t, 1, 15);
+            Assert.InRange(t, 1, 60);
         }
         Assert.True(sim.QueueHandlerAction("exit", "CallExtract", "one", Start.AddSeconds(t)));
-        sim.Advance(Start.AddSeconds(50));
-        var one = sim.Project("one", Start.AddSeconds(50));
-        var two = sim.Project("two", Start.AddSeconds(50));
+        sim.Advance(Start.AddSeconds(t + 50));
+        var one = sim.Project("one", Start.AddSeconds(t + 50));
+        var two = sim.Project("two", Start.AddSeconds(t + 50));
         Assert.Empty(one.MyInventory);
         Assert.Empty(one.MyExtractedLoot);
         Assert.Equal(2, two.MyInventory.Count);
         Assert.DoesNotContain(one.Events, e => e.Kind == "ItemAllocated");
         Assert.DoesNotContain(two.Events, e => e.Kind == "HandlerAction");
         Assert.Contains(one.Events, e => e.Kind == "ActivityInterrupted");
+    }
+
+    [Fact]
+    public void AbandonedSearchClosesBeforeLateRaiderArrives()
+    {
+        var sim = new RaidSimulation("abandoned-search", Start, 1, danger: "Low");
+        sim.AddAutonomousRaider("one", "raider-one", Start);
+        sim.Advance(Start.AddSeconds(60));
+        var market = Assert.Single(sim.Project("one", Start.AddSeconds(60)).Opportunities,
+            opportunity => opportunity.OpportunityId == "market-locker");
+        Assert.True(sim.QueueHandlerAction("exit", "CallExtract", "one", Start.AddSeconds(60)));
+        sim.Advance(Start.AddSeconds(60));
+
+        sim.Advance(market.ClosesAt!.Value);
+        sim.AddAutonomousRaider("two", "raider-two", Start.AddSeconds(80));
+        sim.Advance(Start.AddSeconds(140));
+
+        var lateArrival = sim.Project("two", Start.AddSeconds(140));
+        Assert.Equal("Resolved", Assert.Single(lateArrival.Opportunities,
+            opportunity => opportunity.OpportunityId == "market-locker").Status);
+        Assert.Contains(lateArrival.Events, e => e.Kind == "OpportunityExhausted");
     }
 
     [Fact]

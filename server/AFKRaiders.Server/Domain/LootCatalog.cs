@@ -81,7 +81,7 @@ public interface ILootCatalog
 /// </summary>
 public sealed class LootCatalog : ILootCatalog
 {
-    public const string DefaultContentVersion = "desperanza-shared-loot-v3";
+    public const string DefaultContentVersion = "desperanza-shared-loot-v4";
 
     private readonly Dictionary<string, LootCatalogItem> itemsById;
     private readonly Dictionary<string, OpportunityDefinition> opportunitiesById;

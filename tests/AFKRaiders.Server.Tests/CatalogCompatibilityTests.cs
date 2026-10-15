@@ -7,11 +7,26 @@ namespace AFKRaiders.Server.Tests;
 
 public sealed class CatalogCompatibilityTests
 {
+    internal static readonly string[] C3ItemIds =
+    [
+        "scrap_metal_basic", "scrap_metal_bent", "scrap_metal_twisted",
+        "robot_toe", "robot_finger", "robot_knuckle_joint", "circuit_bundle_messy",
+        "circuit_board_cracked", "single_sock", "battery_half_full", "arc_data_shard_corrupted"
+    ];
+
+    internal static LootCatalog C3Baseline()
+    {
+        var catalog = LootCatalog.Default;
+        return new LootCatalog("desperanza-shared-loot-v3",
+            C3ItemIds.Select(catalog.GetItem), catalog.Opportunities,
+            C3ItemIds.Select(id => catalog.Pool.Single(entry => entry.CatalogId == id)));
+    }
+
     private const string LegacyC1Fingerprint =
         "52392C0BB009F79A680F03AAC5C9C46BF2387CB4AD98B7F7D9A39EDD3A4540C0";
 
     [Fact]
-    public void SharedLootV3RemainsDistinctFromTheExplicitC1CompatibilityBaseline()
+    public void SharedLootRemainsDistinctFromTheExplicitC1CompatibilityBaseline()
     {
         var catalog = LootCatalog.Default;
         var outputs = Enumerable.Range(0, 100).Select(seed => new
@@ -38,6 +53,6 @@ public sealed class CatalogCompatibilityTests
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(snapshot)));
         // C1's exact pre-migration fingerprint remains frozen; later content changes are deliberate.
         Assert.NotEqual(LegacyC1Fingerprint, hash);
-        Assert.Equal("desperanza-shared-loot-v3", catalog.ContentVersion);
+        Assert.Equal(LootCatalog.DefaultContentVersion, catalog.ContentVersion);
     }
 }

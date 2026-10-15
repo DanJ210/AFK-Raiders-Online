@@ -17,7 +17,7 @@ public sealed class LootCatalogTests
     {
         var catalog = LootCatalog.Default;
 
-        Assert.Equal("desperanza-shared-loot-v3", catalog.ContentVersion);
+        Assert.Equal("desperanza-shared-loot-v4", catalog.ContentVersion);
         Assert.NotEmpty(catalog.Items);
         Assert.NotEmpty(catalog.Opportunities);
 

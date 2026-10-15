@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "contentVersion": "desperanza-shared-loot-v3",
+  "contentVersion": "desperanza-shared-loot-v4",
   "items": [
     { "id": "scrap_metal_basic", "name": "Basic Scrap Metal", "value": 8, "rarity": 1, "category": "scrap_components", "flavor": "Sharp, rusty, and eager to give you tetanus.", "eligibilityCategories": ["Salvage", "Residential"] },
     { "id": "scrap_metal_bent", "name": "Bent Scrap Metal", "value": 10, "rarity": 1, "category": "scrap_components", "flavor": "Bent at a perfect 37\u00b0 angle. Useless but stylish.", "eligibilityCategories": ["Salvage", "Residential"] },
@@ -12,7 +12,15 @@
     { "id": "circuit_board_cracked", "name": "Cracked Circuit Board", "value": 18, "rarity": 2, "category": "scrap_components", "flavor": "Still lights up. Shouldn't.", "eligibilityCategories": ["Technology", "Salvage"] },
     { "id": "single_sock", "name": "Single Sock", "value": 5, "rarity": 1, "category": "personal_junk", "flavor": "Its partner is out there somewhere. Probably thriving.", "eligibilityCategories": ["Residential"] },
     { "id": "battery_half_full", "name": "Half-Full Battery", "value": 20, "rarity": 2, "category": "scrap_components", "flavor": "Optimistically labeled '50%'.", "eligibilityCategories": ["Salvage", "Technology"] },
-    { "id": "arc_data_shard_corrupted", "name": "Chassis Data Shard (Corrupted)", "value": 25, "rarity": 2, "category": "arc_tech", "flavor": "Contains 98% static and 2% screaming.", "eligibilityCategories": ["Robot", "Technology"] }
+    { "id": "arc_data_shard_corrupted", "name": "Chassis Data Shard (Corrupted)", "value": 25, "rarity": 2, "category": "arc_tech", "flavor": "Contains 98% static and 2% screaming.", "eligibilityCategories": ["Robot", "Technology"] },
+    { "id": "lost_diary_page", "name": "Lost Diary Page", "value": 10, "rarity": 2, "category": "personal_junk", "flavor": "Reads: 'Day 14: Still no snacks.'", "eligibilityCategories": ["Residential"] },
+    { "id": "crumpled_memo", "name": "Crumpled Memo", "value": 10, "rarity": 2, "category": "personal_junk", "flavor": "Subject: MANDATORY FUN. The irony is not lost on you.", "eligibilityCategories": ["Residential"] },
+    { "id": "left_boot", "name": "Left Boot", "value": 15, "rarity": 2, "category": "apparel_accessories", "flavor": "Someone out there has the right one. The pair would be worth something.", "eligibilityCategories": ["Residential"] },
+    { "id": "fingerless_gloves", "name": "Fingerless Gloves", "value": 20, "rarity": 2, "category": "apparel_accessories", "flavor": "For when you want to be edgy AND cold.", "eligibilityCategories": ["Residential"] },
+    { "id": "rusted_spork", "name": "Rusted Spork", "value": 10, "rarity": 1, "category": "valuables", "flavor": "A relic of simpler, tetanus-filled times.", "eligibilityCategories": ["Residential"] },
+    { "id": "vintage_comic_book", "name": "Vintage Comic Book", "value": 20, "rarity": 2, "category": "valuables", "flavor": "Features a hero who fights robots. The cover is torn but the nostalgia is intact.", "eligibilityCategories": ["Residential"] },
+    { "id": "energy_core_spent", "name": "Spent Energy Core", "value": 10, "rarity": 1, "category": "arc_tech", "flavor": "Completely drained. Same.", "eligibilityCategories": ["Robot", "Technology"] },
+    { "id": "prototype_chip_faulty", "name": "Prototype Chip (Faulty)", "value": 20, "rarity": 2, "category": "arc_tech", "flavor": "It sparks occasionally. You pretend not to notice.", "eligibilityCategories": ["Robot", "Technology"] }
   ],
   "pool": [
     { "catalogId": "scrap_metal_basic", "dropWeight": 35 },
@@ -25,7 +33,15 @@
     { "catalogId": "circuit_board_cracked", "dropWeight": 18 },
     { "catalogId": "single_sock", "dropWeight": 25 },
     { "catalogId": "battery_half_full", "dropWeight": 18 },
-    { "catalogId": "arc_data_shard_corrupted", "dropWeight": 20 }
+    { "catalogId": "arc_data_shard_corrupted", "dropWeight": 20 },
+    { "catalogId": "lost_diary_page", "dropWeight": 20 },
+    { "catalogId": "crumpled_memo", "dropWeight": 20 },
+    { "catalogId": "left_boot", "dropWeight": 20 },
+    { "catalogId": "fingerless_gloves", "dropWeight": 20 },
+    { "catalogId": "rusted_spork", "dropWeight": 20 },
+    { "catalogId": "vintage_comic_book", "dropWeight": 15 },
+    { "catalogId": "energy_core_spent", "dropWeight": 25 },
+    { "catalogId": "prototype_chip_faulty", "dropWeight": 20 }
   ],
   "opportunities": [
     {
