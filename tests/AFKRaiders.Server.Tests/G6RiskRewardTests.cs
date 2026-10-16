@@ -506,6 +506,40 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void IndependentlyExtractingRaidersShareTheOpenVehicleWithoutSharingSettlement()
+    {
+        var sim = new RaidSimulation("shared-extraction", Start, 1, danger: "Low");
+        sim.AddAutonomousRaider("one", "raider-one", Start);
+        sim.AddAutonomousRaider("two", "raider-two", Start);
+        sim.Advance(Start.AddSeconds(60));
+
+        Assert.True(sim.QueueHandlerAction("exit-one", "CallExtract", "one", Start.AddSeconds(60)));
+        Assert.True(sim.QueueHandlerAction("exit-two", "CallExtract", "two", Start.AddSeconds(60)));
+        sim.Advance(Start.AddSeconds(60));
+        sim.Advance(Start.AddSeconds(150));
+
+        var oneAtWindow = sim.Project("one", Start.AddSeconds(150));
+        var twoAtWindow = sim.Project("two", Start.AddSeconds(150));
+        Assert.Equal("WaitingToDepart", oneAtWindow.Players.Single(p => p.PlayerId == "one").Activity);
+        Assert.Equal("WaitingToDepart", twoAtWindow.Players.Single(p => p.PlayerId == "two").Activity);
+        Assert.Contains(oneAtWindow.Events, e => e.Kind == "SharedExtractionCalled");
+        var vehicleArrivals = oneAtWindow.Events.Where(e => e.Kind == "ExtractionVehicleArrived").ToArray();
+        Assert.True(vehicleArrivals.Length == 1,
+            string.Join("; ", vehicleArrivals.Select(e => $"{e.At:O} {e.Text}")));
+        Assert.Contains(oneAtWindow.Events, e => e.Kind == "ExtractionJoined");
+        Assert.Contains(twoAtWindow.Events, e => e.Kind == "ExtractionJoined");
+
+        Assert.True(sim.QueueHandlerAction("depart-one", "DepartExtraction", "one", Start.AddSeconds(150)));
+        sim.Advance(Start.AddSeconds(150));
+        sim.Advance(Start.AddSeconds(200));
+
+        Assert.Equal("Extracted", sim.Project("one", Start.AddSeconds(200)).Players.Single(p => p.PlayerId == "one").Activity);
+        Assert.Equal("Extracted", sim.Project("two", Start.AddSeconds(200)).Players.Single(p => p.PlayerId == "two").Activity);
+        Assert.Single(sim.Project("one", Start.AddSeconds(200)).Events, e => e.Kind == "Extracted");
+        Assert.Single(sim.Project("two", Start.AddSeconds(200)).Events, e => e.Kind == "Extracted");
+    }
+
+    [Fact]
     public void StaggeredEnvironmentalParticipantsMatchActualLocationAndAliveState()
     {
         var impacts = 0;

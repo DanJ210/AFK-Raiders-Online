@@ -35,7 +35,12 @@ public sealed record NarrativeEnrichmentRequest(
 );
 
 public sealed record NarrativeResult(string Text, string Source, string? FailureReason = null);
-public sealed record AmbientCommsContext(string Location, string Activity);
+/// <summary>
+/// Presentation-only prompt context built from committed server state. Never contains player identities.
+/// </summary>
+public sealed record AmbientCommsContext(string Location, string Activity,
+    string? EventKind = null, string? Condition = null, string? Danger = null,
+    string? RobotName = null, int NearbyRaiders = 0);
 /// <summary>
 /// Authoritative typed event record emitted by the domain simulation.
 /// </summary>

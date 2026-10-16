@@ -430,6 +430,32 @@ public sealed class CommsAndPacingTests
         Assert.DoesNotContain(narrator.Requests, r => skipped.Any(e => e.SourceEventId == $"raid:{r.RaidId}:{r.EventSequence}"));
     }
 
+    [Fact]
+    public void UnavailableModelExplainsEligibleAuthoredEntriesWithoutQueuingOrRepeatedRevisions()
+    {
+        var time = new Clock();
+        var narrator = new RecordingNarrator();
+        using var generator = new OnnxGenAiNarrativeGenerator();
+        var coordinator = new RaidCoordinator(time, narrator, narrativeGenerator: generator, nextSeed: () => 2);
+        var one = coordinator.EnrollHandler("raider-one");
+        time.Now = Start.AddSeconds(90);
+        coordinator.AdvanceRaids();
+        var first = coordinator.GetHandlerProjection(one.AccessToken);
+        var eligible = first.FullJournal!.Where(e => e.Kind == "AreaActivityStarted").ToArray();
+        Assert.NotEmpty(eligible);
+        Assert.All(eligible, e =>
+        {
+            Assert.Equal("CanonFallback", e.NarrativeSource);
+            Assert.Equal("NotRequested", e.EnrichmentStatus);
+            Assert.Equal("ModelUnavailable", e.EnrichmentReason);
+            Assert.Null(e.Flavor);
+        });
+        Assert.Empty(narrator.Requests);
+        var repeated = coordinator.GetHandlerProjection(one.AccessToken);
+        Assert.Equal(first.Raid!.Revision, repeated.Raid!.Revision);
+        Assert.Equal(first.FullJournal, repeated.FullJournal);
+    }
+
     private sealed class Clock : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = Start;

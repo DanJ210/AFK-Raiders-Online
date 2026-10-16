@@ -18,7 +18,10 @@ builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddSingleton<INarrativeGenerator>(sp =>
 {
-    var modelPath = builder.Configuration["AI:ModelPath"] ?? Environment.GetEnvironmentVariable("AFK_AI_MODEL_PATH");
+    var configuredPath = builder.Configuration["AI:ModelPath"];
+    var modelPath = string.IsNullOrWhiteSpace(configuredPath)
+        ? Environment.GetEnvironmentVariable("AFK_AI_MODEL_PATH")
+        : configuredPath;
     var logger = sp.GetRequiredService<ILogger<OnnxGenAiNarrativeGenerator>>();
     return new OnnxGenAiNarrativeGenerator(modelPath, logger);
 });

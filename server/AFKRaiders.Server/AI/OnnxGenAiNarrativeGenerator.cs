@@ -21,7 +21,12 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
     public OnnxGenAiNarrativeGenerator(string? modelPath = null, ILogger<OnnxGenAiNarrativeGenerator>? logger = null)
     {
         this.logger = logger ?? NullLogger<OnnxGenAiNarrativeGenerator>.Instance;
-        if (string.IsNullOrWhiteSpace(modelPath) || !Directory.Exists(modelPath)) return;
+        if (string.IsNullOrWhiteSpace(modelPath) || !Directory.Exists(modelPath))
+        {
+            this.logger.LogWarning("Live ONNX narration is offline: {Reason}. Set AI:ModelPath or AFK_AI_MODEL_PATH to an existing model directory before starting the backend. Authored narration remains available.",
+                string.IsNullOrWhiteSpace(modelPath) ? "ModelPathNotConfigured" : "ModelDirectoryNotFound");
+            return;
+        }
         try
         {
             model = new Model(modelPath);
@@ -44,7 +49,7 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
     public async ValueTask<AarDebriefView> GenerateAarDebriefAsync(AarDebriefContext context, CancellationToken ct = default)
     {
         var baseline = fallback.GenerateAarDebrief(context);
-        var aside = await GenerateAmbientAsync("Desperanza", "reviewing my paperwork", ct);
+        var aside = await GenerateAmbientAsync(new AmbientCommsContext("Desperanza", "reviewing my paperwork"), ct);
         if (aside.Text is null) return baseline;
         var bullets = baseline.Bullets.ToArray();
         bullets[2] += $" Optional Raider aside [Generated]: {aside.Text}";
@@ -54,7 +59,7 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
     public async ValueTask<ItemAppraisalView> GenerateItemAppraisalAsync(ItemAppraisalContext context, CancellationToken ct = default)
     {
         var baseline = fallback.GenerateItemAppraisal(context);
-        var aside = await GenerateAmbientAsync("Desperanza", "reviewing my priorities", ct);
+        var aside = await GenerateAmbientAsync(new AmbientCommsContext("Desperanza", "reviewing my priorities"), ct);
         return aside.Text is null ? baseline : baseline with
         {
             Appraisal = $"{baseline.Appraisal} Optional Raider aside [Generated]: {aside.Text}",
@@ -67,8 +72,9 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
 
     public async ValueTask<NarrativeResult> GenerateEventResultAsync(NarrativeEnrichmentRequest request, CancellationToken ct = default)
     {
-        var context = request.EventPayload as AmbientCommsContext;
-        var aside = await GenerateAmbientAsync(context?.Location ?? "Desperanza", context?.Activity ?? "considering my priorities", ct, request.EventSequence);
+        var context = request.EventPayload as AmbientCommsContext
+            ?? new AmbientCommsContext("Desperanza", "considering my priorities");
+        var aside = await GenerateAmbientAsync(context, ct, request.EventSequence);
         return aside.Text is null
             ? new(await fallback.GenerateEnrichedEventTextAsync(request, ct), "ArchivalLog", aside.FailureReason)
             : new(aside.Text, "Generated");
@@ -76,7 +82,7 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
 
     private sealed record AmbientGeneration(string? Text, string? FailureReason = null);
 
-    private async Task<AmbientGeneration> GenerateAmbientAsync(string location, string activity, CancellationToken ct, long sequence = 0)
+    private async Task<AmbientGeneration> GenerateAmbientAsync(AmbientCommsContext context, CancellationToken ct, long sequence = 0)
     {
         if (!IsAvailable) return new(null, "ModelUnavailable");
         var started = System.Diagnostics.Stopwatch.StartNew();
@@ -87,9 +93,9 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
                 token =>
                 {
                     inferenceStarted = true;
-                    return Task.Run(() => JoinAmbientPrefix(InferText(BuildAmbientPrompt(location, activity, sequence), AmbientOutputTokens, token)), CancellationToken.None);
+                    return Task.Run(() => JoinAmbientPrefix(InferText(BuildAmbientPrompt(context, sequence), AmbientOutputTokens, token)), CancellationToken.None);
                 }, ct);
-            var validated = ValidateAmbient(text, out var rejectionReason, location, activity);
+            var validated = ValidateAmbient(text, out var rejectionReason, AllowedTermsFor(context));
             if (validated is null)
                 logger.LogWarning("ONNX ambient output rejected after {Ms}ms: {Reason}; raw length {Length}, preview truncated {Truncated}: {Raw}",
                     started.ElapsedMilliseconds, rejectionReason, text.Length, text.Length > 120,
@@ -188,6 +194,91 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
         "No explanation. Examples: I distrust socks with executive ambitions. I consider optimism a defective compass.<|end|>\n" +
         $"<|user|>\nShort opinion about {RaiderCommsContent.StyleHint(activity, sequence)}.<|end|>\n<|assistant|>\n{AmbientPrefix}";
 
+    internal enum AmbientCategory { AreaActivity, Search, Robot, SharedRobot, Travel, Exit, Diary, Floor, General }
+
+    private sealed record AmbientProfile(string Situation, string Example1, string Example2);
+
+    private static readonly IReadOnlyDictionary<AmbientCategory, AmbientProfile> Profiles = new Dictionary<AmbientCategory, AmbientProfile>
+    {
+        [AmbientCategory.AreaActivity] = new("poking around this area", "I consider dusty shelves a museum of regret.", "I distrust floors that creak with opinions."),
+        [AmbientCategory.Search] = new("searching through containers", "I consider every drawer a tiny locked lie.", "I distrust boxes labelled miscellaneous."),
+        [AmbientCategory.Robot] = new("facing a hostile robot", "I consider that robot a toaster with ambitions.", "I distrust machines that beep politely first."),
+        [AmbientCategory.SharedRobot] = new("facing a robot with company nearby", "I consider that robot an overstaffed alarm clock.", "I distrust machines that enjoy an audience."),
+        [AmbientCategory.Travel] = new("walking briskly between areas", "I consider my boots a reluctant committee.", "I distrust corridors that keep getting longer."),
+        [AmbientCategory.Exit] = new("waiting for the ride out", "I consider timers a rude form of weather.", "I distrust doors that promise departures."),
+        [AmbientCategory.Diary] = new("lingering here for a while", "I consider this bench my temporary office.", "I distrust quiet corners with good acoustics."),
+        [AmbientCategory.Floor] = new("lying on the floor waiting", "I consider this floor an unwelcome mattress.", "I distrust ceilings that stare back."),
+        [AmbientCategory.General] = new("passing the time", "I distrust socks with executive ambitions.", "I consider optimism a defective compass.")
+    };
+
+    // Lowercase lore cues adapted from AFK Raiders content (f62d088a41da951a1fbe9ed7215d2957a933ce50)
+    // so they never seed unvalidated proper nouns.
+    private static readonly IReadOnlyDictionary<string, string> LocationCues = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["Entry Tunnel"] = "a scrapyard sector tunnel",
+        ["Market"] = "abandoned staycation lockers",
+        ["Salvage Yard"] = "humming, vibrating crates",
+        ["Service Depot"] = "spare-parts lockers and expired warranties on optimism",
+        ["Extraction Platform"] = "a vehicle with doors on four sides",
+        ["Desperanza"] = "a tired frontier town"
+    };
+
+    internal static AmbientCategory CategoryFor(AmbientCommsContext context) => (context.EventKind, context.Activity) switch
+    {
+        ("RobotRound", _) or (_, "Fighting" or "FightingRobot") =>
+            context.NearbyRaiders > 0 ? AmbientCategory.SharedRobot : AmbientCategory.Robot,
+        ("Search", _) or (_, "Search" or "Searching") => AmbientCategory.Search,
+        ("Travel", _) or (_, "Travel" or "Travelling" or "Traveling") => AmbientCategory.Travel,
+        ("ExtractionStarted", _) or (_, "Extracting" or "WaitingToDepart") => AmbientCategory.Exit,
+        ("AreaDiary", _) => AmbientCategory.Diary,
+        ("Downed" or "KnockedOut", _) => AmbientCategory.Floor,
+        ("AreaActivityStarted", _) or (_, "Surveying" or "Checking" or "Rummaging") => AmbientCategory.AreaActivity,
+        _ => AmbientCategory.General
+    };
+
+    internal static string BuildAmbientPrompt(AmbientCommsContext context, long sequence = 0)
+    {
+        var category = CategoryFor(context);
+        var profile = Profiles[category];
+        var styleKey = category is AmbientCategory.Robot or AmbientCategory.SharedRobot ? "RobotRound"
+            : category is AmbientCategory.Search ? "Search"
+            : category is AmbientCategory.Exit ? "Extracting"
+            : context.Activity;
+        var place = LocationCues.TryGetValue(context.Location, out var cue) ? $"{context.Location}, {cue}" : context.Location;
+        var scene = new System.Text.StringBuilder($"Place: {place}. Doing: {profile.Situation}.");
+        if (context.Condition is not null)
+            scene.Append($" Weather: {context.Condition}{(context.Danger is null ? "" : $", {context.Danger.ToLowerInvariant()} danger")}.");
+        if (context.RobotName is not null && category is AmbientCategory.Robot or AmbientCategory.SharedRobot)
+            scene.Append($" Robot: {context.RobotName}, high-pitched warning tone.");
+        if (context.NearbyRaiders > 0 && category is not AmbientCategory.SharedRobot)
+            scene.Append(" Company nearby.");
+        var robotRule = category is AmbientCategory.Robot or AmbientCategory.SharedRobot
+            ? "You may mock the robot, but never say who wins or gets hurt."
+            : "No combat.";
+        return "<|system|>\nWrite one complete 6-10-word dry joke ending in a period. " +
+            $"First person, physical objects, not digital. No discoveries, other people, rewards or outcomes. {robotRule} " +
+            $"No explanation. Examples: {profile.Example1} {profile.Example2}<|end|>\n" +
+            $"<|user|>\n{scene} Short opinion about {RaiderCommsContent.StyleHint(styleKey, sequence)}.<|end|>\n<|assistant|>\n{AmbientPrefix}";
+    }
+
+    internal sealed record AmbientAllowedTerms(IReadOnlySet<string> ProperNouns, IReadOnlySet<string> DenialExemptions);
+
+    private static readonly string[] RobotWords = ["robot", "robots", "machine", "machines", "drone", "drones"];
+
+    internal static AmbientAllowedTerms AllowedTermsFor(AmbientCommsContext context)
+    {
+        static IEnumerable<string> Split(string? value) => value is null ? []
+            : value.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries)
+                .SelectMany(w => new[] { w }.Concat(w.Split('-', StringSplitOptions.RemoveEmptyEntries)));
+        var category = CategoryFor(context);
+        var isRobot = category is AmbientCategory.Robot or AmbientCategory.SharedRobot;
+        var robotName = isRobot ? context.RobotName : null;
+        var proper = new HashSet<string>(Split(context.Location).Concat(Split(context.Condition)).Concat(Split(robotName)),
+            StringComparer.OrdinalIgnoreCase);
+        var exempt = new HashSet<string>(isRobot ? RobotWords.Concat(Split(robotName)) : [], StringComparer.OrdinalIgnoreCase);
+        return new(proper, exempt);
+    }
+
     private static readonly HashSet<string> DeniedWords = new(StringComparer.OrdinalIgnoreCase)
     {
         // Outcome, reward and combat claims: the Comms facts line owns these.
@@ -209,6 +300,15 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
         => ValidateAmbient(text, out _, allowedContext);
 
     internal static string? ValidateAmbient(string text, out string? rejectionReason, params string[] allowedContext)
+        => ValidateAmbientCore(text, out rejectionReason,
+            new HashSet<string>(allowedContext.SelectMany(c => c.Split([' ', ',', '-'], StringSplitOptions.RemoveEmptyEntries)), StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+    /// <summary>Validates against server-approved context terms; exemptions bypass only the matching actor/combat denials.</summary>
+    internal static string? ValidateAmbient(string text, out string? rejectionReason, AmbientAllowedTerms terms)
+        => ValidateAmbientCore(text, out rejectionReason, terms.ProperNouns, terms.DenialExemptions);
+
+    private static string? ValidateAmbientCore(string text, out string? rejectionReason, IReadOnlySet<string> allowed, IReadOnlySet<string> exempt)
     {
         rejectionReason = null;
         // Strip only generation trailers and surrounding wrapper quotes; content is never rewritten.
@@ -245,12 +345,11 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
             rejectionReason = "NotFirstPerson";
             return null;
         }
-        var allowed = new HashSet<string>(allowedContext
-            .SelectMany(c => c.Split([' ', ',', '-'], StringSplitOptions.RemoveEmptyEntries)), StringComparer.OrdinalIgnoreCase);
         foreach (var word in words.Skip(1))
         {
             var bare = word.Trim('\'', '-');
-            if (DeniedWords.Contains(bare))
+            var approvedProperNoun = bare.Length > 0 && char.IsUpper(bare[0]) && allowed.Contains(bare);
+            if (DeniedWords.Contains(bare) && !exempt.Contains(bare) && !approvedProperNoun)
             {
                 rejectionReason = $"ForbiddenOutcomeOrActorWord:{bare}";
                 return null;

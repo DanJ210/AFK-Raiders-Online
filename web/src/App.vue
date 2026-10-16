@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { enrichmentExplanation, mergeJournal, narrationLabel } from './journal'
+import { enrichmentExplanation, journalCategories, matchesJournalFilter, mergeJournal, narrationLabel } from './journal'
 import { clearLiveWarning, liveClosedMessage, stopOwnedConnection } from './liveConnection'
 import { rarityAttributes, rarityName } from './rarity'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
@@ -124,6 +124,7 @@ type HandlerAccess = { slot: string; playerId: string; accessToken: string }
 type HandlerProjection = {
   slot: string; playerId: string; displayName: string; dutyEnabled: boolean; status: string
   homeAvailableAt: string | null; currentRaidId: string | null; raid: Projection | null
+  hubResidents?: { slot: string; displayName: string; status: string; homeAvailableAt: string | null }[] | null
   myLastExtractedLoot: ItemView[]; comms: { sequence: number; at: string; kind: string; text: string }[]
   serverTime: string
   lastReturnSummary?: ReturnSummaryView | null
@@ -164,7 +165,7 @@ type SellStashResponse = {
 }
 type EnrollResponse = { accessToken: string; projection: HandlerProjection }
 
-const expectedRulesVersion = 'desperanza-g6-v2'
+const expectedRulesVersion = 'desperanza-g6-v3'
 const requestedIdentity = new URLSearchParams(window.location.search).get('handler')
 const slot = ref<'raider-one' | 'raider-two'>(requestedIdentity === 'two' ? 'raider-two' : 'raider-one')
 const session = shallowRef<HandlerAccess | null>(null)
@@ -195,6 +196,11 @@ let displayTimer: ReturnType<typeof setInterval> | undefined
 const me = computed(() => projection.value?.players.find(player => player.playerId === session.value?.playerId))
 const currentThread = computed(() => projection.value?.currentThread ?? null)
 const recentThreads = computed(() => projection.value?.recentThreads ?? [])
+const hubResidents = computed(() => handlerProjection.value?.hubResidents ?? [])
+const recentHubComms = computed(() => journalEntries.value
+  .filter(event => event.channel === 'Hub')
+  .slice(-4)
+  .reverse())
 const loot = computed(() => me.value?.activity === 'Extracted'
   ? projection.value?.myExtractedLoot ?? handlerProjection.value?.myLastExtractedLoot ?? []
   : projection.value?.myInventory ?? handlerProjection.value?.myLastExtractedLoot ?? [])
@@ -426,7 +432,7 @@ async function purchaseShopItem(catalogId: string, quantity: number = 1) {
   outfitterMessage.value = ''
   try {
     const commandId = `buy:${crypto.randomUUID()}`
-    await request<any>('/api/dev/shop/purchase', access, {
+    await request<unknown>('/api/dev/handler/shop/purchase', access, {
       method: 'POST',
       body: JSON.stringify({ commandId, catalogId, quantity })
     })
@@ -446,7 +452,7 @@ async function equipWeapon(weaponInstanceId: string) {
   outfitterMessage.value = ''
   try {
     const commandId = `equip:${crypto.randomUUID()}`
-    await request<any>('/api/dev/equipment/equip', access, {
+    await request<unknown>('/api/dev/handler/equipment/equip', access, {
       method: 'POST',
       body: JSON.stringify({ commandId, weaponInstanceId })
     })
@@ -466,7 +472,7 @@ async function repairWeapon(weaponInstanceId: string) {
   outfitterMessage.value = ''
   try {
     const commandId = `repair:${crypto.randomUUID()}`
-    const res = await request<any>('/api/dev/equipment/repair', access, {
+    const res = await request<{ repairCostPaid: number }>('/api/dev/handler/equipment/repair', access, {
       method: 'POST',
       body: JSON.stringify({ commandId, weaponInstanceId })
     })
@@ -506,7 +512,7 @@ async function saveStagedLoadout() {
     const stagedSupplies = Object.entries(stagedDraft.value)
       .filter(([_, qty]) => qty > 0)
       .map(([catalogId, quantity]) => ({ catalogId, quantity }))
-    await request<any>('/api/dev/loadout/stage', access, {
+    await request<unknown>('/api/dev/handler/loadout/stage', access, {
       method: 'POST',
       body: JSON.stringify({ commandId, stagedSupplies })
     })
@@ -542,13 +548,7 @@ function closeAppraisalModal() {
 }
 
 const filteredComms = computed(() => {
-  const all = journalEntries.value
-  if (commsFilter.value === 'all') return all
-  if (commsFilter.value === 'diary') return all.filter(e => e.channel.toLowerCase() === 'diary')
-  if (commsFilter.value === 'hub') return all.filter(e => e.channel.toLowerCase() === 'hub')
-  if (commsFilter.value === 'encounters') return all.filter(e =>
-    e.channel.toLowerCase() === 'encounter' || e.channel.toLowerCase() === 'combat' || e.kind.toLowerCase().includes('robot'))
-  return all
+  return journalEntries.value.filter(event => matchesJournalFilter(event, commsFilter.value))
 })
 
 function threadProgressPercent(thread: ActiveThreadView) {
@@ -1020,6 +1020,29 @@ onBeforeUnmount(() => {
           <p class="panel-note">The Raider is home in Desperanza. When duty is enabled, the server admits them to an eligible raid and launches a single-person surface pod; travel takes 60 seconds.</p>
           <p v-if="handlerProjection?.homeAvailableAt" class="privacy-note">Next re-entry eligibility: {{ new Date(handlerProjection.homeAvailableAt).toLocaleTimeString() }} server time.</p>
           <p class="privacy-note">A world stays open while any admitted Raider is active, then closes when the last returns.</p>
+          <div class="hub-residents">
+            <p class="eyebrow">CURRENT HUB RESIDENTS</p>
+            <div v-if="hubResidents.length" class="hub-resident-list">
+              <div v-for="resident in hubResidents" :key="resident.slot" class="hub-resident-row">
+                <span class="avatar">{{ resident.slot === 'raider-one' ? 'MR' : 'DW' }}</span>
+                <span class="hub-resident-copy">
+                  <strong>{{ resident.displayName }}</strong>
+                  <small>{{ resident.status }}</small>
+                  <small v-if="resident.homeAvailableAt && Date.parse(resident.homeAvailableAt) > now">
+                    Next deployment eligibility: {{ new Date(resident.homeAvailableAt).toLocaleTimeString() }}
+                  </small>
+                </span>
+              </div>
+            </div>
+            <p v-else class="empty">No enrolled development Raiders are currently in Desperanza.</p>
+          </div>
+          <div class="hub-comms">
+            <p class="eyebrow">RECENT HUB COMMS</p>
+            <p v-for="event in recentHubComms" :key="event.sourceEventId" class="hub-comms-entry">
+              <time>{{ new Date(event.at).toLocaleTimeString() }}</time> {{ event.text }}
+            </p>
+            <p v-if="!recentHubComms.length" class="empty">Hub transition comms will appear here as they occur.</p>
+          </div>
         </section>
 
         <!-- OUTFITTER & ARMORY WORKSHOP PANEL (G4 & AI-3) -->
@@ -1809,7 +1832,7 @@ onBeforeUnmount(() => {
             <li v-for="event in filteredComms" :key="event.sourceEventId" :class="`channel-${event.channel.toLowerCase()}`">
               <div class="comms-meta">
                 <code>{{ new Date(event.at).toLocaleTimeString() }}</code>
-                <span class="channel-badge">{{ event.channel }}</span>
+                <span v-for="category in journalCategories(event)" :key="category" class="channel-badge" :class="`badge-${category.toLowerCase()}`">{{ category }}</span>
                 <span class="kind-tag">{{ event.kind }}</span>
                 <details>
                   <summary class="kind-tag" :title="enrichmentExplanation(event.enrichmentStatus, event.enrichmentReason)">

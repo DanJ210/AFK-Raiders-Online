@@ -522,6 +522,14 @@
       "text": "A {0} is called to the platform; the large doors open on all four sides when it arrives in {1}s."
     },
     {
+      "id": "simulation.shared-extraction-vehicle-called",
+      "text": "{0} calls the shared {1}; any Raider who independently commits to extraction can join at the platform before departure."
+    },
+    {
+      "id": "simulation.joins-shared-extraction",
+      "text": "{0} independently joins the shared {1} extraction and waits for its doors at the platform."
+    },
+    {
       "id": "simulation.extraction-vehicle-arrived",
       "text": "{0}'s {1} arrives, opening its large doors on all four sides. Depart automatically in {2}s unless the Handler confirms leaving."
     },

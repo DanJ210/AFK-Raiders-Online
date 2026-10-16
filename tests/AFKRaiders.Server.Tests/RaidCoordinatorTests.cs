@@ -134,6 +134,9 @@ public sealed class RaidCoordinatorTests
         var raidId = Assert.IsType<string>(first.Projection.CurrentRaidId);
 
         Assert.Null(second.Projection.CurrentRaidId);
+        var homeResidents = Assert.Single(second.Projection.HubResidents!);
+        Assert.Equal("Dev \"Wet Socks\" Kowalski", homeResidents.DisplayName);
+        Assert.Contains("Desperanza", homeResidents.Status);
         clock.Now += TimeSpan.FromSeconds(29);
         coordinator.AdvanceRaids();
         Assert.Null(coordinator.GetHandlerProjection(second.AccessToken).CurrentRaidId);
@@ -203,6 +206,8 @@ public sealed class RaidCoordinatorTests
         Assert.Null(coordinator.GetHandlerProjection(handler.AccessToken).CurrentRaidId);
         Assert.Equal("At Home / Cooling Down",
             coordinator.GetHandlerProjection(handler.AccessToken).Status);
+        Assert.Contains(coordinator.GetHandlerProjection(handler.AccessToken).HubResidents!,
+            resident => resident.Slot == "raider-one" && resident.Status == "Cooling down in Desperanza");
 
         clock.Now = homeAvailableAt.Value - TimeSpan.FromSeconds(1);
         coordinator.AdvanceRaids();
@@ -220,6 +225,8 @@ public sealed class RaidCoordinatorTests
         Assert.NotEqual(firstRaidId, nextRaidId);
         Assert.Contains(coordinator.GetHandlerProjection(handler.AccessToken).Comms,
             item => item.Kind == "RaidAdmission" && item.Text.Contains("autonomously joins", StringComparison.Ordinal));
+        Assert.Contains(coordinator.GetHandlerProjection(handler.AccessToken).Comms,
+            item => item.Kind == "HubReady" && item.At == homeAvailableAt.Value);
     }
 
     [Fact]

@@ -69,6 +69,15 @@ select:focus, input:focus { border-color: var(--lime); }
 .duty-toggle { width: auto; }
 .home-dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .home-dashboard h2 { margin-top: 10px; }
+.hub-residents, .hub-comms { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
+.hub-resident-list { display: grid; gap: 8px; }
+.hub-resident-row { display: flex; align-items: center; gap: 10px; padding: 9px; border: 1px solid #34354a; background: #111321; }
+.hub-resident-copy { min-width: 0; }
+.hub-resident-copy strong, .hub-resident-copy small { display: block; }
+.hub-resident-copy strong { font-size: 11px; }
+.hub-resident-copy small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.hub-comms-entry { margin: 8px 0 0; color: #c8c5d9; font-size: 10px; line-height: 1.55; }
+.hub-comms-entry time { margin-right: 6px; color: var(--muted); font: 10px Consolas, monospace; }
 .active-raid { margin-top: 24px; }
 .raid-world-heading { margin-bottom: 16px; }
 .raid-world-heading h2 { margin: 9px 0 4px; font-size: 23px; }
@@ -148,9 +157,9 @@ th { color: var(--muted); }
 .comms-scroll li { padding: 12px 0; border-top: 1px solid var(--line); }
 .comms-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
 .channel-badge { padding: 1px 6px; border-radius: 2px; font: 9px Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; background: #262947; color: #a8b8e0; border: 1px solid #3c426e; }
-.channel-diary .channel-badge { background: #352647; color: #d8a8e0; border-color: #5f3c6e; }
-.channel-hub .channel-badge { background: #263e47; color: #a8dae0; border-color: #3c646e; }
-.channel-encounter .channel-badge, .channel-combat .channel-badge { background: #472626; color: #e0a8a8; border-color: #6e3c3c; }
+.channel-badge.badge-diary { background: #352647; color: #d8a8e0; border-color: #5f3c6e; }
+.channel-badge.badge-hub { background: #263e47; color: #a8dae0; border-color: #3c646e; }
+.channel-badge.badge-encounter, .channel-badge.badge-combat { background: #472626; color: #e0a8a8; border-color: #6e3c3c; }
 .kind-tag { color: var(--muted); font: 10px Consolas, monospace; }
 .raid-tag { color: #6d7294; font: 9px Consolas, monospace; }
 .comms-text { margin: 4px 0 0; color: #ccd2e0; font-size: 12px; line-height: 1.6; }

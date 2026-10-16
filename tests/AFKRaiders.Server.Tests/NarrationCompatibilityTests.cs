@@ -15,6 +15,7 @@ public sealed class NarrationCompatibilityTests
             "EncounterResolved", "ItemAllocated", "ItemAwarded", "PackingStarted", "PackingCompleted",
             "RecoveryStarted", "RecoveryCompleted", "RobotCombatStarted", "RobotJoined", "RobotParticipantJoined",
             "RobotRound", "RobotDefeated", "RobotEscaped", "ExtractionStarted", "ExtractionVehicleArrived", "Extracted", "ExtractionCompleted",
+            "SharedExtractionCalled", "ExtractionJoined",
             "Downed", "KnockedOut", "HiddenPocketSalvaged", "HiddenPocketEmpty", "ConsumableUsed", "HandlerAction",
             "CallExtract", "Calm", "Pressure", "DutyEnabled", "DutyPaused", "ReturnedHome", "RaidWorldClosed",
             "AreaDiary", "AreaActivityStarted", "AreaActivityCompleted", "WorldCondition", "Unknown" };
@@ -59,6 +60,6 @@ public sealed class NarrationCompatibilityTests
                 lines.Add(JsonSerializer.Serialize(sim.Project("two", start.AddHours(1))));
             }
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
-        Assert.Equal("D3CEE7D5A778472D44C1C126A3C570A02D246DD82D8D2E972315002B7E254D87", hash);
+        Assert.Equal("A1C64A40C0365681E531E532544ACB57A186D18FCBB80B12215CB8AE7A955999", hash);
     }
 }

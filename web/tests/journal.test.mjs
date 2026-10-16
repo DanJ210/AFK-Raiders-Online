@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { enrichmentExplanation, mergeJournal, narrationLabel } from '../src/journal.ts'
+import { enrichmentExplanation, journalCategories, matchesJournalFilter, mergeJournal, narrationLabel } from '../src/journal.ts'
 
 test('narration badges distinguish authored content from accepted AI without treating unrequested entries as failures', () => {
   assert.equal(narrationLabel(), 'Authored')
@@ -15,6 +15,28 @@ test('narration badges distinguish authored content from accepted AI without tre
   assert.match(enrichmentExplanation('Expired'), /became stale/)
   assert.match(enrichmentExplanation('FutureStatus'), /Unrecognized.*FutureStatus/)
   assert.match(enrichmentExplanation('NotRequested', 'LiveBudgetBusy'), /avoid an inference backlog/)
+  assert.match(enrichmentExplanation('NotRequested', 'ModelUnavailable'), /Live AI is offline.*restart the backend/)
+})
+
+test('diary badges coexist with hub and actual encounter categories and drive the same filters', () => {
+  const cases = [
+    [{ channel: 'Diary', kind: 'AreaActivityStarted' }, ['Diary']],
+    [{ channel: 'Hub', kind: 'ReturnedHome' }, ['Diary', 'Hub']],
+    [{ channel: 'Diary', kind: 'CrossedPaths' }, ['Diary', 'Encounter']],
+    [{ channel: 'Diary', kind: 'EncounterResolved' }, ['Diary', 'Encounter']],
+    [{ channel: 'Diary', kind: 'RobotRound' }, ['Diary', 'Encounter', 'Combat']],
+    [{ channel: 'Combat', kind: 'Damage' }, ['Diary', 'Combat', 'Encounter']],
+    [{ channel: 'Support', kind: 'HandlerSupportAction' }, ['Diary', 'Support']],
+    [{ channel: 'FutureChannel', kind: 'FutureEvent' }, ['Diary', 'FutureChannel']],
+    [{ channel: 'Diary', kind: 'Search' }, ['Diary']],
+  ]
+  for (const [event, categories] of cases) {
+    assert.deepEqual(journalCategories(event), categories)
+    assert.equal(matchesJournalFilter(event, 'all'), true)
+    assert.equal(matchesJournalFilter(event, 'diary'), true)
+    assert.equal(matchesJournalFilter(event, 'hub'), categories.includes('Hub'))
+    assert.equal(matchesJournalFilter(event, 'encounters'), categories.includes('Encounter'))
+  }
 })
 
 test('enrichment replaces an existing source without duplicate entries or losing older raids', () => {

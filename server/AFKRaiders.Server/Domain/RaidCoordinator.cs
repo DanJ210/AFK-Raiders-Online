@@ -160,12 +160,14 @@ public sealed class RaidCoordinator
                 AdvanceWorlds(nextAdmissionAt, revisions);
                 RefreshAutonomousMembership(nextAdmissionAt);
                 TryCloseAutonomousWorld(nextAdmissionAt);
+                RecordHomeReadiness(nextAdmissionAt);
                 AdmitEligibleRaiders(nextAdmissionAt, revisions);
                 nextAdmissionAt += AdmissionPulse;
             }
             AdvanceWorlds(now, revisions);
             RefreshAutonomousMembership(now);
             TryCloseAutonomousWorld(now);
+            RecordHomeReadiness(now);
             return revisions.Values.OrderBy(revision => revision.RaidId, StringComparer.Ordinal).ToArray();
         }
     }
@@ -319,6 +321,7 @@ public sealed class RaidCoordinator
             var extractedAt = terminalEvent.At;
             handler.IsHome = true;
             handler.HomeAvailableAt = extractedAt + HomeInterval;
+            handler.HomeReadinessLogged = false;
             handler.LastExtractedLoot = projection.MyExtractedLoot.ToArray();
 
             if (handler.SettledRaidIds.Add(world.Simulation.RaidId))
@@ -545,6 +548,34 @@ public sealed class RaidCoordinator
         activeAutonomousRaidId = null;
     }
 
+    private void RecordHomeReadiness(DateTimeOffset at)
+    {
+        foreach (var handler in handlers.Values.Where(handler =>
+            handler.IsHome && !handler.HomeReadinessLogged &&
+            handler.HomeAvailableAt is { } availableAt && availableAt <= at))
+        {
+            var readyAt = handler.HomeAvailableAt!.Value;
+            handler.HomeReadinessLogged = true;
+            var message = $"{DisplayName(handler.Slot)}'s home interval is complete; ready for another eligible admission in Desperanza.";
+            handler.Events.Add(new HandlerEventView(handler.Events.Count + 1, readyAt, "HubReady", message));
+            AddJournalEntry(handler, null, readyAt, "HubReady", "Hub", message,
+                $"hub:ready:{handler.LastReturnSummary?.RaidId}:{handler.Slot}");
+        }
+    }
+
+    private HubResidentView[] GetHubResidents(DateTimeOffset at) =>
+        handlers.Values
+            .Where(handler => handler.IsHome)
+            .OrderBy(handler => handler.Slot, StringComparer.Ordinal)
+            .Select(handler => new HubResidentView(
+                handler.Slot,
+                DisplayName(handler.Slot),
+                handler.HomeAvailableAt is { } availableAt && availableAt > at
+                    ? "Cooling down in Desperanza"
+                    : handler.DutyEnabled ? "Ready for duty in Desperanza" : "At home in Desperanza / duty paused",
+                handler.HomeAvailableAt))
+            .ToArray();
+
     private HandlerProjection ProjectHandler(HandlerState handler, DateTimeOffset at)
     {
         RaidProjection? raidProjection = null;
@@ -599,7 +630,8 @@ public sealed class RaidCoordinator
             handler.Coins, handler.Stash.TotalValue, handler.Stash.Count, HomeStash.MaxCapacity,
             handler.Stash.Items, handler.Stash.GetGroups(),
             equippedWeapon, handler.OwnedWeapons.ToArray(), supplyList, stagedList, shopCatalogView,
-            handler.SignalCurrent, handler.SignalMax, raidProjection?.MyHiddenPocketInstanceId);
+            handler.SignalCurrent, handler.SignalMax, raidProjection?.MyHiddenPocketInstanceId,
+            GetHubResidents(at));
     }
 
     public PurchaseShopItemResponse PurchaseShopItem(string accessToken, PurchaseShopItemRequest request)
@@ -1210,10 +1242,25 @@ public sealed class RaidCoordinator
 
     private void QueueLiveNarration(RaidSimulation simulation, RaidEventView evt)
     {
-        if (!narrativeGenerator.IsAvailable || narrativeGenerator is TemplateNarrativeGenerator ||
-            simulation.Completed || time.GetUtcNow() - evt.At > TimeSpan.FromSeconds(90) ||
-            !Content.NarrationContent.Default.CanEnrich(evt.Kind) ||
-            !simulation.TryQueueNarration(evt.Sequence)) return;
+        if (narrativeGenerator is TemplateNarrativeGenerator || simulation.Completed ||
+            time.GetUtcNow() - evt.At > TimeSpan.FromSeconds(90) ||
+            !Content.NarrationContent.Default.CanEnrich(evt.Kind)) return;
+        if (!narrativeGenerator.IsAvailable)
+        {
+            simulation.MarkNarrationUnavailable(evt.Sequence);
+            return;
+        }
+        if (!simulation.TryQueueNarration(evt.Sequence)) return;
+        var location = evt.Location ?? "Desperanza";
+        var isRobot = evt.Kind == "RobotRound";
+        var context = new AmbientCommsContext(location, evt.Activity ?? evt.Kind,
+            EventKind: evt.Kind,
+            Condition: simulation.Condition.Name,
+            Danger: simulation.Condition.Danger.ToString(),
+            RobotName: isRobot ? simulation.RobotName : null,
+            NearbyRaiders: isRobot ? Math.Max(0, evt.ParticipantIds.Count - 1)
+                : simulation.OtherActiveRaidersAt(location, evt.ParticipantIds[0]));
+        var allowedTerms = OnnxGenAiNarrativeGenerator.AllowedTermsFor(context);
         bool Current()
         {
             lock (gate)
@@ -1224,7 +1271,7 @@ public sealed class RaidCoordinator
             lock (gate)
             {
                 string? rejectionReason = null;
-                var flavor = result.Source == "Generated" ? OnnxGenAiNarrativeGenerator.ValidateAmbient(result.Text, out rejectionReason) : null;
+                var flavor = result.Source == "Generated" ? OnnxGenAiNarrativeGenerator.ValidateAmbient(result.Text, out rejectionReason, allowedTerms) : null;
                 if (Current() && flavor is not null)
                     simulation.ApplyNarration(evt.Sequence, evt.Text, flavor);
                 else simulation.FinishNarration(evt.Sequence, Current() ? "Fallback" : "Expired",
@@ -1236,7 +1283,7 @@ public sealed class RaidCoordinator
             }
         }
         _ = narrator.EnqueueEnrichmentAsync(new(simulation.RaidId, evt.ParticipantIds[0], evt.Sequence, evt.Kind,
-            new AmbientCommsContext(evt.Location ?? "Desperanza", evt.Activity ?? evt.Kind),
+            context,
             text => Apply(new(text, "Generated")), Apply, Current));
     }
 
@@ -1380,6 +1427,7 @@ public sealed class RaidCoordinator
         public string AccessToken { get; } = accessToken;
         public bool DutyEnabled { get; set; } = true;
         public bool IsHome { get; set; } = true;
+        public bool HomeReadinessLogged { get; set; }
         public DateTimeOffset? HomeAvailableAt { get; set; }
         public string? CurrentRaidId { get; set; }
         public IReadOnlyList<ItemView> LastExtractedLoot { get; set; } = [];
@@ -1441,7 +1489,9 @@ public sealed record HandlerProjection(
     ShopCatalogView? ShopCatalog = null,
     int SignalCurrent = 3,
     int SignalMax = 5,
-    string? SecretHiddenPocketInstanceId = null);
+    string? SecretHiddenPocketInstanceId = null,
+    IReadOnlyList<HubResidentView>? HubResidents = null);
+public sealed record HubResidentView(string Slot, string DisplayName, string Status, DateTimeOffset? HomeAvailableAt);
 public sealed record HandlerEventView(int Sequence, DateTimeOffset At, string Kind, string Text);
 
 public sealed record ReturnSummaryView(

@@ -7,7 +7,7 @@ namespace AFKRaiders.Server.Domain;
 
 public sealed class RaidSimulation
 {
-    public const string RulesVersion = "desperanza-g6-v2";
+    public const string RulesVersion = "desperanza-g6-v3";
     public static readonly TimeSpan AdmissionWindow = TimeSpan.FromSeconds(20);
     public const int MaxRaiders = 2;
     private const int PodDeploymentSeconds = 60;
@@ -36,6 +36,7 @@ public sealed class RaidSimulation
     private readonly List<EncounterView> encounters = [];
     private readonly RobotState robot = new();
     private RobotEncounterView? robotEncounter;
+    private SharedExtractionVehicle? sharedExtraction;
     private bool departed;
     private readonly Opportunity[] opportunities;
     private readonly List<PendingHandlerAction> pendingHandlerActions = [];
@@ -117,6 +118,10 @@ public sealed class RaidSimulation
         raider.LastVoice = state.LastLine;
     }
     public int ParticipantCount => raiders.Count;
+    public string RobotName => robot.Name;
+    // Prompt context only: counts other active Raiders sharing a location; never projected with identities.
+    internal int OtherActiveRaidersAt(string location, string playerId) => raiders.Count(r =>
+        r.PlayerId != playerId && r.Location == location && r.Activity is not ("Extracted" or "KnockedOut"));
     internal bool HasRaider(string playerId) => raiders.Any(r => r.PlayerId == playerId);
     public int Revision { get; private set; } = 1;
     public bool Completed => departed && raiders.Count > 0 && raiders.All(raider => raider.Activity is "Extracted" or "KnockedOut");
@@ -135,6 +140,10 @@ public sealed class RaidSimulation
                 deadlines.Add(nextHazardAt);
                 if (!deadlineResolved) deadlines.Add(DeadlineAt);
             }
+            if (sharedExtraction is { Status: "Calling" } calling)
+                deadlines.Add(calling.ArrivalAt);
+            if (sharedExtraction is { Status: "Boarding", BoardingClosesAt: { } boardingClosesAt })
+                deadlines.Add(boardingClosesAt);
             deadlines.AddRange(opportunities
                 .Where(opportunity => !opportunity.Resolved)
                 .Select(opportunity => opportunity.ClosesAt));
@@ -331,6 +340,8 @@ public sealed class RaidSimulation
                 BeginSearch(raider, at);
             }
 
+            ProcessSharedExtraction(at);
+
             ResolveRobotRound(at);
 
             foreach (var opportunity in opportunities.OrderBy(opportunity => opportunity.Id, StringComparer.Ordinal)
@@ -353,16 +364,6 @@ public sealed class RaidSimulation
                 else if (raider.Activity == "Extracting")
                 {
                     CompleteExtraction(raider, at);
-                }
-                else if (raider.Activity == "CallingExtraction")
-                {
-                    Emit(at, "ExtractionVehicleArrived", [raider.PlayerId],
-                        NarrationContent.Default.Format("simulation.extraction-vehicle-arrived",
-                            raider.Name, raider.ExitVehicle, ExtractionBoardingWindowSeconds),
-                        location: raider.Location, activity: "WaitingToDepart",
-                        durationSeconds: ExtractionBoardingWindowSeconds,
-                        threadId: $"extract:{raider.Location}");
-                    SetActivity(raider, "WaitingToDepart", null, at.AddSeconds(ExtractionBoardingWindowSeconds), at);
                 }
                 else if (raider.Activity == "WaitingToDepart")
                 {
@@ -445,6 +446,9 @@ public sealed class RaidSimulation
                     TryAutonomousConsumableUse(raider, at);
                 }
             }
+
+            if (sharedExtraction is { Status: "Boarding", BoardingClosesAt: { } closesAt } && closesAt == at)
+                sharedExtraction.Status = "Departed";
 
             if (riskReward) ProcessWorldTime(at);
             foreach (var raider in OrderedRaiders().Where(r => r.NextDiaryAt == at))
@@ -835,6 +839,77 @@ public sealed class RaidSimulation
     private static int Score(SimRaider raider) =>
         raider.Greed + raider.Aptitude * 3 + raider.Initiative - raider.Backpack.Sum(item => item.Value) / 5;
 
+    private void JoinOrCallSharedExtraction(SimRaider raider, DateTimeOffset at)
+    {
+        if (sharedExtraction is { Status: "Calling" } calling)
+        {
+            SetActivity(raider, "WaitingForVehicle", null, calling.ArrivalAt, at);
+            EmitExtractionJoin(raider, calling.Vehicle, at);
+            return;
+        }
+        if (sharedExtraction is { Status: "Boarding", BoardingClosesAt: { } closesAt } boarding &&
+            at < closesAt)
+        {
+            SetActivity(raider, "WaitingToDepart", null, closesAt, at);
+            EmitExtractionJoin(raider, boarding.Vehicle, at);
+            return;
+        }
+
+        var arrivalAt = at.AddSeconds(ExtractionVehicleArrivalSeconds);
+        sharedExtraction = new SharedExtractionVehicle(raider.Name, raider.ExitVehicle, arrivalAt);
+        SetActivity(raider, "CallingExtraction", null, arrivalAt, at);
+        var threadId = $"extract:{raider.Location}";
+        Emit(at, "ExtractionStarted", [raider.PlayerId],
+            NarrationContent.Default.Format("simulation.calls-vehicle-with-four-sided-doors",
+                raider.ExitVehicle, ExtractionVehicleArrivalSeconds),
+            location: raider.Location,
+            durationSeconds: ExtractionVehicleArrivalSeconds,
+            threadId: threadId);
+        var activeRaiders = ActiveExtractionParticipants();
+        Emit(at, "SharedExtractionCalled", activeRaiders,
+            NarrationContent.Default.Format("simulation.shared-extraction-vehicle-called",
+                raider.Name, raider.ExitVehicle),
+            location: raider.Location,
+            durationSeconds: ExtractionVehicleArrivalSeconds,
+            threadId: threadId);
+    }
+
+    private void ProcessSharedExtraction(DateTimeOffset at)
+    {
+        if (sharedExtraction is not { Status: "Calling" } vehicle || vehicle.ArrivalAt != at)
+            return;
+
+        vehicle.Status = "Boarding";
+        vehicle.BoardingClosesAt = at.AddSeconds(ExtractionBoardingWindowSeconds);
+        foreach (var raider in OrderedRaiders().Where(raider =>
+            raider.EmergencyExtract && raider.Location == "Extraction Platform" &&
+            raider.Activity is "CallingExtraction" or "WaitingForVehicle"))
+        {
+            SetActivity(raider, "WaitingToDepart", null, vehicle.BoardingClosesAt, at);
+        }
+        Emit(at, "ExtractionVehicleArrived", ActiveExtractionParticipants(),
+            NarrationContent.Default.Format("simulation.extraction-vehicle-arrived",
+                vehicle.CalledBy, vehicle.Vehicle, ExtractionBoardingWindowSeconds),
+            location: "Extraction Platform", activity: "WaitingToDepart",
+            durationSeconds: ExtractionBoardingWindowSeconds,
+            threadId: "extract:Extraction Platform");
+    }
+
+    private void EmitExtractionJoin(SimRaider raider, string vehicle, DateTimeOffset at)
+    {
+        Emit(at, "ExtractionJoined", ActiveExtractionParticipants(),
+            NarrationContent.Default.Format("simulation.joins-shared-extraction",
+                raider.Name, vehicle),
+            location: "Extraction Platform",
+            threadId: "extract:Extraction Platform");
+    }
+
+    private string[] ActiveExtractionParticipants() =>
+        OrderedRaiders()
+            .Where(raider => raider.Activity is not ("Extracted" or "KnockedOut" or "Downed"))
+            .Select(raider => raider.PlayerId)
+            .ToArray();
+
     private ItemAwardView[] Distribute(string opportunity, SimRaider[] recipients)
     {
         if (recipients.Length == 0)
@@ -892,17 +967,19 @@ public sealed class RaidSimulation
                 raider.NextDiaryAt = at.AddSeconds(20);
                 return;
             }
-            var threadId = $"extract:{raider.Location}";
-            var arrivalSeconds = riskReward ? ExtractionVehicleArrivalSeconds : 10;
-            SetActivity(raider, riskReward ? "CallingExtraction" : "Extracting", null, at.AddSeconds(arrivalSeconds), at);
-            Emit(at, "ExtractionStarted", [raider.PlayerId],
-                riskReward
-                    ? NarrationContent.Default.Format("simulation.calls-vehicle-with-four-sided-doors",
-                        raider.ExitVehicle, ExtractionVehicleArrivalSeconds)
-                    : NarrationContent.Default.Format("narrator.calls-extraction-the-shuttle-requests", raider.Name),
-                location: raider.Location,
-                durationSeconds: arrivalSeconds,
-                threadId: threadId);
+            if (riskReward)
+            {
+                JoinOrCallSharedExtraction(raider, at);
+            }
+            else
+            {
+                SetActivity(raider, "Extracting", null, at.AddSeconds(10), at);
+                Emit(at, "ExtractionStarted", [raider.PlayerId],
+                    NarrationContent.Default.Format("narrator.calls-extraction-the-shuttle-requests", raider.Name),
+                    location: raider.Location,
+                    durationSeconds: 10,
+                    threadId: $"extract:{raider.Location}");
+            }
             return;
         }
         var destination = raider.Route.Dequeue();
@@ -1163,6 +1240,15 @@ public sealed class RaidSimulation
         ));
     }
 
+    internal void MarkNarrationUnavailable(int sequence)
+    {
+        var index = events.FindIndex(e => e.Sequence == sequence);
+        if (index < 0 || events[index].EnrichmentStatus != "NotRequested" ||
+            events[index].EnrichmentReason == "ModelUnavailable") return;
+        events[index] = events[index] with { EnrichmentReason = "ModelUnavailable" };
+        Revision++;
+    }
+
     internal bool TryQueueNarration(int sequence)
     {
         if (!queuedNarration.Add(sequence)) return false;
@@ -1173,7 +1259,7 @@ public sealed class RaidSimulation
             Revision++;
             return false;
         }
-        events[index] = events[index] with { EnrichmentStatus = "Pending" };
+        events[index] = events[index] with { EnrichmentStatus = "Pending", EnrichmentReason = null };
         Revision++;
         return true;
     }
@@ -1302,7 +1388,7 @@ public sealed class RaidSimulation
                 "Active", raider.ActivityStartedAt, raider.ActivityEndsAt, total,
                 NarrationContent.Default.Format("simulation.recovering-breath-after-salvage-contest", remaining), logs);
         }
-        if (raider.Activity is "CallingExtraction" or "WaitingToDepart")
+        if (raider.Activity is "CallingExtraction" or "WaitingForVehicle" or "WaitingToDepart")
         {
             var threadId = $"extract:{raider.Location}";
             var remaining = raider.ActivityEndsAt.HasValue
@@ -1311,11 +1397,12 @@ public sealed class RaidSimulation
             var logs = events.Where(e => e.ThreadId == threadId && e.ParticipantIds.Contains(raider.PlayerId))
                 .Select(e => e.NarrationText).ToArray();
             var calling = raider.Activity == "CallingExtraction";
+            var waitingForVehicle = raider.Activity == "WaitingForVehicle";
             return new ActiveThreadView(threadId, "Extraction",
-                calling ? "Calling Train / Service Elevator" : "Vehicle Arrived / Departing",
+                calling ? "Calling Train / Service Elevator" : waitingForVehicle ? "Joining Shared Extraction" : "Vehicle Arrived / Departing",
                 raider.Location, "Active", raider.ActivityStartedAt, raider.ActivityEndsAt,
-                calling ? ExtractionVehicleArrivalSeconds : ExtractionBoardingWindowSeconds,
-                calling
+                calling || waitingForVehicle ? ExtractionVehicleArrivalSeconds : ExtractionBoardingWindowSeconds,
+                calling || waitingForVehicle
                     ? NarrationContent.Default.Format("simulation.extraction-vehicle-landing-in-s", remaining, raider.ExitVehicle)
                     : NarrationContent.Default.Format("simulation.extraction-departure-window-s", remaining, raider.ExitVehicle),
                 logs);
@@ -1656,6 +1743,15 @@ public sealed class RaidSimulation
         public DateTimeOffset? NextRoundAt { get; set; }
         public HashSet<string> ParticipantIds { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, RobotDamage> DamageByPlayer { get; } = new(StringComparer.Ordinal);
+    }
+
+    private sealed class SharedExtractionVehicle(string calledBy, string vehicle, DateTimeOffset arrivalAt)
+    {
+        public string CalledBy { get; } = calledBy;
+        public string Vehicle { get; } = vehicle;
+        public DateTimeOffset ArrivalAt { get; } = arrivalAt;
+        public DateTimeOffset? BoardingClosesAt { get; set; }
+        public string Status { get; set; } = "Calling";
     }
 
     private sealed class RobotDamage(DateTimeOffset joinedAt)

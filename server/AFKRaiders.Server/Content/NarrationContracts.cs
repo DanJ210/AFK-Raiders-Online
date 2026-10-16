@@ -85,6 +85,8 @@ internal static class NarrationContracts
         ["simulation.arrives-at"] = 2,
         ["simulation.pod-launches-from-desperanza"] = 2,
         ["simulation.calls-vehicle-with-four-sided-doors"] = 2,
+        ["simulation.shared-extraction-vehicle-called"] = 2,
+        ["simulation.joins-shared-extraction"] = 2,
         ["simulation.extraction-vehicle-arrived"] = 3,
         ["simulation.boards-vehicle-and-confirms-departure"] = 2,
         ["simulation.completed-at-no-loot-or"] = 3,
