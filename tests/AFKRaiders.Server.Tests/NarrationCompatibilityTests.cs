@@ -19,7 +19,7 @@ public sealed class NarrationCompatibilityTests
             "Downed", "KnockedOut", "HiddenPocketSalvaged", "HiddenPocketEmpty", "ConsumableUsed", "HandlerAction",
             "CallExtract", "Calm", "Pressure", "DutyEnabled", "DutyPaused", "ReturnedHome", "RaidWorldClosed",
             "AreaDiary", "AreaActivityStarted", "AreaActivityCompleted", "WorldCondition", "Unknown" };
-        var activities = new[] { "Surveying", "Checking", "Rummaging", "Searching", "FightingRobot", "Extracting", "Unknown" };
+        var activities = new[] { "Surveying", "Checking", "Rummaging", "Searching", "FightingRobot", "Extracting", "Hub", "Unknown" };
         var narrator = new TemplateRaidNarrator();
         var start = DateTimeOffset.Parse("2026-10-14T00:00:00Z");
         var lines = new List<string>();
@@ -60,6 +60,7 @@ public sealed class NarrationCompatibilityTests
                 lines.Add(JsonSerializer.Serialize(sim.Project("two", start.AddHours(1))));
             }
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
-        Assert.Equal("A1C64A40C0365681E531E532544ACB57A186D18FCBB80B12215CB8AE7A955999", hash);
+        // C6 and LOOT-1 intentionally change authored templates and project the selected field activity.
+        Assert.Equal("DD00D7AF0E4D74DF32B2E742A24245C3EAC8F00B7FEA7B2AA5B8AFDE414C8FAE", hash);
     }
 }

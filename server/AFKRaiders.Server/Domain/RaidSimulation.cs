@@ -83,13 +83,22 @@ public sealed class RaidSimulation
             robot.Flavor = dangerProfile.RobotFlavor;
             robot.Health = robot.MaxHealth = dangerProfile.RobotHealth;
         }
-        opportunities = this.catalog.Opportunities
-            .Select(o => new Opportunity(o.Id, o.Location, o.DurationSeconds))
-            .ToArray();
-        var worldInstances = useTableBackedLoot
-            ? this.catalog.CreateTableBackedWorldItems(raidId, seed)
+        var worldOpportunities = this.riskReward && !fastPacing
+            ? this.catalog.SelectWorldOpportunities(seed)
+            : this.catalog.Opportunities
+                .GroupBy(opportunity => opportunity.Location, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .ToArray();
+        opportunities = worldOpportunities.Select(opportunity => new Opportunity(opportunity)).ToArray();
+        var opportunityIds = worldOpportunities.Select(opportunity => opportunity.Id).ToHashSet(StringComparer.Ordinal);
+        var hasVariantOpportunity = worldOpportunities.Any(opportunity => opportunity.FixedItemIds.Count == 0);
+        var worldInstances = useTableBackedLoot || hasVariantOpportunity
+            ? this.catalog.CreateTableBackedWorldItems(raidId, seed, worldOpportunities.Select(opportunity => opportunity.Id).ToArray())
             : this.catalog.CreateFixedWorldItems(raidId);
-        items = worldInstances.Select(w => new WorldItem(w.OpportunityId, w.Item)).ToList();
+        items = worldInstances
+            .Where(worldItem => opportunityIds.Contains(worldItem.OpportunityId))
+            .Select(worldItem => new WorldItem(worldItem.OpportunityId, worldItem.Item))
+            .ToList();
     }
 
     public ILootCatalog Catalog => catalog;
@@ -474,13 +483,14 @@ public sealed class RaidSimulation
         var me = raiders.Single(raider => raider.PlayerId == playerId);
         var currentThread = BuildActiveThread(me, serverTime);
         var recentThreads = me.CompletedThreads.TakeLast(5).ToArray();
+        var salvageOpportunity = opportunities.Single(opportunity => opportunity.Location == "Salvage Yard");
         return new RaidProjection(RaidId, Revision, RulesVersion, serverTime, Status,
             StartsAt + AdmissionWindow, NextActivityAt, riskReward ? Zone : "Scrapyard",
             OrderedRaiders().Select(raider => new PlayerView(raider.PlayerId, raider.Name, raider.Disposition,
                 raider.Location, raider.Activity, raider.Destination, raider.ActivityEndsAt)).ToArray(),
             locations.Select(location => new LocationView(location.Name, location.Neighbors.ToArray())).ToArray(),
-            new CrateView("humming-crate", "Salvage Yard", OpportunityStatus(opportunities.Single(opportunity => opportunity.Id == "humming-crate")),
-                items.Count(item => item.Opportunity == "humming-crate" && item.OwnerId is null && !item.Lost)),
+            new CrateView(salvageOpportunity.Id, salvageOpportunity.Location, OpportunityStatus(salvageOpportunity),
+                items.Count(item => item.Opportunity == salvageOpportunity.Id && item.OwnerId is null && !item.Lost)),
             new RobotView(robot.Id, robot.Name, robot.Location, robot.Status, robot.Health, robot.MaxHealth,
                 robot.RoundsResolved, robot.NextRoundAt, robot.ParticipantIds.Order(StringComparer.Ordinal).ToArray()),
             me.Health, me.MaxHealth,
@@ -489,7 +499,7 @@ public sealed class RaidSimulation
             robotEncounter is not null && robotEncounter.ParticipantIds.Contains(playerId) ? robotEncounter : null,
             events.Where(raidEvent => raidEvent.ParticipantIds.Contains(playerId)).ToArray(),
             opportunities.Select(opportunity => new OpportunityView(opportunity.Id, opportunity.Location,
-                OpportunityStatus(opportunity), opportunity.ClosesAt,
+                opportunity.Activity, opportunity.Title, OpportunityStatus(opportunity), opportunity.ClosesAt,
                 items.Count(item => item.Opportunity == opportunity.Id && item.OwnerId is null && !item.Lost),
                 opportunity.ParticipantIds.Order(StringComparer.Ordinal).ToArray())).ToArray(),
             currentThread,
@@ -538,15 +548,11 @@ public sealed class RaidSimulation
             return;
         }
         opportunity.Admit(raider.PlayerId, at);
-        SetActivity(raider, "Searching", null, opportunity.ClosesAt, at);
-        var text = opportunity.Id switch
-        {
-            "market-locker" => NarrationContent.Default.Format("simulation.a-locker-labeled-staycation-hums"),
-            "humming-crate" => NarrationContent.Default.Format("simulation.a-humming-crate-sits-in"),
-            _ => NarrationContent.Default.Format("simulation.the-service-depot-locker-contains")
-        };
+        SetActivity(raider, opportunity.Activity, null, opportunity.ClosesAt, at);
         var threadId = $"search:{opportunity.Id}";
-        Emit(at, "Search", [raider.PlayerId], NarrationContent.Default.Format("simulation.searches-at", raider.Name, raider.Location, text),
+        Emit(at, "Search", [raider.PlayerId],
+            NarrationContent.Default.Format("simulation.field-activity-started",
+                raider.Name, opportunity.Title, raider.Location, opportunity.StartText),
             location: raider.Location,
             opportunityId: opportunity.Id,
             threadId: threadId);
@@ -600,7 +606,7 @@ public sealed class RaidSimulation
         if (participants.Length == 0)
         {
             FinishRobotEncounter(at, "Escaped", [], NarrationContent.Default.Format("simulation.has-no-remaining-fighters-no", robot.Name));
-            var abandoned = opportunities.Single(o => o.Id == "depot-locker");
+            var abandoned = opportunities.Single(o => o.Location == "Service Depot");
             abandoned.Resolved = true;
             foreach (var item in items.Where(i => i.Opportunity == abandoned.Id && i.OwnerId is null)) item.Lost = true;
             return;
@@ -652,7 +658,7 @@ public sealed class RaidSimulation
         {
             robot.Status = "Escaped";
             robot.NextRoundAt = null;
-            var depot = opportunities.Single(opportunity => opportunity.Id == "depot-locker");
+            var depot = opportunities.Single(opportunity => opportunity.Location == "Service Depot");
             depot.Resolved = true;
             foreach (var item in items.Where(item => item.Opportunity == depot.Id && item.OwnerId is null))
                 item.Lost = true;
@@ -665,7 +671,7 @@ public sealed class RaidSimulation
         {
             robot.Status = "Escaped";
             robot.NextRoundAt = null;
-            var depot = opportunities.Single(opportunity => opportunity.Id == "depot-locker");
+            var depot = opportunities.Single(opportunity => opportunity.Location == "Service Depot");
             depot.Resolved = true;
             foreach (var item in items.Where(item => item.Opportunity == depot.Id && item.OwnerId is null))
                 item.Lost = true;
@@ -720,9 +726,9 @@ public sealed class RaidSimulation
             return;
         }
         if (participants.Any(raider =>
-            raider.Location != opportunity.Location || raider.Activity != "Searching" || raider.ActivityEndsAt != at))
+            raider.Location != opportunity.Location || raider.Activity != opportunity.Activity || raider.ActivityEndsAt != at))
         {
-            throw new InvalidOperationException("Search participants must be present and searching at the shared deadline.");
+            throw new InvalidOperationException("Field activity participants must be present and active at the shared deadline.");
         }
         if (riskReward)
         {
@@ -731,18 +737,18 @@ public sealed class RaidSimulation
             items.RemoveAll(i => i.Opportunity == opportunity.Id);
             items.AddRange(generated.Select(i => new WorldItem(i.OpportunityId, i.Item)));
             foreach (var participant in participants)
-                ChangePersonality(participant, 2, 1, at, "Completed salvage search");
+                ChangePersonality(participant, 2, 1, at, $"Completed {opportunity.Activity.ToLowerInvariant()}");
         }
         var threadId = $"search:{opportunity.Id}";
-        if (opportunity.Id != "humming-crate")
+        if (!opportunity.Contestable)
         {
             var awards = Distribute(opportunity.Id, participants);
             foreach (var raider in participants)
             {
-                CompleteThread(raider, threadId, $"{opportunity.Location} search completed.");
+                CompleteThread(raider, threadId, opportunity.CompletedText);
             }
             Emit(at, "SearchCompleted", participants.Select(raider => raider.PlayerId).ToArray(),
-                NarrationContent.Default.Format("simulation.search-completed", opportunity.Location, string.Join("; ", awards.Select(award => $"{award.RecipientName} recovered {award.ItemName}"))),
+                $"{opportunity.CompletedText} {string.Join("; ", awards.Select(award => $"{award.RecipientName} recovered {award.ItemName}"))}.",
                 location: opportunity.Location,
                 opportunityId: opportunity.Id,
                 threadId: threadId);
@@ -790,10 +796,11 @@ public sealed class RaidSimulation
             participants.Select(raider => raider.PlayerId).ToArray(), factors, allocation, reason));
         foreach (var raider in participants)
         {
-            CompleteThread(raider, threadId, $"{resolution}: {string.Join("; ", allocation.Select(award => $"{award.RecipientName} recovered {award.ItemName}"))}.");
+            CompleteThread(raider, threadId,
+                $"{opportunity.CompletedText} {resolution}: {string.Join("; ", allocation.Select(award => $"{award.RecipientName} recovered {award.ItemName}"))}.");
         }
         Emit(at, "EncounterResolved", participants.Select(raider => raider.PlayerId).ToArray(),
-            $"{resolution}: {string.Join("; ", allocation.Select(award => $"{award.RecipientName} recovered {award.ItemName}"))}. {reason}",
+            $"{opportunity.CompletedText} {resolution}: {string.Join("; ", allocation.Select(award => $"{award.RecipientName} recovered {award.ItemName}"))}. {reason}",
             location: "Salvage Yard",
             opportunityId: opportunity.Id,
             reason: reason,
@@ -1307,7 +1314,10 @@ public sealed class RaidSimulation
                 events.Where(e => e.ParticipantIds.Contains(raider.PlayerId) &&
                     e.At >= raider.ActivityStartedAt && e.Kind is "AreaDiary" or "ExtractionDecision")
                     .Select(e => e.NarrationText).ToArray());
-        if (raider.Activity is "Surveying" or "Checking" or "Rummaging")
+        var activeOpportunity = opportunities.FirstOrDefault(candidate =>
+            candidate.Location == raider.Location && candidate.Activity == raider.Activity &&
+            candidate.ParticipantIds.Contains(raider.PlayerId));
+        if (activeOpportunity is null && (raider.Activity is "Surveying" or "Checking" or "Rummaging"))
         {
             var threadId = $"area:{raider.PlayerId}:{raider.AreaVisit}:{raider.AreaBeat}";
             return new ActiveThreadView(threadId, "AreaActivity", raider.Activity, raider.Location, "Active",
@@ -1330,25 +1340,20 @@ public sealed class RaidSimulation
                 "Active", raider.ActivityStartedAt, raider.ActivityEndsAt, total,
                 NarrationContent.Default.Format("simulation.eta-s-navigation-guided-by", remaining), logs);
         }
-        if (raider.Activity == "Searching")
+        if (activeOpportunity is not null)
         {
-            var opp = opportunities.FirstOrDefault(o => o.Location == raider.Location);
-            var threadId = $"search:{opp?.Id ?? raider.Location}";
-            var total = opp?.SearchSeconds ?? 10;
-            var remaining = opp?.ClosesAt.HasValue == true
-                ? Math.Max(0, (int)Math.Ceiling((opp.ClosesAt.Value - serverTime).TotalSeconds))
+            var opportunity = activeOpportunity;
+            var threadId = $"search:{opportunity.Id}";
+            var remaining = opportunity.ClosesAt.HasValue
+                ? Math.Max(0, (int)Math.Ceiling((opportunity.ClosesAt.Value - serverTime).TotalSeconds))
                 : 0;
-            var title = opp?.Id switch
-            {
-                "market-locker" => NarrationContent.Default.Format("simulation.salvage-search-staycation-locker"),
-                "humming-crate" => NarrationContent.Default.Format("simulation.salvage-search-humming-crate"),
-                _ => NarrationContent.Default.Format("simulation.salvage-search-service-depot-locker")
-            };
-            var logs = events.Where(e => (e.ThreadId == threadId || e.OpportunityId == opp?.Id) && e.ParticipantIds.Contains(raider.PlayerId))
+            var logs = events.Where(e => (e.ThreadId == threadId || e.OpportunityId == opportunity.Id) && e.ParticipantIds.Contains(raider.PlayerId))
                 .Select(e => e.NarrationText).ToArray();
-            return new ActiveThreadView(threadId, "Search", title, raider.Location,
-                "Active", raider.ActivityStartedAt, opp?.ClosesAt ?? raider.ActivityEndsAt, total,
-                NarrationContent.Default.Format("simulation.searching-container-deadline-in-s", remaining), logs);
+            var threadKind = opportunity.Activity == OpportunityActivity.Searching ? "Search" : opportunity.Activity;
+            return new ActiveThreadView(threadId, threadKind, opportunity.Title, raider.Location,
+                "Active", raider.ActivityStartedAt, opportunity.ClosesAt ?? raider.ActivityEndsAt,
+                opportunity.SearchSeconds,
+                NarrationContent.Default.Format("simulation.field-activity-deadline-in-s", remaining), logs);
         }
         if (raider.Activity == "FightingRobot")
         {
@@ -1698,11 +1703,16 @@ public sealed class RaidSimulation
         }
     }
 
-    internal sealed class Opportunity(string id, string location, int searchSeconds)
+    internal sealed class Opportunity(OpportunityDefinition definition)
     {
-        public string Id { get; } = id;
-        public string Location { get; } = location;
-        public int SearchSeconds { get; } = searchSeconds;
+        public string Id { get; } = definition.Id;
+        public string Location { get; } = definition.Location;
+        public int SearchSeconds { get; } = definition.DurationSeconds;
+        public string Activity { get; } = definition.Activity;
+        public string Title { get; } = definition.Title;
+        public string StartText { get; } = definition.StartText;
+        public string CompletedText { get; } = definition.CompletedText;
+        public bool Contestable { get; } = definition.Contestable;
         public DateTimeOffset? ClosesAt { get; private set; }
         public bool Resolved { get; set; }
         public HashSet<string> ParticipantIds { get; } = new(StringComparer.Ordinal);
@@ -1850,8 +1860,8 @@ public sealed record RaidProjection(string RaidId, int Revision, string RulesVer
     double MyAppetite = 0,
     double Exposure = 0,
     IReadOnlyList<HazardWarningView>? HazardWarnings = null);
-public sealed record OpportunityView(string OpportunityId, string Location, string Status, DateTimeOffset? ClosesAt,
-    int RemainingItems, IReadOnlyList<string> ParticipantIds);
+public sealed record OpportunityView(string OpportunityId, string Location, string Activity, string Title,
+    string Status, DateTimeOffset? ClosesAt, int RemainingItems, IReadOnlyList<string> ParticipantIds);
 public sealed record PlayerView(string PlayerId, string DisplayName, string Disposition, string Location,
     string Activity, string? Destination, DateTimeOffset? ActivityEndsAt);
 public sealed record LocationView(string Name, IReadOnlyList<string> Neighbors);

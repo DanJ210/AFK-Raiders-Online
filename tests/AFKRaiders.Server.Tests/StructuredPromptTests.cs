@@ -35,6 +35,8 @@ public sealed class StructuredPromptTests
         Assert.Contains("Weather: Overtime Red, high danger.", prompt);
         Assert.Contains("Robot: Roomba Prime", prompt);
         Assert.Contains("never say who wins or gets hurt", prompt);
+        Assert.Contains("at most 200 characters", prompt);
+        Assert.DoesNotContain("6-10-word", prompt);
         Assert.DoesNotContain("player", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Company nearby", prompt);
         Assert.EndsWith("I consider", prompt);

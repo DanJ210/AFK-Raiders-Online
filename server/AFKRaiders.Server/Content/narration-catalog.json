@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contentVersion": "desperanza-narration-v1",
+  "contentVersion": "desperanza-narration-v3",
   "pools": [
     {
       "id": "survival.downed",
@@ -117,7 +117,14 @@
         "I prefer directions without a subscription.",
         "My patience qualifies as antique stock.",
         "The Before-ish survives best on labels. The labels have very optimistic historians.",
-        "Hydroponic Arguments reached a lettuce agreement. The minutes remain leafy."
+        "I consider lettuce custody a matter for Hydroponic Arguments.",
+        "The Great Downstairs sounds less like an era and more like a basement committee.",
+        "Desperanza calls this a home interval. My backpack calls it unpaid leave.",
+        "The Water Ration Desk believes every sip needs a witness.",
+        "Old-world companies promised comfort. The warranty survived with questions.",
+        "The Permit Choir can make silence sound like a required attachment.",
+        "I trust the hub's directions as far as I can fold them.",
+        "Civilization is one working stamp away from requesting another stamp."
       ]
     },
     {
@@ -128,7 +135,9 @@
         "I prefer medical tape without motivational quotes.",
         "My confidence comes in questionable packaging.",
         "I consider premium panic a billing category.",
-        "My dignity is not covered by the warranty."
+        "My dignity is not covered by the warranty.",
+        "Nearly Fresh calls this a snack. The wrapper declined to provide a date.",
+        "The Water Ration Desk says hydration improves paperwork posture."
       ]
     },
     {
@@ -137,7 +146,9 @@
         "I consider this forecast a workplace grievance.",
         "My socks oppose the atmospheric agenda.",
         "I prefer weather without administrative ambition.",
-        "My optimism needs a waterproof case."
+        "My optimism needs a waterproof case.",
+        "Apology Weather sounds less personal when filed in triplicate.",
+        "I consider a forecast with no forms a suspiciously generous forecast."
       ]
     },
     {
@@ -209,7 +220,13 @@
         "I'm budgeting my optimism for the return journey.",
         "I'm traveling light, if emotional baggage doesn't count.",
         "I'm treating every step as a small investment in dry socks.",
-        "Tube Routes taught me that direct is an aspiration, not a measurement."
+        "Tube Routes taught me that direct is an aspiration, not a measurement.",
+        "The tube map has several arrows and no interest in follow-up questions.",
+        "Every pod has one seat and several opinions about the route.",
+        "The Hatch Authority handles departure forms. Gravity handles the rest.",
+        "I trust the tube map exactly as far as I can fold it.",
+        "The surface is a short trip if measured in paperwork.",
+        "Arrival is the part the schedule mentions in smaller print."
       ]
     },
     {
@@ -221,7 +238,12 @@
         "I'm offering the zipper a brief prayer and no bargaining rights.",
         "I consider this locker a patience seminar with hinges.",
         "I'm conducting research. The clipboard would only introduce bias.",
-        "OopsAll Logistics defines delivered as the point at which nobody can find the package."
+        "OopsAll Logistics defines delivered as the point at which nobody can find the package.",
+        "Nearly Fresh labels snacks by legal weather, not calendar.",
+        "I search this locker with the confidence of an expired warranty.",
+        "Every drawer is a tiny referendum on my priorities.",
+        "Clipboard Researchers call it a sample. I call it a container with boundaries.",
+        "A suspicious label is still more reliable than my shopping instinct."
       ]
     },
     {
@@ -233,7 +255,14 @@
         "I'm keeping my justification brief: could be useful.",
         "I can defend this decision in writing. Please don't request the writing.",
         "I'm treating this as the foundation of a very specific future strategy.",
-        "The Pawn Desk says every object has a future. Mine appears to involve paperwork."
+        "The Pawn Desk says every object has a future. Mine appears to involve paperwork.",
+        "The Pawn Desk values this highly, which is how I know the price is emotional.",
+        "Coupon Barons calculate discounts in a currency called almost enough.",
+        "Bravado Battery promises courage; the cell requests a quieter audience.",
+        "Nearly Fresh advertises shelf life as a matter for arbitration.",
+        "An OopsAll Logistics label proves intent, not delivery.",
+        "ComfortCo guaranteed comfort until further notice. The notice is missing.",
+        "A coupon is a promise with arithmetic attached."
       ]
     },
     {
@@ -245,7 +274,11 @@
         "I consider confidence a defense strategy with disappointing peer review.",
         "I'm requesting that this be classified as a workplace disagreement.",
         "I'm reserving my dignity for the performance review.",
-        "A.R.C. means Aggressively Roaming Chassis. I am hoping the aggression has office hours."
+        "A.R.C. means Aggressively Roaming Chassis. I am hoping the aggression has office hours.",
+        "That A.R.C. chassis has the confidence of a machine with no supervisor.",
+        "I would appeal to the chassis. It appears to be the entire department.",
+        "That warning tone sounds like a disciplinary meeting with wheels.",
+        "We both have a maintenance schedule. Only one of us brought tools."
       ]
     },
     {
@@ -257,6 +290,12 @@
         "I consider boarding priority worth precisely none of my remaining dignity.",
         "I'm keeping my panic optional and my paperwork accessible.",
         "I'm rating this exit strategy above the alternative.",
+        "The Exit Strategy Booth charges extra for maps that acknowledge distance.",
+        "The platform is a meeting place for me and a deadline.",
+        "Departure windows are punctual in the way paperwork is punctual.",
+        "My extraction plan was written on a receipt. The return policy is missing.",
+        "I will board when ready. My dignity will require separate transport.",
+        "The Hatch Authority calls it a departure. My knees call it a negotiation.",
         "The Exit Strategy Booth uses nearby as a unit of distance."
       ]
     },
@@ -280,7 +319,13 @@
         "I would like my paperwork waterproof.",
         "I consider my confidence provisional, like the flooring.",
         "I'm submitting my concerns in the form of continued movement.",
-        "I'm maintaining a professional distance from my own judgment."
+        "I'm maintaining a professional distance from my own judgment.",
+        "Desperanza defines a shortcut as two stamps and a witness.",
+        "Home is where the paperwork recognizes your handwriting.",
+        "The Before-ish sounds like a filing category with excellent publicity.",
+        "I maintain a respectful distance from the hydroponic committee.",
+        "All roads lead to a Tube Routes map. The routes remain a separate matter.",
+        "The Pawn Desk can appraise anything except my confidence."
       ]
     },
     {
@@ -337,6 +382,41 @@
         "paperwork",
         "socks",
         "compasses"
+      ]
+    },
+    {
+      "id": "style.hub",
+      "lines": [
+        "tube route maps",
+        "departure claim windows",
+        "ration desk cups",
+        "pawn desk ledgers",
+        "hydroponic lettuce debates",
+        "security stamp trays",
+        "old departure boards",
+        "pod seating charts",
+        "warranty claim forms",
+        "four sided vehicle doors",
+        "coupon baron arithmetic",
+        "quiet corners with paperwork",
+        "claims window labels",
+        "locker philosophy",
+        "desperanza tube maps"
+      ]
+    },
+    {
+      "id": "hub.activities",
+      "lines": [
+        "Ran a gear check. Everything is technically present. Confidence: borderline.",
+        "Spilled synth-coffee on my boots. The boots took it personally.",
+        "Sat on a cot. The springs made a noise that sounded like judgment.",
+        "Mission terminal displayed an error message: 'No.'",
+        "Took a recovery nap on a cot in Desperanza. Dreamed about crates. Woke up reaching for one.",
+        "Gave themselves a pep talk in the locker-room mirror. Rat Rating momentarily irrelevant.",
+        "Studied the Tube Routes map. The dotted line appears to represent administrative confidence.",
+        "Watched Hydroponic Arguments debate lettuce custody. The lettuce declined to testify.",
+        "Visited the Water Ration Desk to practice heroic sipping. No water changed ownership.",
+        "Hatch Authority stamped the waiting form WAITING. Progress remains mostly ink."
       ]
     }
   ],
@@ -590,6 +670,10 @@
       "text": "{0} searches at {1}. {2}"
     },
     {
+      "id": "simulation.field-activity-started",
+      "text": "{0} begins {1} at {2}. {3}"
+    },
+    {
       "id": "simulation.cross-paths-at-the-existing",
       "text": "{0} cross paths at {1}. The existing search deadline does not move."
     },
@@ -607,7 +691,7 @@
     },
     {
       "id": "simulation.is-disabled-the-service-depot",
-      "text": "{0} is disabled. The Service Depot locker is now accessible."
+      "text": "{0} is disabled. The Service Depot field site is accessible."
     },
     {
       "id": "simulation.has-health-it-deals-raw",
@@ -615,11 +699,11 @@
     },
     {
       "id": "simulation.overran-all-fighters-the-service",
-      "text": "{0} overran all fighters. The Service Depot locker is lost for this raid."
+      "text": "{0} overran all fighters. The Service Depot opportunity is lost for this raid."
     },
     {
       "id": "simulation.escapes-after-rounds-the-service",
-      "text": "{0} escapes after {1} rounds. The Service Depot locker is lost for this raid."
+      "text": "{0} escapes after {1} rounds. The Service Depot opportunity is lost for this raid."
     },
     {
       "id": "simulation.search-completed",
@@ -720,6 +804,10 @@
     {
       "id": "simulation.searching-container-deadline-in-s",
       "text": "Searching container. Deadline in {0}s."
+    },
+    {
+      "id": "simulation.field-activity-deadline-in-s",
+      "text": "Field activity in progress. Deadline in {0}s."
     },
     {
       "id": "simulation.combat-round",

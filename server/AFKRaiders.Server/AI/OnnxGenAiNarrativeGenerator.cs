@@ -98,8 +98,8 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
             var validated = ValidateAmbient(text, out var rejectionReason, AllowedTermsFor(context));
             if (validated is null)
                 logger.LogWarning("ONNX ambient output rejected after {Ms}ms: {Reason}; raw length {Length}, preview truncated {Truncated}: {Raw}",
-                    started.ElapsedMilliseconds, rejectionReason, text.Length, text.Length > 120,
-                    text.Length > 120 ? text[..120] : text);
+                    started.ElapsedMilliseconds, rejectionReason, text.Length, text.Length > AmbientMaxCharacters,
+                    AmbientLogPreview(text));
             else
                 logger.LogInformation("ONNX ambient Generated in {Ms}ms.", started.ElapsedMilliseconds);
             return new(validated, validated is null ? $"Rejected:{rejectionReason}" : null);
@@ -178,7 +178,10 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
             || (t.Length > 8 && t[^1] is '.' or '!' or '?');
     }
 
-    internal const int AmbientOutputTokens = 32;
+    internal const int AmbientMaxCharacters = 200;
+    internal const int AmbientOutputTokens = 96;
+    internal static string AmbientLogPreview(string text) =>
+        text.Length > AmbientMaxCharacters ? text[..AmbientMaxCharacters] : text;
     // Prefilled into the assistant turn so Phi continues in the first person.
     internal const string AmbientPrefix = "I consider";
 
@@ -189,10 +192,10 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
             : AmbientPrefix + continuation;
 
     internal static string BuildAmbientPrompt(string location, string activity, long sequence = 0) =>
-        "<|system|>\nWrite one complete 6-10-word dry joke ending in a period. " +
+        $"<|system|>\nWrite one complete dry joke of at most {AmbientMaxCharacters} characters ending in a period. " +
         "First person, physical objects, not digital. No actions, discoveries, other people, rewards or combat. " +
         "No explanation. Examples: I distrust socks with executive ambitions. I consider optimism a defective compass.<|end|>\n" +
-        $"<|user|>\nShort opinion about {RaiderCommsContent.StyleHint(activity, sequence)}.<|end|>\n<|assistant|>\n{AmbientPrefix}";
+        $"<|user|>\nShort opinion about {RaiderCommsContent.StyleHint(location == "Desperanza" ? "Hub" : activity, sequence)}.<|end|>\n<|assistant|>\n{AmbientPrefix}";
 
     internal enum AmbientCategory { AreaActivity, Search, Robot, SharedRobot, Travel, Exit, Diary, Floor, General }
 
@@ -243,6 +246,7 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
         var styleKey = category is AmbientCategory.Robot or AmbientCategory.SharedRobot ? "RobotRound"
             : category is AmbientCategory.Search ? "Search"
             : category is AmbientCategory.Exit ? "Extracting"
+            : context.Location == "Desperanza" ? "Hub"
             : context.Activity;
         var place = LocationCues.TryGetValue(context.Location, out var cue) ? $"{context.Location}, {cue}" : context.Location;
         var scene = new System.Text.StringBuilder($"Place: {place}. Doing: {profile.Situation}.");
@@ -255,7 +259,7 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
         var robotRule = category is AmbientCategory.Robot or AmbientCategory.SharedRobot
             ? "You may mock the robot, but never say who wins or gets hurt."
             : "No combat.";
-        return "<|system|>\nWrite one complete 6-10-word dry joke ending in a period. " +
+        return $"<|system|>\nWrite one complete dry joke of at most {AmbientMaxCharacters} characters ending in a period. " +
             $"First person, physical objects, not digital. No discoveries, other people, rewards or outcomes. {robotRule} " +
             $"No explanation. Examples: {profile.Example1} {profile.Example2}<|end|>\n" +
             $"<|user|>\n{scene} Short opinion about {RaiderCommsContent.StyleHint(styleKey, sequence)}.<|end|>\n<|assistant|>\n{AmbientPrefix}";
@@ -314,9 +318,9 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
         // Strip only generation trailers and surrounding wrapper quotes; content is never rewritten.
         text = Regex.Replace(text, @"<\|(end|endoftext)\|>.*$", "", RegexOptions.Singleline).Trim();
         text = text.Trim('"', '\'', '\u201C', '\u201D', ' ').Trim();
-        if (text.Length is < 8 or > 140)
+        if (text.Length is < 8 or > AmbientMaxCharacters)
         {
-            rejectionReason = "LengthOutside8To140Characters";
+            rejectionReason = $"LengthOutside8To{AmbientMaxCharacters}Characters";
             return null;
         }
         if (text.Contains("<|", StringComparison.Ordinal) || text.Contains('\n'))
@@ -335,9 +339,9 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
             return null;
         }
         var words = text[..^1].Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length is < 4 or > 20)
+        if (words.Length < 4)
         {
-            rejectionReason = "WordCountOutside4To20";
+            rejectionReason = "WordCountBelow4";
             return null;
         }
         if (!FirstPersonOpeners.Contains(words[0]))

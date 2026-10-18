@@ -7,7 +7,9 @@ namespace AFKRaiders.Server.Domain;
 public sealed class RaidCoordinator
 {
     private static readonly TimeSpan AdmissionPulse = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan HomeInterval = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan HomeInterval = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan HubActivityInterval = TimeSpan.FromMinutes(1);
+    private const int ReadyUpSignalCost = 2;
     private readonly TimeProvider time;
     private readonly IRaidNarrator narrator;
     private readonly INarrativeGenerator narrativeGenerator;
@@ -58,6 +60,7 @@ public sealed class RaidCoordinator
             var state = new HandlerState(slot, Guid.NewGuid().ToString("N"), requestId, accessToken);
             state.EquippedWeaponInstanceId = state.OwnedWeapons[0].InstanceId;
             state.LastSignalRegenAt = time.GetUtcNow();
+            BeginHomeStay(state, time.GetUtcNow(), initial: true);
             handlers.Add(slot, state);
             handlerCredentials.Add(Hash(accessToken), slot);
             var initMsg = $"{DisplayName(slot)} starts autonomous duty from Desperanza. Standard-issue {state.OwnedWeapons[0].Name} assigned.";
@@ -93,6 +96,39 @@ public sealed class RaidCoordinator
                 AddJournalEntry(state, null, time.GetUtcNow(), kind, "Hub", text, $"hub:duty:{state.Slot}:{state.Events.Count}");
             }
             return ProjectHandler(state, time.GetUtcNow());
+        }
+    }
+
+    public HandlerProjection ReadyUp(string accessToken, ReadyUpRequest request)
+    {
+        lock (gate)
+        {
+            var state = GetAuthorizedHandler(accessToken);
+            if (string.IsNullOrWhiteSpace(request.CommandId) || request.CommandId.Length > 100)
+                throw new RaidCommandException("InvalidCommandId");
+            if (state.ProcessedReadyCommands.Contains(request.CommandId))
+                return ProjectHandler(state, time.GetUtcNow());
+
+            AdvanceRaids();
+            if (!state.IsHome)
+                throw new RaidCommandException("RaiderNotAtHome");
+
+            var now = time.GetUtcNow();
+            if (state.DutyEnabled && state.HomeAvailableAt <= now)
+                throw new RaidCommandException("RaiderAlreadyQueued");
+            RegenerateSignal(state, now);
+            if (state.SignalCurrent < ReadyUpSignalCost)
+                throw new RaidCommandException("InsufficientSignal");
+            state.SignalCurrent -= ReadyUpSignalCost;
+            state.DutyEnabled = true;
+            state.HomeAvailableAt = now;
+            state.HomeReadinessLogged = true;
+            state.ProcessedReadyCommands.Add(request.CommandId);
+            var message = $"{DisplayName(state.Slot)} readies up in Desperanza for {ReadyUpSignalCost} Signal. Queued for the next eligible admission; Hatch Authority has misplaced the waiting form.";
+            state.Events.Add(new HandlerEventView(state.Events.Count + 1, now, "HandlerReadyUp", message));
+            AddJournalEntry(state, null, now, "HandlerReadyUp", "Hub", message,
+                $"hub:ready-up:{request.CommandId}", location: "Desperanza");
+            return ProjectHandler(state, now);
         }
     }
 
@@ -160,6 +196,7 @@ public sealed class RaidCoordinator
                 AdvanceWorlds(nextAdmissionAt, revisions);
                 RefreshAutonomousMembership(nextAdmissionAt);
                 TryCloseAutonomousWorld(nextAdmissionAt);
+                RecordHubActivities(nextAdmissionAt);
                 RecordHomeReadiness(nextAdmissionAt);
                 AdmitEligibleRaiders(nextAdmissionAt, revisions);
                 nextAdmissionAt += AdmissionPulse;
@@ -167,6 +204,7 @@ public sealed class RaidCoordinator
             AdvanceWorlds(now, revisions);
             RefreshAutonomousMembership(now);
             TryCloseAutonomousWorld(now);
+            RecordHubActivities(now);
             RecordHomeReadiness(now);
             return revisions.Values.OrderBy(revision => revision.RaidId, StringComparer.Ordinal).ToArray();
         }
@@ -286,6 +324,7 @@ public sealed class RaidCoordinator
         handler.CurrentRaidId = world.Simulation.RaidId;
         handler.IsHome = false;
         handler.HomeAvailableAt = null;
+        handler.NextHubActivityAt = null;
         world.Simulation.Advance(at);
         var msg = $"{DisplayName(handler.Slot)} autonomously joins an ongoing raid from Desperanza.";
         handler.Events.Add(new HandlerEventView(handler.Events.Count + 1, at, "RaidAdmission", msg));
@@ -320,8 +359,7 @@ public sealed class RaidCoordinator
             var terminalEvent = projection.Events.Last(item => item.Kind == "Extracted" || item.Kind == "KnockedOut");
             var extractedAt = terminalEvent.At;
             handler.IsHome = true;
-            handler.HomeAvailableAt = extractedAt + HomeInterval;
-            handler.HomeReadinessLogged = false;
+            BeginHomeStay(handler, extractedAt);
             handler.LastExtractedLoot = projection.MyExtractedLoot.ToArray();
 
             if (handler.SettledRaidIds.Add(world.Simulation.RaidId))
@@ -548,6 +586,34 @@ public sealed class RaidCoordinator
         activeAutonomousRaidId = null;
     }
 
+    private void BeginHomeStay(HandlerState handler, DateTimeOffset at, bool initial = false)
+    {
+        handler.HomeAvailableAt = at + (fastPacing
+            ? initial ? TimeSpan.Zero : TimeSpan.FromSeconds(60)
+            : HomeInterval);
+        handler.HomeReadinessLogged = false;
+        handler.NextHubActivityAt = at + HubActivityInterval;
+    }
+
+    private void RecordHubActivities(DateTimeOffset at)
+    {
+        foreach (var handler in handlers.Values.Where(handler => handler.IsHome)
+            .OrderBy(handler => handler.Slot, StringComparer.Ordinal))
+        {
+            while (handler.NextHubActivityAt is { } activityAt && activityAt <= at)
+            {
+                var lines = Content.NarrationContent.Default.Pool("hub.activities");
+                var flavor = lines[handler.HubActivitySequence % lines.Count];
+                handler.HubActivitySequence++;
+                handler.NextHubActivityAt = activityAt + HubActivityInterval;
+                AddJournalEntry(handler, null, activityAt, "HubActivity", "Hub", flavor,
+                    $"hub:activity:{handler.Slot}:{handler.HubActivitySequence}",
+                    location: "Desperanza", activity: "HangingOut",
+                    factsText: "Spending time in Desperanza. No gameplay effects.");
+            }
+        }
+    }
+
     private void RecordHomeReadiness(DateTimeOffset at)
     {
         foreach (var handler in handlers.Values.Where(handler =>
@@ -571,7 +637,7 @@ public sealed class RaidCoordinator
                 handler.Slot,
                 DisplayName(handler.Slot),
                 handler.HomeAvailableAt is { } availableAt && availableAt > at
-                    ? "Cooling down in Desperanza"
+                    ? "Hanging out in Desperanza"
                     : handler.DutyEnabled ? "Ready for duty in Desperanza" : "At home in Desperanza / duty paused",
                 handler.HomeAvailableAt))
             .ToArray();
@@ -586,7 +652,8 @@ public sealed class RaidCoordinator
         }
         var status = !handler.IsHome ? "In Raid"
             : handler.CurrentRaidId is not null ? "Returned to Desperanza"
-            : handler.HomeAvailableAt > at ? "At Home / Cooling Down"
+            : !handler.DutyEnabled ? "At Home / Paused"
+            : handler.HomeAvailableAt > at ? "At Home / Hanging Out"
             : handler.DutyEnabled ? "At Home / On Duty" : "At Home / Paused";
 
         var equippedWeapon = handler.OwnedWeapons.FirstOrDefault(w => w.InstanceId == handler.EquippedWeaponInstanceId)
@@ -631,7 +698,8 @@ public sealed class RaidCoordinator
             handler.Stash.Items, handler.Stash.GetGroups(),
             equippedWeapon, handler.OwnedWeapons.ToArray(), supplyList, stagedList, shopCatalogView,
             handler.SignalCurrent, handler.SignalMax, raidProjection?.MyHiddenPocketInstanceId,
-            GetHubResidents(at));
+            GetHubResidents(at), handler.IsHome,
+            handler.IsHome && (!handler.DutyEnabled || handler.HomeAvailableAt > at), ReadyUpSignalCost);
     }
 
     public PurchaseShopItemResponse PurchaseShopItem(string accessToken, PurchaseShopItemRequest request)
@@ -1429,6 +1497,9 @@ public sealed class RaidCoordinator
         public bool IsHome { get; set; } = true;
         public bool HomeReadinessLogged { get; set; }
         public DateTimeOffset? HomeAvailableAt { get; set; }
+        public DateTimeOffset? NextHubActivityAt { get; set; }
+        public int HubActivitySequence { get; set; }
+        public HashSet<string> ProcessedReadyCommands { get; } = new(StringComparer.Ordinal);
         public string? CurrentRaidId { get; set; }
         public IReadOnlyList<ItemView> LastExtractedLoot { get; set; } = [];
         public List<HandlerEventView> Events { get; } = [];
@@ -1462,6 +1533,7 @@ public sealed record RaidRevision(string RaidId, int Revision);
 public sealed record CreatedRaid(string RaidId, string InviteCode, string PlayerId, string AccessToken, RaidProjection Projection);
 public sealed record JoinedRaid(string RaidId, string PlayerId, string AccessToken, RaidProjection Projection);
 public sealed record EnrolledHandler(string AccessToken, HandlerProjection Projection);
+public sealed record ReadyUpRequest(string CommandId);
 public sealed record HandlerProjection(
     string Slot,
     string PlayerId,
@@ -1490,7 +1562,10 @@ public sealed record HandlerProjection(
     int SignalCurrent = 3,
     int SignalMax = 5,
     string? SecretHiddenPocketInstanceId = null,
-    IReadOnlyList<HubResidentView>? HubResidents = null);
+    IReadOnlyList<HubResidentView>? HubResidents = null,
+    bool IsHome = false,
+    bool CanReadyUp = false,
+    int ReadyUpSignalCost = 2);
 public sealed record HubResidentView(string Slot, string DisplayName, string Status, DateTimeOffset? HomeAvailableAt);
 public sealed record HandlerEventView(int Sequence, DateTimeOffset At, string Kind, string Text);
 

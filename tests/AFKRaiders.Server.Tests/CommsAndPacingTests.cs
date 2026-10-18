@@ -89,11 +89,13 @@ public sealed class CommsAndPacingTests
     [Fact]
     public void CallbackUpdatesJournalBySourceAndActiveThreadWithoutChangingFactsOrLeaking()
     {
-        var time = new Clock();
+        var time = new Clock { Now = Start.AddSeconds(-30) };
         var narrator = new RecordingNarrator();
         var coordinator = new RaidCoordinator(time, narrator, narrativeGenerator: new LiveStub());
         var one = coordinator.EnrollHandler("raider-one");
         var two = coordinator.EnrollHandler("raider-two");
+        coordinator.ReadyUp(one.AccessToken, new("ready"));
+        time.Now = Start;
         coordinator.AdvanceRaids();
         var before = coordinator.GetHandlerProjection(one.AccessToken);
         var request = narrator.Requests.First(r => r.EventType == "Travel" && r.RaiderId == one.Projection.PlayerId);
@@ -157,10 +159,12 @@ public sealed class CommsAndPacingTests
     [Fact]
     public void LateAndInvalidCallbacksKeepCanonAndCannotOverwriteNextRaid()
     {
-        var time = new Clock();
+        var time = new Clock { Now = Start.AddSeconds(-30) };
         var narrator = new RecordingNarrator();
         var coordinator = new RaidCoordinator(time, narrator, narrativeGenerator: new LiveStub());
         var one = coordinator.EnrollHandler("raider-one");
+        coordinator.ReadyUp(one.AccessToken, new("ready"));
+        time.Now = Start;
         coordinator.AdvanceRaids();
         var request = narrator.Requests.First(r => r.EventType == "Travel");
         request.OnResult!.Invoke(new("I recovered 99 scrap and killed a dragon.", "Generated"));
@@ -201,13 +205,13 @@ public sealed class CommsAndPacingTests
         Assert.StartsWith("<|system|>\n", prompt);
         Assert.Contains("<|end|>\n<|user|>\n", prompt);
         Assert.EndsWith("<|end|>\n<|assistant|>\nI consider", prompt);
-        Assert.Contains("complete 6-10-word dry joke ending in a period", prompt);
+        Assert.Contains("complete dry joke of at most 200 characters ending in a period", prompt);
         Assert.Contains("First person, physical objects, not digital.", prompt);
         Assert.Contains("No actions, discoveries, other people, rewards or combat.", prompt);
         Assert.Contains("Examples: I distrust socks with executive ambitions. I consider optimism a defective compass.", prompt);
         // Keep activity-specific parody guidance compact for CPU prefill.
-        Assert.True(prompt.Split([' ', '\n'], StringSplitOptions.RemoveEmptyEntries).Length <= 65, prompt);
-        Assert.Equal(32, OnnxGenAiNarrativeGenerator.AmbientOutputTokens);
+        Assert.True(prompt.Split([' ', '\n'], StringSplitOptions.RemoveEmptyEntries).Length <= 75, prompt);
+        Assert.Equal(96, OnnxGenAiNarrativeGenerator.AmbientOutputTokens);
     }
 
     [Theory]
@@ -215,11 +219,11 @@ public sealed class CommsAndPacingTests
     [InlineData("I feel quietly", "MissingSentenceTerminator")]
     [InlineData("I feel quietly.\nI feel hopeful.", "GenerationArtifactOrMultiline")]
     [InlineData("I feel quietly. I feel hopeful.", "InvalidCharactersOrMultipleSentences")]
-    [InlineData("I feel hopeful.", "WordCountOutside4To20")]
+    [InlineData("I feel hopeful.", "WordCountBelow4")]
     [InlineData("This paperwork feels deeply judgmental.", "NotFirstPerson")]
     [InlineData("I found something shiny in the rubble.", "ForbiddenOutcomeOrActorWord:found")]
     [InlineData("I miss Rosa very much.", "UnknownProperNoun:Rosa")]
-    [InlineData("I", "LengthOutside8To140Characters")]
+    [InlineData("I", "LengthOutside8To200Characters")]
     public void AmbientRejectionHasSpecificReasonWithoutRepairingText(string text, string expectedReason)
     {
         Assert.Null(OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason, "Market"));
@@ -232,6 +236,50 @@ public sealed class CommsAndPacingTests
         const string text = "I'm treating my zipper as opposing counsel.";
         Assert.Equal(text, OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason));
         Assert.Null(reason);
+    }
+
+    [Fact]
+    public void AmbientAcceptsFullTwoHundredCharactersAndMoreThanTwentyWordsWithoutTruncating()
+    {
+        var text = "I consider " + string.Concat(Enumerable.Repeat("my dusty boots and ", 9)) + "a " + new string('a', 15) + ".";
+        Assert.Equal(200, text.Length);
+        Assert.True(text.Split(' ').Length > 20);
+        Assert.Equal(text, OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason));
+        Assert.Null(reason);
+        Assert.Equal(text, OnnxGenAiNarrativeGenerator.AmbientLogPreview(text));
+        var tooLong = text.Insert(text.Length - 1, "a");
+        Assert.Equal(201, tooLong.Length);
+        Assert.Null(OnnxGenAiNarrativeGenerator.ValidateAmbient(tooLong, out reason));
+        Assert.Equal("LengthOutside8To200Characters", reason);
+        Assert.Equal(tooLong[..200], OnnxGenAiNarrativeGenerator.AmbientLogPreview(tooLong));
+    }
+
+    [Theory]
+    [InlineData(120)]
+    [InlineData(140)]
+    [InlineData(141)]
+    [InlineData(199)]
+    [InlineData(200)]
+    public void AmbientPreviewAndAcceptanceKeepTheWholeSentenceUpToTheLimit(int length)
+    {
+        const string prefix = "I consider this paperwork ";
+        var text = prefix + new string('a', length - prefix.Length - 1) + ".";
+        Assert.Equal(length, text.Length);
+        Assert.Equal(text, OnnxGenAiNarrativeGenerator.AmbientLogPreview(text));
+        Assert.Equal(text, OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason));
+        Assert.Null(reason);
+    }
+
+    [Theory]
+    [InlineData("found")]
+    [InlineData("they")]
+    [InlineData("hurt")]
+    public void LongerAsidesStillReportTheExactForbiddenWord(string deniedWord)
+    {
+        var text = "I consider " + string.Concat(Enumerable.Repeat("my dusty boots and ", 7)) + deniedWord + ".";
+        Assert.InRange(text.Length, 141, 200);
+        Assert.Null(OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason));
+        Assert.Equal($"ForbiddenOutcomeOrActorWord:{deniedWord}", reason);
     }
 
     [Theory]
@@ -402,10 +450,13 @@ public sealed class CommsAndPacingTests
     [Fact]
     public void LiveBurstAdmitsOneRequestAndExplicitlyKeepsOthersAuthoredWithoutRetrying()
     {
-        var time = new Clock();
+        var time = new Clock { Now = Start.AddSeconds(-30) };
         var narrator = new RecordingNarrator();
         var coordinator = new RaidCoordinator(time, narrator, narrativeGenerator: new LiveStub(), nextSeed: () => 2);
         var one = coordinator.EnrollHandler("raider-one");
+        coordinator.ReadyUp(one.AccessToken, new("ready"));
+        time.Now = Start;
+        coordinator.AdvanceRaids();
         time.Now = Start.AddSeconds(60);
         coordinator.AdvanceRaids();
         var journal = coordinator.GetHandlerProjection(one.AccessToken).FullJournal!;
@@ -433,11 +484,14 @@ public sealed class CommsAndPacingTests
     [Fact]
     public void UnavailableModelExplainsEligibleAuthoredEntriesWithoutQueuingOrRepeatedRevisions()
     {
-        var time = new Clock();
+        var time = new Clock { Now = Start.AddSeconds(-30) };
         var narrator = new RecordingNarrator();
         using var generator = new OnnxGenAiNarrativeGenerator();
         var coordinator = new RaidCoordinator(time, narrator, narrativeGenerator: generator, nextSeed: () => 2);
         var one = coordinator.EnrollHandler("raider-one");
+        coordinator.ReadyUp(one.AccessToken, new("ready"));
+        time.Now = Start;
+        coordinator.AdvanceRaids();
         time.Now = Start.AddSeconds(90);
         coordinator.AdvanceRaids();
         var first = coordinator.GetHandlerProjection(one.AccessToken);

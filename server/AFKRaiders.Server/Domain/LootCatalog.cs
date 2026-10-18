@@ -3,7 +3,7 @@ namespace AFKRaiders.Server.Domain;
 /// <summary>
 /// A validated item entry in the server-owned loot catalog.
 /// Provenance: Reused from afk-raiders/src/content/loot-tables/scrap_components.json
-/// at git commit f62d088a41da951a1fbe9ed7215d2957a933ce50.
+/// and related loot tables at git commit f62d088a41da951a1fbe9ed7215d2957a933ce50.
 /// </summary>
 public sealed record LootCatalogItem(
     string Id,
@@ -43,7 +43,12 @@ public sealed record OpportunityDefinition(
     int DurationSeconds,
     IReadOnlyList<string> FixedItemIds,
     int DrawCount,
-    IReadOnlyList<string> EligibleCategories
+    IReadOnlyList<string> EligibleCategories,
+    string Activity,
+    string Title,
+    string StartText,
+    string CompletedText,
+    bool Contestable
 );
 
 /// <summary>
@@ -68,10 +73,13 @@ public interface ILootCatalog
     IReadOnlyList<LootCatalogItem> Items { get; }
     IReadOnlyList<OpportunityDefinition> Opportunities { get; }
     IReadOnlyList<WeightedLootEntry> Pool { get; }
+    IReadOnlyList<OpportunityDefinition> SelectWorldOpportunities(int seed);
     LootCatalogItem GetItem(string id);
     bool TryGetItem(string id, out LootCatalogItem? item);
     IReadOnlyList<WorldItemInstance> CreateFixedWorldItems(string raidId);
     IReadOnlyList<WorldItemInstance> CreateTableBackedWorldItems(string raidId, int seed);
+    IReadOnlyList<WorldItemInstance> CreateTableBackedWorldItems(string raidId, int seed,
+        IReadOnlyList<string> opportunityIds);
     IReadOnlyList<WorldItemInstance> CreateOpportunityItems(string raidId, int seed, string opportunityId,
         string danger, double exposure, double appetite);
 }
@@ -81,7 +89,7 @@ public interface ILootCatalog
 /// </summary>
 public sealed class LootCatalog : ILootCatalog
 {
-    public const string DefaultContentVersion = "desperanza-shared-loot-v4";
+    public const string DefaultContentVersion = "desperanza-shared-loot-v5";
 
     private readonly Dictionary<string, LootCatalogItem> itemsById;
     private readonly Dictionary<string, OpportunityDefinition> opportunitiesById;
@@ -197,6 +205,11 @@ public sealed class LootCatalog : ILootCatalog
             {
                 throw new LootCatalogValidationException($"Opportunity '{opp.Id}' duration must be positive ({opp.DurationSeconds}).");
             }
+            if (!OpportunityActivity.IsKnown(opp.Activity))
+                throw new LootCatalogValidationException($"Opportunity '{opp.Id}' has unknown activity '{opp.Activity}'.");
+            if (string.IsNullOrWhiteSpace(opp.Title) || string.IsNullOrWhiteSpace(opp.StartText) ||
+                string.IsNullOrWhiteSpace(opp.CompletedText))
+                throw new LootCatalogValidationException($"Opportunity '{opp.Id}' requires a title and start/completion text.");
             if (opp.DrawCount <= 0)
             {
                 throw new LootCatalogValidationException($"Opportunity '{opp.Id}' draw count must be positive ({opp.DrawCount}).");
@@ -256,6 +269,17 @@ public sealed class LootCatalog : ILootCatalog
 
     public bool TryGetItem(string id, out LootCatalogItem? item) => itemsById.TryGetValue(id, out item);
 
+    public IReadOnlyList<OpportunityDefinition> SelectWorldOpportunities(int seed) =>
+        Opportunities
+            .GroupBy(opportunity => opportunity.Location, StringComparer.Ordinal)
+            .Select(group =>
+            {
+                var candidates = group.ToArray();
+                var index = (int)(RaidConditions.Roll(seed, $"opportunity:{group.Key}") * candidates.Length);
+                return candidates[index];
+            })
+            .ToArray();
+
     /// <summary>
     /// Generates the fixed 6-instance world items required for exact backward compatibility with S5 regression baselines.
     /// </summary>
@@ -281,12 +305,21 @@ public sealed class LootCatalog : ILootCatalog
     /// Generates unique, finite world items deterministically based on a seed and opportunity weighted pools.
     /// Identical seeds produce identical item instances; distinct instances always receive unique instance IDs.
     /// </summary>
-    public IReadOnlyList<WorldItemInstance> CreateTableBackedWorldItems(string raidId, int seed)
+    public IReadOnlyList<WorldItemInstance> CreateTableBackedWorldItems(string raidId, int seed) =>
+        CreateTableBackedWorldItems(raidId, seed, SelectWorldOpportunities(seed).Select(opportunity => opportunity.Id).ToArray());
+
+    public IReadOnlyList<WorldItemInstance> CreateTableBackedWorldItems(string raidId, int seed,
+        IReadOnlyList<string> opportunityIds)
     {
         var result = new List<WorldItemInstance>();
+        var selectedIds = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var opp in Opportunities)
+        foreach (var opportunityId in opportunityIds)
         {
+            if (!selectedIds.Add(opportunityId))
+                throw new ArgumentException($"Opportunity '{opportunityId}' was selected more than once.", nameof(opportunityIds));
+            if (!opportunitiesById.TryGetValue(opportunityId, out var opp))
+                throw new KeyNotFoundException($"Opportunity '{opportunityId}' was not found in catalog {ContentVersion}.");
             var pool = EligiblePool(opp).ToArray();
             var totalWeight = pool.Sum(e => e.DropWeight);
 
@@ -346,4 +379,17 @@ public sealed class LootCatalog : ILootCatalog
     {
         return Content.CatalogContent.LoadLoot();
     }
+}
+
+public static class OpportunityActivity
+{
+    public const string Searching = "Searching";
+    public const string Scavenging = "Scavenging";
+    public const string Salvaging = "Salvaging";
+    public const string Recovering = "Recovering";
+    public const string Rummaging = "Rummaging";
+    public const string Dismantling = "Dismantling";
+
+    public static bool IsKnown(string activity) =>
+        activity is Searching or Scavenging or Salvaging or Recovering or Rummaging or Dismantling;
 }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import ts from 'typescript'
+import { computed, effectScope, nextTick, ref, watch } from 'vue'
 
 const app = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
 const program = readFileSync(new URL('../../server/AFKRaiders.Server/Program.cs', import.meta.url), 'utf8')
@@ -86,3 +87,106 @@ for (const [name, args, path, payload, prefix, success, errorPrefix] of cases) {
     assert.equal(h.refreshes, 0)
   })
 }
+
+const stagingStateNames = [
+  'shopCatalog', 'stagedDraft', 'ownedSupplies', 'stagedSupplies',
+  'stagedMedicalCount', 'stagedRechargerCount',
+]
+const stagingSource = source.statements.filter(node =>
+  (ts.isVariableStatement(node)
+    && node.declarationList.declarations.some(declaration => stagingStateNames.includes(declaration.name.getText(source))))
+  || (ts.isFunctionDeclaration(node) && ['getOwnedSupplyQuantity', 'adjustStagedDraft'].includes(node.name?.text))
+  || (ts.isExpressionStatement(node) && ts.isCallExpression(node.expression)
+    && node.expression.expression.getText(source) === 'watch' && node.getText(source).includes('stagedDraft')),
+).map(node => node.getText(source)).join('\n')
+const compiledStaging = ts.transpileModule(stagingSource, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+}).outputText
+
+function stagingHarness(t) {
+  const handlerProjection = ref(null)
+  const scope = effectScope()
+  t.after(() => scope.stop())
+  return scope.run(() => new Function(
+    'handlerProjection', 'computed', 'ref', 'watch',
+    `${compiledStaging}
+    return { handlerProjection, stagedDraft, stagedSupplies, stagedMedicalCount, stagedRechargerCount,
+      getOwnedSupplyQuantity, adjustStagedDraft };`,
+  )(handlerProjection, computed, ref, watch))
+}
+
+function supplyProjection() {
+  return {
+    playerId: 'raider-one',
+    supplyStock: [
+      { catalogId: 'bandage_white', category: 'Medical', quantity: 5 },
+      { catalogId: 'fizz_cell', category: 'ShieldRecharger', quantity: 3 },
+    ],
+    stagedSupplies: [],
+    shopCatalog: {
+      supplies: [
+        { id: 'bandage_white', category: 'Medical' },
+        { id: 'fizz_cell', category: 'ShieldRecharger' },
+      ],
+    },
+  }
+}
+
+test('purchased server supplyStock enables staging and retains stock/category limits', async t => {
+  const h = stagingHarness(t)
+  assert.equal(h.getOwnedSupplyQuantity('bandage_white'), 0)
+  h.handlerProjection.value = supplyProjection()
+  await nextTick()
+  assert.equal(h.getOwnedSupplyQuantity('bandage_white'), 5)
+  assert.equal(h.getOwnedSupplyQuantity('missing'), 0)
+  for (let i = 0; i < 6; i++) h.adjustStagedDraft('bandage_white', 1, 'Medical')
+  for (let i = 0; i < 4; i++) h.adjustStagedDraft('fizz_cell', 1, 'ShieldRecharger')
+  assert.equal(h.stagedMedicalCount.value, 4)
+  assert.equal(h.stagedRechargerCount.value, 2)
+  assert.equal(h.getOwnedSupplyQuantity('bandage_white'), 5, 'draft does not consume stock')
+  for (let i = 0; i < 6; i++) h.adjustStagedDraft('bandage_white', -1, 'Medical')
+  assert.equal(h.stagedDraft.value.bandage_white, 0)
+  h.handlerProjection.value.supplyStock[0].quantity = 1
+  h.adjustStagedDraft('bandage_white', 1, 'Medical')
+  h.adjustStagedDraft('bandage_white', 1, 'Medical')
+  assert.equal(h.stagedDraft.value.bandage_white, 1)
+})
+
+test('unchanged polling snapshots and additional purchases preserve unsaved staging edits', async t => {
+  const h = stagingHarness(t)
+  h.handlerProjection.value = supplyProjection()
+  await nextTick()
+  h.adjustStagedDraft('bandage_white', 1, 'Medical')
+  for (let i = 0; i < 3; i++) {
+    const refreshed = supplyProjection()
+    refreshed.supplyStock[0].quantity += i
+    h.handlerProjection.value = refreshed
+    await nextTick()
+    assert.equal(h.stagedDraft.value.bandage_white, 1)
+  }
+})
+
+test('authoritative staging changes and identity changes resynchronize the draft', async t => {
+  const h = stagingHarness(t)
+  const projection = supplyProjection()
+  projection.stagedSupplies = [{ catalogId: 'bandage_white', category: 'Medical', quantity: 1 }]
+  h.handlerProjection.value = projection
+  await nextTick()
+  assert.equal(h.stagedDraft.value.bandage_white, 1)
+  h.adjustStagedDraft('bandage_white', 1, 'Medical')
+  h.handlerProjection.value = structuredClone(projection)
+  await nextTick()
+  assert.equal(h.stagedDraft.value.bandage_white, 2, 'unchanged saved quantities preserve edits')
+  const updated = structuredClone(projection)
+  updated.stagedSupplies[0].quantity = 3
+  h.handlerProjection.value = updated
+  await nextTick()
+  assert.equal(h.stagedDraft.value.bandage_white, 3)
+  h.adjustStagedDraft('bandage_white', 1, 'Medical')
+  h.handlerProjection.value = { ...structuredClone(updated), playerId: 'raider-two' }
+  await nextTick()
+  assert.equal(h.stagedDraft.value.bandage_white, 3, 'another identity cannot inherit unsaved edits')
+  h.handlerProjection.value = null
+  await nextTick()
+  assert.deepEqual(h.stagedDraft.value, {})
+})

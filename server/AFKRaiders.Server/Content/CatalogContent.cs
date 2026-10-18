@@ -60,7 +60,7 @@ internal static class CatalogContent
     {
         const string source = "loot-catalog.json";
         var document = Read<LootCatalogDocument>(stream, source);
-        Require(document.SchemaVersion == 3, source, "Unsupported schemaVersion; expected 3.");
+        Require(document.SchemaVersion == 4, source, "Unsupported schemaVersion; expected 4.");
         Require(document.Items is { Count: > 0 } && document.Opportunities is { Count: > 0 },
             source, "Items and opportunities must be nonempty arrays.");
         foreach (var item in document.Items)

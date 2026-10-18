@@ -1,4 +1,5 @@
 using AFKRaiders.Server.Domain;
+using System.Text.Json;
 
 namespace AFKRaiders.Server.Tests;
 
@@ -91,6 +92,14 @@ public sealed class EquipmentAndShopTests
         Assert.NotNull(buyMeds.UpdatedSupplies);
         Assert.Equal(1, buyMeds.UpdatedSupplies[0].Quantity);
 
+        var purchasedProjection = coordinator.GetHandlerProjection(enrolled.AccessToken);
+        var stock = Assert.Single(purchasedProjection.SupplyStock!);
+        Assert.Equal("bandage_white", stock.CatalogId);
+        Assert.Equal(1, stock.Quantity);
+        var json = JsonSerializer.SerializeToElement(purchasedProjection, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Equal("bandage_white", json.GetProperty("supplyStock")[0].GetProperty("catalogId").GetString());
+        Assert.Equal(1, json.GetProperty("supplyStock")[0].GetProperty("quantity").GetInt32());
+
         // Stage 1 bandage for field loadout
         var stageRes = coordinator.StageLoadout(enrolled.AccessToken, new StageLoadoutRequest("cmd-stage-meds", [
             new StagedSupplyRequestItem("bandage_white", 1)
@@ -109,6 +118,7 @@ public sealed class EquipmentAndShopTests
         Assert.Equal("aspperigo", updatedProj.EquippedWeapon?.CatalogId);
         Assert.Single(updatedProj.StagedSupplies ?? []);
         Assert.Equal("bandage_white", updatedProj.StagedSupplies![0].CatalogId);
+        Assert.Equal(1, Assert.Single(updatedProj.SupplyStock!).Quantity);
     }
 
     [Fact]

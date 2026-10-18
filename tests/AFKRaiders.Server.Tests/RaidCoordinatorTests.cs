@@ -204,10 +204,10 @@ public sealed class RaidCoordinatorTests
 
         Assert.NotNull(homeAvailableAt);
         Assert.Null(coordinator.GetHandlerProjection(handler.AccessToken).CurrentRaidId);
-        Assert.Equal("At Home / Cooling Down",
+        Assert.Equal("At Home / Hanging Out",
             coordinator.GetHandlerProjection(handler.AccessToken).Status);
         Assert.Contains(coordinator.GetHandlerProjection(handler.AccessToken).HubResidents!,
-            resident => resident.Slot == "raider-one" && resident.Status == "Cooling down in Desperanza");
+            resident => resident.Slot == "raider-one" && resident.Status == "Hanging out in Desperanza");
 
         clock.Now = homeAvailableAt.Value - TimeSpan.FromSeconds(1);
         coordinator.AdvanceRaids();

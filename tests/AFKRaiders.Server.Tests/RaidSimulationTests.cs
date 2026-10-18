@@ -105,7 +105,10 @@ public sealed class RaidSimulationTests
     [Fact]
     public void SearchWindowIncludesExactDeadlineButNotOneTickAfterAndNeverResets()
     {
-        var search = new RaidSimulation.Opportunity("test", "Salvage Yard", 12);
+        var search = new RaidSimulation.Opportunity(new OpportunityDefinition(
+            "test", "Salvage Yard", 12, [], 2, [LootEligibilityCategory.Salvage],
+            OpportunityActivity.Searching, "Test activity", "A test activity begins.",
+            "Test activity complete.", true));
         search.Admit("one", Start);
         search.Admit("two", Start.AddSeconds(12));
         Assert.Equal(Start.AddSeconds(12), search.ClosesAt);

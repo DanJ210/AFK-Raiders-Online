@@ -36,6 +36,8 @@ internal static class NarrationContracts
         "style.robot",
         "style.exit",
         "style.general",
+        "style.hub",
+        "hub.activities",
     ];
 
     internal static readonly IReadOnlyDictionary<string, int> TemplateArguments = new Dictionary<string, int>(StringComparer.Ordinal)
@@ -102,6 +104,7 @@ internal static class NarrationContracts
         ["simulation.a-humming-crate-sits-in"] = 0,
         ["simulation.the-service-depot-locker-contains"] = 0,
         ["simulation.searches-at"] = 3,
+        ["simulation.field-activity-started"] = 4,
         ["simulation.cross-paths-at-the-existing"] = 2,
         ["simulation.encounters-at"] = 4,
         ["simulation.joins-the-fight-against-the"] = 4,
@@ -135,6 +138,7 @@ internal static class NarrationContracts
         ["simulation.salvage-search-humming-crate"] = 0,
         ["simulation.salvage-search-service-depot-locker"] = 0,
         ["simulation.searching-container-deadline-in-s"] = 1,
+        ["simulation.field-activity-deadline-in-s"] = 1,
         ["simulation.combat-round"] = 2,
         ["simulation.round-in-s-hp"] = 5,
         ["simulation.packing-backpack-complete-in-s"] = 1,

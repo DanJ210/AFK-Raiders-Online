@@ -130,6 +130,21 @@ if (app.Environment.IsDevelopment())
             return Results.Unauthorized();
         }
     });
+    app.MapPost("/api/dev/handler/ready-up", (ReadyUpRequest request, HttpRequest httpRequest, RaidCoordinator raids) =>
+    {
+        try
+        {
+            return Results.Ok(raids.ReadyUp(ReadAccessToken(httpRequest), request));
+        }
+        catch (RaidAccessException)
+        {
+            return Results.Unauthorized();
+        }
+        catch (RaidCommandException exception)
+        {
+            return Results.BadRequest(new { error = exception.Reason });
+        }
+    });
     app.MapPost("/api/dev/handler/stash/sell", (SellStashItemsRequest request, HttpRequest httpRequest, RaidCoordinator raids) =>
     {
         try

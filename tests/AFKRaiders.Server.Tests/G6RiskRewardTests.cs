@@ -264,13 +264,15 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
     {
         var sim = new RaidSimulation("exit", Start, 1, danger: "Low");
         sim.AddAutonomousRaider("one", "raider-one", Start);
+        var marketActivity = Assert.Single(sim.Project("one", Start).Opportunities,
+            opportunity => opportunity.Location == "Market").Activity;
         sim.Advance(Start);
         var departure = Assert.Single(sim.Project("one", Start).Events, e => e.Kind == "Travel");
         Assert.Equal(60, departure.DurationSeconds);
         Assert.Equal("Market", departure.Destination);
         Assert.Equal("Traveling", sim.Project("one", Start.AddSeconds(59)).Players.Single().Activity);
         sim.Advance(Start.AddSeconds(60));
-        Assert.Equal("Searching", sim.Project("one", Start.AddSeconds(60)).Players.Single().Activity);
+        Assert.Equal(marketActivity, sim.Project("one", Start.AddSeconds(60)).Players.Single().Activity);
         Assert.Contains(sim.Project("one", Start).Events,
             e => e.Kind == "Travel" && e.Text.Contains("Desperanza pod", StringComparison.OrdinalIgnoreCase));
     }
@@ -341,10 +343,13 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
     {
         int Play(bool reads)
         {
-            var clock = new Clock();
+            var clock = new Clock { Now = Start.AddSeconds(-30) };
             var coordinator = new RaidCoordinator(clock, nextSeed: () => 1);
             var handler = coordinator.EnrollHandler("raider-one");
+            coordinator.ReadyUp(handler.AccessToken, new("ready"));
+            clock.Now = Start;
             coordinator.AdvanceRaids();
+            coordinator.SetSignalForTesting(handler.AccessToken, 5);
             clock.Now = Start.AddSeconds(65);
             coordinator.AdvanceRaids();
             if (reads) _ = coordinator.GetHandlerProjection(handler.AccessToken);
@@ -465,8 +470,10 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
         var sim = new RaidSimulation("interrupt-search", Start, 1, danger: "Low");
         sim.AddAutonomousRaider("one", "raider-one", Start);
         sim.AddAutonomousRaider("two", "raider-two", Start);
+        var marketActivity = Assert.Single(sim.Project("one", Start).Opportunities,
+            opportunity => opportunity.Location == "Market").Activity;
         var t = 0;
-        while (sim.Project("one", Start.AddSeconds(t)).Players.Single(p => p.PlayerId == "one").Activity != "Searching")
+        while (sim.Project("one", Start.AddSeconds(t)).Players.Single(p => p.PlayerId == "one").Activity != marketActivity)
         {
             t++;
             sim.Advance(Start.AddSeconds(t));
@@ -491,7 +498,7 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
         sim.AddAutonomousRaider("one", "raider-one", Start);
         sim.Advance(Start.AddSeconds(60));
         var market = Assert.Single(sim.Project("one", Start.AddSeconds(60)).Opportunities,
-            opportunity => opportunity.OpportunityId == "market-locker");
+            opportunity => opportunity.Location == "Market");
         Assert.True(sim.QueueHandlerAction("exit", "CallExtract", "one", Start.AddSeconds(60)));
         sim.Advance(Start.AddSeconds(60));
 
@@ -501,7 +508,7 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
 
         var lateArrival = sim.Project("two", Start.AddSeconds(140));
         Assert.Equal("Resolved", Assert.Single(lateArrival.Opportunities,
-            opportunity => opportunity.OpportunityId == "market-locker").Status);
+            opportunity => opportunity.OpportunityId == market.OpportunityId).Status);
         Assert.Contains(lateArrival.Events, e => e.Kind == "OpportunityExhausted");
     }
 

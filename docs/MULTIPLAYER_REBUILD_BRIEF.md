@@ -3,6 +3,7 @@
 Date: 2026-10-10
 Product alignment confirmed: 2026-10-11
 Product direction clarified: 2026-10-12
+Autonomous Raider economy confirmed: 2026-10-17
 
 ## Purpose and status
 
@@ -26,7 +27,8 @@ This workspace contains the M1 networking proof, independent server-owned journe
 - Crates provide events or contests when Raiders cross paths during a server-owned raid. Gameplay factors resolve those encounters; Handler click speed is not the intended competition.
 - All Raiders reside in **Desperanza**, the persistent home hub, before a raid. Raiders autonomously join recurring, ongoing server-run raids; private invites are not the core participation or matchmaking loop.
 - Raiders organically encounter other actual Raiders while sharing those raids. Their autonomous raid cycle repeats without requiring a Handler to redeploy them or wait for an invite.
-- The Handler is the player: they monitor comms and can influence selected aspects of their Raider. The exact influence actions, costs, timing, and offline safeguards remain to be designed; they must not turn play into mandatory moment-to-moment control.
+- The Handler is the player: they monitor comms and influence their Raider **only through spendable Signal actions**. The Handler does not shop, sell, equip, repair, or stage loadouts. Exact Signal actions, costs, timing, and offline safeguards remain to be designed; they must not turn play into mandatory moment-to-moment control.
+- **Autonomous Raider economy (confirmed 2026-10-17):** Like Godville, the Raider manages its own economy. See [Autonomous Raider economy](#autonomous-raider-economy-confirmed-2026-10-17) below.
 - **Main-game continuity (confirmed 2026-10-12):** The Handler stays in Desperanza while the Raider reports every gameplay action and encounter through the Comms Log, including parody actions and commentary. Diary and active-thread presentation are core gameplay surfaces, not decorative additions to multiplayer receipts. The original design remains valid beyond social encounters; the S1-S5 slices establish engine groundwork, not the full game.
 - Encounters are not asynchronous fights against saved Raider snapshots. Every participant in a shared encounter is an actual Raider in the same authoritative world and uses its server clock.
 
@@ -36,7 +38,50 @@ The original [game design document](GAME_DESIGN.md) is the main-game baseline fo
 
 Build an autonomous zero-player RPG with live, recurring social PvPvE extraction gameplay organized around Desperanza as the shared home hub.
 
-The player is a Handler, not the Raider. Their Raider moves, searches, fights, and resolves encounters autonomously. The intended gameplay continues without a Handler responding to each event. Preparation, standing intentions, social actions, and limited support are possible Handler involvement; their exact rules remain proposals requiring confirmation.
+The player is a Handler, not the Raider. Their Raider moves, searches, fights, resolves encounters, and prepares between raids autonomously. The intended gameplay continues without a Handler responding to each event. Handler involvement is limited to Signal actions (support, nudges, and any later approved standing intentions or social actions); their exact rules remain proposals requiring confirmation. Preparation is the Raider's decision, not a Handler task.
+
+### Autonomous Raider economy (confirmed 2026-10-17)
+
+This is confirmed product direction, not an experimental proposal. Exact traits, weights, prices, stock, and Signal costs still need tuning and remain unvalidated balance.
+
+- **The Raider makes its own economic decisions.** In Desperanza it sells loot, buys weapons and supplies, equips, repairs, stashes, and decides when it is ready to depart. Weapons come mainly from raid loot and sometimes from Desperanza traders. The Handler has no shop, sell, equip, repair, or staging controls.
+- **Deterministic, server-owned decisions.** The C# domain decides with a utility (scoring) policy: every legal option (sell, buy, equip, repair, stash, depart) gets a score, for example power gain × trait weight − price − cash-reserve risk. Inputs are only what the Raider should know: inventory, coins, durability, current trader stock, recent outcomes, and its traits. The coordinator validates and commits each choice as a journaled event. Same seed, state, and time give the same decisions, so replay, retries, tests, and recovery stay deterministic.
+- **Personality through traits.** Each Raider has seeded traits (examples: Greedy, Cautious, Hoarder, Brawler, Gadgeteer) that weight its choices and drift slowly with committed experience, such as becoming more cautious after a failed extraction. Different Raiders choose differently from the same stock.
+- **Signals as nudges, not commands.** Signal actions shift scoring weights temporarily (for example "Spend!", "Play it safe", "Hoard"), like the existing Calm/Pressure greed nudges. They never name a specific purchase or bypass validation, and an absent Handler forfeits nothing owed.
+- **Desperanza traders.** Trader stock is generated from a seed for each cycle and is shared and finite. When Raiders want the same scarce item, a deterministic order decides, never request arrival or reflexes. Each purchase or sale commits exactly once: retries and repeated scheduling cannot double-charge, double-pay, or duplicate items.
+- **AI models do not decide.** No language model chooses actions, prices, or outcomes. The reasons are nondeterminism, latency, cost, prompt injection through player-controlled text, and the need to validate every move anyway. AI enriches the voice of committed events (diary and Comms explaining *why* the Raider bought that ridiculous gun), with authored templates as fallback, as the [AI systems design](AI_SYSTEMS_DESIGN.md) already describes.
+- **Possible later hybrid (not approved):** at most once per Desperanza visit, a model selects among the top few options that the utility policy already ranked as legal. The selection is journaled as an event so replay reads it instead of re-asking the model, and the utility policy's top choice is used if the model fails. This is a deferred experiment that needs separate approval.
+
+The implemented G4/OUTFITTER Handler shop, equip, repair, and staging controls are transitional. They are superseded by this direction and will be replaced, not extended. See the [implementation ledger](IMPLEMENTATION_PROGRESS.md) for the proposed replacement step.
+
+#### Initial economy values (settled 2026-10-17)
+
+These are the starting contract for ECON implementation. They were chosen autonomously because the user was unavailable, to fit the existing catalog (weapons 0/65/140/280 coins, supplies 8-90 coins, loot 5-35 coins, averaging about 16). They are tunable and **not validated balance**. Change them through a recorded decision, not silently.
+
+1. **Traits.** Each Raider has one seeded primary trait. The existing **Cautious** and **Hoarder** are kept, and **Brawler** and **Gadgeteer** are added. A separate "Greedy" trait is not added, because the existing evolving greed stat already covers it. Trait drift is deferred to a later step.
+
+   | Trait | Weapon weight | Medical weight | Recharger weight | Cash reserve | Repair at durability ≤ | Sells |
+   |---|---|---|---|---|---|---|
+   | Cautious | 0.8 | 1.5 | 1.2 | 40% | 75% | All loot |
+   | Hoarder | 0.8 | 1.0 | 1.0 | 50% | 50% | All except its 3 most valuable items |
+   | Brawler | 1.5 | 0.8 | 0.8 | 15% | 25% | All loot |
+   | Gadgeteer | 1.0 | 1.0 | 1.5 | 25% | 50% | All loot |
+
+2. **Decision pass.** It runs once when the Raider arrives in Desperanza, as fixed ordered phases: sell → repair → buy/equip weapon → buy/stage supplies → ready.
+   - **Reserve:** after selling, the Raider keeps at least `max(reserve% × coins, repair cost of its equipped weapon)` unspent.
+   - **Scoring:** a candidate's score is `benefit × trait weight ÷ price`. Weapon benefit is the gain in average damage × multiplier over the best usable owned weapon. Supply benefit is its heal, revive, or charge amount. Only affordable candidates with a positive benefit that respect the reserve qualify. The Raider buys the highest score.
+   - **Ties:** ties go to catalog order, then instance ID.
+   - **Equipping:** the Raider always equips its best usable weapon. A broken weapon is repaired if affordable. Otherwise the Raider equips the next usable weapon, or the free Tea Kettle fallback.
+   - **Supply limits:** existing limits stay at 4 medical and 2 rechargers. The Raider fills its loadout from owned stock first and buys only to cover a shortfall.
+3. **Selling.** On return, the Raider sells eligible loot at the existing G3 sale value. The Hoarder exception keeps its 3 most valuable items. The 120-unit stash cap and lowest-value auto-sale remain. Every sale is one event that commits once.
+4. **Desperanza traders.** Trader stock rotates every 10-minute Hub cycle, seeded by cycle index, and is shared by all residents.
+   - **Stock:** the Tea Kettle is always free. Each cycle offers one non-starter weapon (quantity 1) and 3 random supply types (quantity 2-4 each).
+   - **Prices:** catalog value.
+   - **Contested stock:** when stock is scarce, the earliest committed Hub arrival buys first, then Raider ID. Request arrival order never decides.
+   - **Scope:** ECON-1 may use the full catalog as unlimited stock; finite rotation is ECON-2.
+5. **Weapons as loot (ECON-2).** Aspperigo and Vernerider join field opportunity pools at about 5% of draws combined. Temptrest AR is trader-only. Found weapons start at full durability and are kept as owned equipment, not sold as loot.
+6. **Signal nudges (ECON-3).** Two nudges are added, **Spend** and **Save**, each costing 1 Signal like Calm and Pressure. Each shifts the cash reserve by ±20 percentage points (clamped to 0-80%) for the next decision pass only. Only one nudge can be pending; it doesn't stack and is deduplicated on retries. A nudge never names an item.
+7. **Outfitter retirement (ECON-1).** Remove the Handler purchase, equip, repair, and staging mutation endpoints and buttons in the same step that adds autonomous preparation, so there is no period with both manual and autonomous preparation. Keep a read-only Loadout/Inventory view that shows the Raider's committed decisions. Supplies the Handler already bought stay as Raider-owned stock.
 
 "AFK" means no constant movement, aiming, reflex claiming, or mandatory encounter input. Live social integration connects actual human-owned Raiders; it does not require their Handlers to be continuously present. It also does not mean each browser independently invents a shared multiplayer world. Raiders return to Desperanza and re-enter the autonomous raid cycle; the world does not depend on a friend creating a private session.
 
@@ -70,7 +115,7 @@ Comedy makes consequences memorable; funny logs are not a substitute for meaning
 
 Raiders reside in Desperanza between raids and autonomously enter ongoing server-run raids where actual human-owned Raiders share locations and a world clock. They return to the hub and continue the cycle without waiting for an invite or a Handler deployment command. Production population and account-backed lifecycle remain to be specified; the current technical harness supports at most two development identities.
 
-**Bounded S5 experiment (approved 2026-10-12):** one-time duty opt-in; 30-second admission pulses; at most two actual development Raiders per world; immediate solo start when no other eligible Raider is available; 60 seconds at home before re-entry; worlds stay open while any admitted Raider remains active and close after the last returns. Browser/Handler absence does not withdraw or pause an enrolled Raider. Pause affects future admission only. The Handler monitors comms and may pause/resume future duty; no new encounter actions are included. These settings are slice decisions, not public matchmaking policy, fairness guarantees, or validated balance. The runtime details and verification evidence are in the [README](../README.md) and [implementation ledger](IMPLEMENTATION_PROGRESS.md).
+**Bounded S5 experiment (approved 2026-10-12, Hub residence superseded by HUB-3 on 2026-10-16 and Ready Up cost by HUB-4 on 2026-10-17):** one-time duty opt-in; 30-second admission pulses; at most two actual development Raiders per world; solo admission when no other eligible Raider is available; worlds stay open while any admitted Raider remains active and close after the last returns. Raiders now spend ten minutes in Desperanza both on enrollment and after every return, with server-committed, owner-private, nonreward parody Hub activities every minute, including during paused duty or Handler absence. Optional Ready Up spends 2 Signal to skip the remaining stay and resume duty, immediately entering the queue without bypassing admission cadence, world availability or capacity; it never interrupts an active raid. The server rejects insufficient Signal without queue/duty changes and retries never spend twice. Without input, enabled duty queues automatically for free when the stay ends. Browser/Handler absence does not withdraw or pause an enrolled Raider. Pause affects future admission only. These settings are slice decisions, not public matchmaking policy, fairness guarantees, or validated balance. The runtime details and verification evidence are in the [README](../README.md) and [implementation ledger](IMPLEMENTATION_PROGRESS.md).
 
 - Raiders search, travel, and fight autonomously through connected locations.
 - Locations contain shared loot opportunities and robot threats.
@@ -105,6 +150,9 @@ These are concrete starting proposals, not previously approved balance requireme
 | Population | Actual Raiders share ongoing raids; production capacity/concurrency remain open. S5 uses two Development identities only |
 | Social entry | Autonomous admission from Desperanza creates organic encounters; private invites are not the core loop |
 | World | One small location graph with shared loot, robots, and extraction |
+| Preparation | Raider autonomously sells, buys, equips, repairs, and departs in Desperanza through a deterministic trait-weighted utility policy (confirmed direction 2026-10-17); no Handler shop or loadout controls |
+| Equipment sources | Weapons mainly from raid loot; Desperanza traders sell from seeded, finite, shared per-cycle stock |
+| Handler influence | Spendable Signal actions only, including temporary scoring nudges; never specific purchases |
 | Standing orders | Avoid confrontation, deal first, or claim the objective |
 | Optional live choices | Offer a split, stand ground, or break contact; autonomous behavior resolves the encounter without a response |
 | Communication | Preset messages; no freeform chat initially |
@@ -380,7 +428,7 @@ Do not expand squads, seasons, territory, rankings, or a large progression econo
 
 - New repository name, ownership, visibility, and local workspace.
 - Acceptance of the proposed .NET/SignalR stack and initial gameplay rules.
-- Desperanza's between-raid role and which preparation/repair/stash activities must be available before the next autonomous departure.
+- Autonomous economy tuning: initial values were settled 2026-10-17 (see [Initial economy values](#initial-economy-values-settled-2026-10-17)). Trait drift rules and balance validation of those values remain open.
 - Production raid lifecycle and capacity: how account-backed worlds are created, populated, retained, and closed while Raiders enter and extract at different times. S5's two-identity in-memory lifecycle is a bounded experiment.
 - Production autonomous admission cadence, population/capacity, eligibility, opt-out/pause, and solo behavior when no other actual Raider is available. S5's cadence and solo-start rule do not establish the production policy.
 - Repeated-encounter fairness, target avoidance/limits, and exposure for unattended Raiders in a larger always-on population. S5 introduces no target selection or pair-cooldown system.

@@ -70,6 +70,7 @@ public static class RaiderCommsContent
     {
         IReadOnlyList<string> themes = activity switch
         {
+            "Hub" or "AtHome" => NarrationContent.Default.Pool("style.hub"),
             "Checking" => NarrationContent.Default.Pool("style.checking"),
             "Surveying" => NarrationContent.Default.Pool("style.surveying"),
             "Rummaging" => NarrationContent.Default.Pool("style.rummaging"),

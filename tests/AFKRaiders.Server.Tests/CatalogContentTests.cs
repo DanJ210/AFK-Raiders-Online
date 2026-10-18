@@ -62,7 +62,7 @@ public sealed class CatalogContentTests
         var document = BundledDocument("loot-catalog.json");
         document["schemaVersion"] = 2;
         var exception = Assert.Throws<InvalidDataException>(() => Read("loot-catalog.json", document.ToJsonString()));
-        Assert.Contains("expected 3", exception.Message);
+        Assert.Contains("expected 4", exception.Message);
     }
 
     [Theory]
@@ -74,6 +74,11 @@ public sealed class CatalogContentTests
     [InlineData("loot-catalog.json", "pool", "dropWeight")]
     [InlineData("loot-catalog.json", "opportunities", "fixedItemIds")]
     [InlineData("loot-catalog.json", "opportunities", "eligibleCategories")]
+    [InlineData("loot-catalog.json", "opportunities", "activity")]
+    [InlineData("loot-catalog.json", "opportunities", "title")]
+    [InlineData("loot-catalog.json", "opportunities", "startText")]
+    [InlineData("loot-catalog.json", "opportunities", "completedText")]
+    [InlineData("loot-catalog.json", "opportunities", "contestable")]
     [InlineData("shop-catalog.json", "weapons", "damageMultiplier")]
     [InlineData("shop-catalog.json", "supplies", "reviveAmount")]
     public void DefinitionFieldsCannotBeSilentlyDefaulted(string file, string collection, string field)
@@ -108,6 +113,8 @@ public sealed class CatalogContentTests
     [InlineData("duplicateTableCategory")]
     [InlineData("negativeWeight")]
     [InlineData("blankPoolReference")]
+    [InlineData("unknownActivity")]
+    [InlineData("blankActivityText")]
     public void InvalidLootDefinitionsAreRejectedWithSourceContext(string mutation)
     {
         var document = BundledDocument("loot-catalog.json");
@@ -148,6 +155,8 @@ public sealed class CatalogContentTests
             case "duplicateOpportunity": opportunities.Add(opportunity.DeepClone()); break;
             case "legacyOpportunityPool": opportunity["pool"] = pool.DeepClone(); break;
             case "duplicateTableCategory": opportunity["eligibleCategories"]!.AsArray().Add("Salvage"); break;
+            case "unknownActivity": opportunity["activity"] = "Unreviewed"; break;
+            case "blankActivityText": opportunity["startText"] = " "; break;
         }
         var exception = Assert.Throws<InvalidDataException>(() => Read("loot-catalog.json", document.ToJsonString()));
         Assert.Contains("loot-catalog.json", exception.Message);

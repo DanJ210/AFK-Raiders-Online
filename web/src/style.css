@@ -92,10 +92,21 @@ code { color: #d8ded4; font: 11px Consolas, monospace; overflow-wrap: anywhere; 
 .live-badge { flex-direction: row !important; align-items: center; margin-left: auto; color: var(--lime); font: 10px Consolas, monospace; letter-spacing: .08em; }
 .raid-grid { display: grid; grid-template-columns: 1fr 1.05fr 1fr; gap: 14px; }
 .panel { min-height: 280px; padding: 20px; border: 1px solid var(--line); background: linear-gradient(145deg, #191a31, #151626); }
+.collapsible-panel { position: relative; }
+.panel-collapse-toggle { position: absolute; top: 12px; right: 12px; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 28px; padding: 0 8px; color: var(--muted); border: 1px solid transparent; border-radius: 2px; background: var(--panel); font-size: 12px; }
+.panel-collapse-toggle:hover, .panel-collapse-toggle:focus-visible { border-color: var(--line); color: #e6e5f3; }
+.panel-collapse-toggle:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.panel-collapse-icon { color: var(--lime); font-size: 20px; line-height: 1; }
+.panel-content { padding-top: 28px; }
+.collapsible-panel.is-collapsed { min-height: 0; padding: 0; }
+.collapsible-panel.is-collapsed .panel-content { display: none; }
+.collapsible-panel.is-collapsed .panel-collapse-toggle { position: static; width: 100%; justify-content: space-between; min-height: 42px; padding: 8px 14px; color: #c8c5d9; }
+.panel-collapse-label { font-size: 11px; font-weight: 700; text-align: left; }
 .panel h2 { margin: 8px 0 18px; font-size: 17px; letter-spacing: -.03em; }
 .player-row, .item-row { display: flex; align-items: center; gap: 12px; min-height: 58px; border-top: 1px solid #2c332d; }
 .player-row strong, .item-row strong { display: block; font-size: 12px; }
 .player-row small, .item-row small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+.item-row > .appraise-btn { width: auto; flex: 0 0 auto; }
 .avatar { display: grid; place-items: center; width: 34px; height: 34px; color: var(--lime); background: #283222; font: 11px Consolas, monospace; }
 .presence { margin-left: auto; }
 .empty { padding: 13px 0; color: #81897f; font-size: 11px; line-height: 1.6; }
@@ -114,6 +125,7 @@ code { color: #d8ded4; font: 11px Consolas, monospace; overflow-wrap: anywhere; 
 .route li.current { color: var(--lime); }
 .route small { display: block; margin-top: 4px; font-size: 10px; }
 .receipt, .comms { margin-top: 16px; min-height: auto; }
+.comms { margin-bottom: 16px; }
 .table-scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; }
 th, td { padding: 10px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -242,11 +254,12 @@ th { color: var(--muted); }
 .outfitter-subheading { margin-bottom: 4px; }
 
 /* Weapons & Durability */
-.equipped-weapon-card { background: #12162b; border: 1px solid #3c4a75; border-left: 3px solid #4cc9f0; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .weapons-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .weapon-card { background: #101222; border: 1px solid var(--line); padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; border-radius: 2px; }
+.equipped-weapon-card { background: #12162b; border-color: #3c4a75; padding: 14px 16px; align-items: stretch; gap: 16px; }
+.equipped-weapon-card .weapon-card-actions { align-self: center; width: min(100%, 240px); }
 .weapon-card.is-equipped { border-color: #3b5b82; background: #11182c; }
-.weapon-main-info { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.weapon-main-info { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .weapon-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .equipped-tag { font: 700 9px Consolas, monospace; background: #163e52; color: #56d2ff; padding: 1px 6px; border-radius: 2px; }
 .rarity-badge { font: 700 9px Consolas, monospace; padding: 1px 6px; border-radius: 2px; color: var(--rarity-color); background: color-mix(in srgb, var(--rarity-color) 15%, #101222); }

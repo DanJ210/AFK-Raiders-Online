@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using AFKRaiders.Server.AI;
 using AFKRaiders.Server.Content;
+using AFKRaiders.Server.Domain;
 
 namespace AFKRaiders.Server.Tests;
 
@@ -170,6 +171,11 @@ public sealed class NarrationContentTests
         var prompt = OnnxGenAiNarrativeGenerator.BuildAmbientPrompt("Market", "Checking");
         Assert.Contains("zippers", prompt);
         Assert.Contains("No actions, discoveries, other people, rewards or combat.", prompt);
+        var hubPrompt = OnnxGenAiNarrativeGenerator.BuildAmbientPrompt(
+            new AmbientCommsContext("Desperanza", "reviewing my paperwork"));
+        Assert.Contains("tube route maps", hubPrompt);
+        Assert.Contains("tube route maps", OnnxGenAiNarrativeGenerator.BuildAmbientPrompt("Desperanza", "Checking"));
+        Assert.Equal("desperanza-narration-v3", NarrationContent.Default.ContentVersion);
         Assert.Null(OnnxGenAiNarrativeGenerator.ValidateAmbient("I recovered legendary loot from a robot."));
         Assert.NotNull(OnnxGenAiNarrativeGenerator.ValidateAmbient("I consider paperwork a defective compass."));
     }

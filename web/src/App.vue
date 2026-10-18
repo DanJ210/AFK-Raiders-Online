@@ -4,6 +4,7 @@ import { clearLiveWarning, liveClosedMessage, stopOwnedConnection } from './live
 import { rarityAttributes, rarityName } from './rarity'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { HubConnectionBuilder, type HubConnection } from '@microsoft/signalr'
+import CollapsiblePanel from './components/CollapsiblePanel.vue'
 
 type PlayerView = {
   playerId: string; displayName: string; disposition: string; location: string
@@ -45,8 +46,7 @@ type SupplyDefinition = {
 }
 type OwnedWeapon = {
   instanceId: string; catalogId: string; name: string; currentDurability: number
-  maxDurability: number; repairCost: number; damage: number; damageMultiplier: number
-  damageMin: number; damageMax: number; rarity: number; flavor: string
+  maxDurability: number; repairCost: number; rarity: number; flavor: string
 }
 type OwnedSupplyStack = {
   catalogId: string; name: string; category: string; quantity: number; costPerUnit: number
@@ -112,8 +112,8 @@ type Projection = {
   myGreed?: number; myMood?: number; myResilience?: number; myExtractChance?: number
   myAppetite?: number; exposure?: number
   hazardWarnings?: { location: string; resolvesAt: string; rawDamage: number }[]
-  opportunities: { opportunityId: string; location: string; status: string; closesAt: string | null
-    remainingItems: number; participantIds: string[] }[]
+  opportunities: { opportunityId: string; location: string; activity: string; title: string
+    status: string; closesAt: string | null; remainingItems: number; participantIds: string[] }[]
   myInventory: ItemView[]; myExtractedLoot: ItemView[]; encounters: EncounterView[]
   robotEncounter: RobotEncounterView | null
   events: { sequence: number; at: string; kind: string; text: string }[]
@@ -124,6 +124,8 @@ type HandlerAccess = { slot: string; playerId: string; accessToken: string }
 type HandlerProjection = {
   slot: string; playerId: string; displayName: string; dutyEnabled: boolean; status: string
   homeAvailableAt: string | null; currentRaidId: string | null; raid: Projection | null
+  isHome: boolean; canReadyUp: boolean
+  readyUpSignalCost: number
   hubResidents?: { slot: string; displayName: string; status: string; homeAvailableAt: string | null }[] | null
   myLastExtractedLoot: ItemView[]; comms: { sequence: number; at: string; kind: string; text: string }[]
   serverTime: string
@@ -137,7 +139,7 @@ type HandlerProjection = {
   stashGroups?: StashGroupView[] | null
   equippedWeapon?: OwnedWeapon | null
   ownedWeapons?: OwnedWeapon[] | null
-  ownedSupplies?: OwnedSupplyStack[] | null
+  supplyStock?: OwnedSupplyStack[] | null
   stagedSupplies?: StagedSupplyItem[] | null
   shopCatalog?: ShopCatalogView | null
   lastTopItemAppraisal?: ItemAppraisalView | null
@@ -173,6 +175,8 @@ const handlerProjection = ref<HandlerProjection | null>(null)
 const projection = ref<Projection | null>(null)
 const error = ref('')
 const connecting = ref(false)
+const readyUpPending = ref(false)
+let readyUpIntent: { accessToken: string; commandId: string } | null = null
 const serverReady = ref(false)
 const serverStatus = ref('Checking local game server')
 const aiStatus = ref<{ generator: string; available: boolean; mode: string } | null>(null)
@@ -369,7 +373,15 @@ const stagedDraft = ref<Record<string, number>>({})
 
 const equippedWeapon = computed(() => handlerProjection.value?.equippedWeapon ?? null)
 const ownedWeapons = computed(() => handlerProjection.value?.ownedWeapons ?? [])
-const ownedSupplies = computed(() => handlerProjection.value?.ownedSupplies ?? [])
+
+function weaponDamage(catalogId: string): string {
+  const definition = shopCatalog.value?.weapons.find(weapon => weapon.id === catalogId)
+  return definition
+    ? `${definition.damageMin}–${definition.damageMax} (x${definition.damageMultiplier})`
+    : 'Unavailable (weapon catalog entry missing)'
+}
+
+const ownedSupplies = computed(() => handlerProjection.value?.supplyStock ?? [])
 const stagedSupplies = computed(() => handlerProjection.value?.stagedSupplies ?? [])
 const topAppraisedItem = computed(() => {
   const summary = handlerProjection.value?.lastReturnSummary
@@ -394,12 +406,13 @@ const stagedRechargerCount = computed(() => {
   return count
 })
 
-watch(() => handlerProjection.value?.stagedSupplies, (staged) => {
+watch([
+  () => handlerProjection.value?.playerId,
+  () => JSON.stringify(stagedSupplies.value),
+], () => {
   const draft: Record<string, number> = {}
-  if (staged) {
-    for (const item of staged) {
-      draft[item.catalogId] = item.quantity
-    }
+  for (const item of stagedSupplies.value) {
+    draft[item.catalogId] = item.quantity
   }
   stagedDraft.value = draft
 }, { immediate: true })
@@ -855,6 +868,33 @@ async function toggleDuty() {
   }
 }
 
+async function readyUp() {
+  const access = session.value
+  if (!access || !handlerProjection.value?.canReadyUp || readyUpPending.value
+    || signalCurrent.value < handlerProjection.value.readyUpSignalCost) return
+  readyUpPending.value = true
+  error.value = ''
+  if (readyUpIntent?.accessToken !== access.accessToken) {
+    readyUpIntent = { accessToken: access.accessToken, commandId: crypto.randomUUID() }
+  }
+  try {
+    const value = await request<HandlerProjection>('/api/dev/handler/ready-up', access, {
+      method: 'POST',
+      body: JSON.stringify({ commandId: readyUpIntent.commandId }),
+    })
+    acceptProjection(value, access)
+    readyUpIntent = null
+  } catch (cause) {
+    if (cause instanceof Error && cause.message.includes('401')) {
+      clearSession(access.slot, 'Development session expired after server restart. Please start autonomous duty to enroll.')
+    } else {
+      error.value = cause instanceof Error ? cause.message : 'Unable to ready up'
+    }
+  } finally {
+    readyUpPending.value = false
+  }
+}
+
 async function restoreHandler(targetSlot: 'raider-one' | 'raider-two') {
   const key = accessStorageKey(targetSlot)
   const stored = localStorage.getItem(key)
@@ -988,10 +1028,10 @@ onBeforeUnmount(() => {
           <p class="eyebrow">HANDLER CONSOLE / {{ handlerProjection?.status }}</p>
           <h1>Desperanza</h1>
           <p class="subhead">{{ handlerProjection?.displayName }} / {{ handlerProjection?.dutyEnabled ? 'AUTONOMOUS DUTY ON' : 'FUTURE ADMISSIONS PAUSED' }}
-            <span v-if="me"> / {{ me.activity }} at {{ me.location }}<span v-if="me.destination"> to {{ me.destination }}</span>
+            <span v-if="handlerProjection?.isHome && handlerProjection.homeAvailableAt && secondsRemaining(handlerProjection.homeAvailableAt) > 0">
+              / Hub stay: {{ secondsRemaining(handlerProjection.homeAvailableAt) }}s remaining</span>
+            <span v-else-if="me && !handlerProjection?.isHome"> / {{ me.activity }} at {{ me.location }}<span v-if="me.destination"> to {{ me.destination }}</span>
               <span v-if="me.activityEndsAt"> / next activity in {{ secondsRemaining(me.activityEndsAt) }}s</span></span>
-            <span v-else-if="handlerProjection?.homeAvailableAt && secondsRemaining(handlerProjection.homeAvailableAt) > 0">
-              / next eligible in {{ secondsRemaining(handlerProjection.homeAvailableAt) }}s</span>
           </p>
         </div>
         <div class="handler-actions">
@@ -1014,10 +1054,14 @@ onBeforeUnmount(() => {
       <p class="notice">Pausing affects future admissions only. A Raider already in a raid continues, resolves encounters without Handler input, and returns to Desperanza independently.</p>
 
       <div v-if="!isRaidActive" class="home-dashboard">
-        <section class="panel">
+        <CollapsiblePanel class="panel" label="Desperanza duty board">
           <p class="eyebrow">DESPERANZA / DUTY BOARD</p>
           <h2>{{ handlerProjection?.status }}</h2>
-          <p class="panel-note">The Raider is home in Desperanza. When duty is enabled, the server admits them to an eligible raid and launches a single-person surface pod; travel takes 60 seconds.</p>
+          <p class="panel-note">Your Raider hangs out in Desperanza for 10 minutes on enrollment and after every raid, with regular parody Comms. Duty then queues them automatically for free. Ready Up costs {{ handlerProjection?.readyUpSignalCost }} Signal to skip the rest of the stay and resume paused duty; admission still waits for the next eligible 30-second pulse. Surface pod travel takes 60 seconds.</p>
+          <button v-if="handlerProjection?.isHome" :disabled="readyUpPending || !handlerProjection.canReadyUp || signalCurrent < handlerProjection.readyUpSignalCost" @click="readyUp">
+            {{ readyUpPending ? 'Readying up...' : handlerProjection.canReadyUp ? `Ready Up (${handlerProjection.readyUpSignalCost} Signal)` : 'Queued for raid' }}
+          </button>
+          <p v-if="handlerProjection?.canReadyUp && signalCurrent < handlerProjection.readyUpSignalCost" class="privacy-note">Not enough Signal. Wait for Signal to regenerate, or let enabled duty queue automatically when the Hub stay ends.</p>
           <p v-if="handlerProjection?.homeAvailableAt" class="privacy-note">Next re-entry eligibility: {{ new Date(handlerProjection.homeAvailableAt).toLocaleTimeString() }} server time.</p>
           <p class="privacy-note">A world stays open while any admitted Raider is active, then closes when the last returns.</p>
           <div class="hub-residents">
@@ -1041,12 +1085,12 @@ onBeforeUnmount(() => {
             <p v-for="event in recentHubComms" :key="event.sourceEventId" class="hub-comms-entry">
               <time>{{ new Date(event.at).toLocaleTimeString() }}</time> {{ event.text }}
             </p>
-            <p v-if="!recentHubComms.length" class="empty">Hub transition comms will appear here as they occur.</p>
+            <p v-if="!recentHubComms.length" class="empty">Hub Comms arrive every minute while your Raider hangs out, even with the Handler offline.</p>
           </div>
-        </section>
+        </CollapsiblePanel>
 
         <!-- OUTFITTER & ARMORY WORKSHOP PANEL (G4 & AI-3) -->
-        <section class="panel outfitter-panel">
+        <CollapsiblePanel class="panel outfitter-panel" label="Outfitter and field workshop">
           <div class="outfitter-header">
             <div>
               <p class="eyebrow">EQUIPMENT &amp; LOGISTICS / DESPERANZA OUTFITTER</p>
@@ -1085,7 +1129,7 @@ onBeforeUnmount(() => {
                 </div>
                 <small class="weapon-flavor">{{ equippedWeapon.flavor }}</small>
                 <div class="weapon-stats-row">
-                  <span>Dmg: <strong>{{ equippedWeapon.damageMin }}–{{ equippedWeapon.damageMax }}</strong> (x{{ equippedWeapon.damageMultiplier }})</span>
+                  <span>Dmg: <strong>{{ weaponDamage(equippedWeapon.catalogId) }}</strong></span>
                   <span>Durability: <strong>{{ equippedWeapon.currentDurability }} / {{ equippedWeapon.maxDurability }}</strong></span>
                   <span v-if="equippedWeapon.currentDurability < equippedWeapon.maxDurability" class="repair-cost-tag">
                     Service Fee: {{ equippedWeapon.repairCost }} ¢
@@ -1131,7 +1175,7 @@ onBeforeUnmount(() => {
                     <span class="rarity-badge">{{ rarityName(wpn.rarity) }}</span>
                   </div>
                   <div class="weapon-stats-row">
-                    <span>Dmg: {{ wpn.damageMin }}–{{ wpn.damageMax }}</span>
+                    <span>Dmg: {{ weaponDamage(wpn.catalogId) }}</span>
                     <span>Dur: {{ wpn.currentDurability }}/{{ wpn.maxDurability }}</span>
                   </div>
                   <div class="durability-meter">
@@ -1320,10 +1364,10 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </div>
-        </section>
+        </CollapsiblePanel>
 
         <!-- HOME STASH & VAULT PANEL -->
-        <section class="panel stash-panel">
+        <CollapsiblePanel class="panel stash-panel" label="Home stash">
           <div class="stash-header">
             <div>
               <p class="eyebrow">PERSISTENT REPOSITORY / DESPERANZA VAULT</p>
@@ -1359,9 +1403,9 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <p v-else class="empty">Home stash is currently empty. Complete raids to accumulate salvage.</p>
-        </section>
+        </CollapsiblePanel>
 
-        <section v-if="projection" class="panel">
+        <CollapsiblePanel v-if="projection" class="panel" label="Ongoing world monitor">
           <p class="eyebrow">ONGOING WORLD / HANDLER MONITOR</p>
           <h2>{{ projection.status }} / {{ projection.players.length }} actual Raiders</h2>
           <div v-for="player in projection.players" :key="player.playerId" class="player-row">
@@ -1370,8 +1414,8 @@ onBeforeUnmount(() => {
               <small>{{ player.location }} / {{ player.activity }}<span v-if="player.destination"> to {{ player.destination }}</span></small></span>
           </div>
           <p class="privacy-note">Your Raider has returned. The shared world remains monitored until every admitted Raider returns.</p>
-        </section>
-        <section v-if="handlerProjection?.lastReturnSummary" class="panel debrief-panel" :class="{ 'ko-debrief': handlerProjection.lastReturnSummary.outcome === 'KnockedOut' }">
+        </CollapsiblePanel>
+        <CollapsiblePanel v-if="handlerProjection?.lastReturnSummary" class="panel debrief-panel" :class="{ 'ko-debrief': handlerProjection.lastReturnSummary.outcome === 'KnockedOut' }" label="Mission debrief">
           <!-- G5 TERMINAL KNOCKED OUT DEBRIEF -->
           <div v-if="handlerProjection.lastReturnSummary.outcome === 'KnockedOut'" class="ko-debrief-card">
             <div class="ko-header">
@@ -1488,15 +1532,15 @@ onBeforeUnmount(() => {
               <button class="secondary mini-btn appraise-btn" :disabled="appraising" @click="requestAppraisal(item.catalogId, item.name, item.value)">Appraise</button>
             </div>
           </div>
-        </section>
-        <section v-else class="panel">
+        </CollapsiblePanel>
+        <CollapsiblePanel v-else class="panel" label="Last secured result">
           <p class="eyebrow">LAST SECURED RESULT / PRIVATE</p>
           <h2>{{ handlerProjection?.myLastExtractedLoot.length ?? 0 }} items / {{ handlerProjection?.myLastExtractedLoot.reduce((sum, item) => sum + item.value, 0) ?? 0 }} value</h2>
           <div v-for="item in handlerProjection?.myLastExtractedLoot ?? []" :key="item.instanceId" class="item-row" v-bind="itemRarity(item.catalogId)">
             <span><strong>{{ item.name }} / {{ item.value }}</strong><small>{{ item.flavor }}</small></span>
           </div>
           <p v-if="!handlerProjection?.myLastExtractedLoot.length" class="empty">No secured raid result yet.</p>
-        </section>
+        </CollapsiblePanel>
       </div>
       <div v-if="projection && isRaidActive" class="active-raid">
         <div class="raid-world-heading">
@@ -1508,7 +1552,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- G5 RAIDER SURVIVAL & SHIELD HUD -->
-        <section class="panel survival-hud-panel">
+        <CollapsiblePanel class="panel survival-hud-panel" label="Raider vitals and shield telemetry">
           <div class="hud-header">
             <div>
               <p class="eyebrow">RAIDER VITALS &amp; SHIELD TELEMETRY // MAKESHIFT CONFIDENCE SHIELD</p>
@@ -1570,10 +1614,10 @@ onBeforeUnmount(() => {
               </span>
             </div>
           </div>
-        </section>
+        </CollapsiblePanel>
 
         <!-- G5 HANDLER SUPPORT DIRECTIVES PANEL -->
-        <section class="panel handler-support-panel">
+        <CollapsiblePanel class="panel handler-support-panel" label="Handler support directives">
           <div class="support-header">
             <div>
               <p class="eyebrow">EMERGENCY INTERVENTION // HANDLER SUPPORT</p>
@@ -1645,10 +1689,10 @@ onBeforeUnmount(() => {
               <p>Greed +10, Mood -2: more valuable-item appetite, less exit willingness and resilience. Existing shared loot stays finite.</p>
             </button>
           </div>
-        </section>
+        </CollapsiblePanel>
 
         <!-- ACTIVE THREAD SPOTLIGHT -->
-        <section v-if="currentThread" class="panel thread-panel">
+        <CollapsiblePanel v-if="currentThread" class="panel thread-panel" :label="`Active thread: ${currentThread.title}`">
           <div class="thread-header">
             <div>
               <p class="eyebrow">ACTIVE THREAD / {{ currentThread.kind.toUpperCase() }}</p>
@@ -1670,7 +1714,7 @@ onBeforeUnmount(() => {
               <span>{{ log }}</span>
             </div>
           </div>
-        </section>
+        </CollapsiblePanel>
 
         <div v-if="recentThreads.length" class="recent-threads-summary">
           <span class="label">RECENT COMPLETED THREADS:</span>
@@ -1679,8 +1723,54 @@ onBeforeUnmount(() => {
           </span>
         </div>
 
+      <!-- CONTINUOUS HANDLER COMMS FEED -->
+      <CollapsiblePanel class="panel comms" label="Continuous Handler Comms journal">
+        <div class="comms-header">
+          <div>
+            <p class="eyebrow">CONTINUOUS COMMS JOURNAL / CROSS-RAID PARODY FEED</p>
+            <h2>Handler channel / {{ transport }}</h2>
+          </div>
+          <div class="comms-filter-tabs">
+            <button :class="{ active: commsFilter === 'all' }" class="filter-tab" @click="commsFilter = 'all'">All ({{ journalEntries.length }})</button>
+            <button :class="{ active: commsFilter === 'diary' }" class="filter-tab" @click="commsFilter = 'diary'">Diary</button>
+            <button :class="{ active: commsFilter === 'hub' }" class="filter-tab" @click="commsFilter = 'hub'">Hub</button>
+            <button :class="{ active: commsFilter === 'encounters' }" class="filter-tab" @click="commsFilter = 'encounters'">Encounters</button>
+          </div>
+        </div>
+
+        <div ref="commsContainerRef" class="comms-scroll" @scroll="onCommsScroll">
+          <ol>
+            <li v-for="event in filteredComms" :key="event.sourceEventId" :class="`channel-${event.channel.toLowerCase()}`">
+              <div class="comms-meta">
+                <code>{{ new Date(event.at).toLocaleTimeString() }}</code>
+                <span v-for="category in journalCategories(event)" :key="category" class="channel-badge" :class="`badge-${category.toLowerCase()}`">{{ category }}</span>
+                <span class="kind-tag">{{ event.kind }}</span>
+                <details>
+                  <summary class="kind-tag" :title="enrichmentExplanation(event.enrichmentStatus, event.enrichmentReason)">
+                    {{ narrationLabel(event.narrativeSource) }}
+                  </summary>
+                  <p class="comms-text">{{ enrichmentExplanation(event.enrichmentStatus, event.enrichmentReason) }}</p>
+                  <p class="comms-text">Source: {{ event.narrativeSource || 'CanonFallback' }} / Status: {{ event.enrichmentStatus || 'NotRequested' }}</p>
+                  <p v-if="event.enrichmentReason" class="comms-text">Reason: {{ event.enrichmentReason }}</p>
+                </details>
+                <span v-if="event.raidId" class="raid-tag">#{{ event.raidId.slice(0, 6) }}</span>
+              </div>
+              <p class="comms-text">{{ event.text }}</p>
+              <p v-if="event.flavor" class="comms-text">Optional Raider aside [Generated]: {{ event.flavor }}</p>
+            </li>
+          </ol>
+          <p v-if="!filteredComms.length" class="empty">No comms recorded in this channel yet.</p>
+        </div>
+
+        <div v-if="hasNewUnreadComms" class="unread-banner">
+          <button class="unread-jump" @click="scrollToBottom">
+            ↓ New transmission received (Click to jump to latest)
+          </button>
+        </div>
+      </CollapsiblePanel>
+
       <div class="raid-grid">
-        <section class="panel people">
+        <CollapsiblePanel class="panel people" label="Raiders in this world">
           <p class="eyebrow">ACTUAL RAIDERS / SHARED SESSION</p>
           <h2>Who's in the scrapyard?</h2>
           <div v-for="player in projection.players" :key="player.playerId" class="player-row">
@@ -1690,8 +1780,8 @@ onBeforeUnmount(() => {
               <small v-if="player.activityEndsAt">{{ secondsRemaining(player.activityEndsAt) }}s</small>
           </div>
           <p class="privacy-note">Only actual Raiders in this authoritative world participate. Handler connection is not Raider participation.</p>
-        </section>
-        <section class="panel">
+        </CollapsiblePanel>
+        <CollapsiblePanel class="panel" label="Shared map and independent journeys">
           <p class="eyebrow">SHARED MAP / INDEPENDENT JOURNEYS</p>
           <h2>The scenic route to regret</h2>
           <ol class="route">
@@ -1701,10 +1791,11 @@ onBeforeUnmount(() => {
             </li>
           </ol>
           <div v-for="opportunity in projection.opportunities" :key="opportunity.opportunityId" class="privacy-note">
-            <strong>{{ opportunity.location }} / {{ opportunity.opportunityId }}</strong>
+            <strong>{{ opportunity.location }} / {{ opportunity.title }}</strong>
+            <small>{{ opportunity.activity }} / {{ opportunity.opportunityId }}</small>
             <div>{{ opportunity.status }} / {{ opportunity.remainingItems }} items remain
               <span v-if="opportunity.status === 'Searching' && opportunity.closesAt"> / closes in {{ secondsRemaining(opportunity.closesAt) }}s</span></div>
-            <div v-if="opportunity.participantIds.length">Search participants: {{ participantNames(opportunity.participantIds) }}</div>
+            <div v-if="opportunity.participantIds.length">Participants: {{ participantNames(opportunity.participantIds) }}</div>
           </div>
           <div class="privacy-note">
             <strong>{{ projection.robot.name }} / {{ projection.robot.location }}</strong>
@@ -1717,8 +1808,8 @@ onBeforeUnmount(() => {
               Actual combat participants: {{ participantNames(projection.robot.participantIds) }}
             </div>
           </div>
-        </section>
-        <section class="panel backpack-panel">
+        </CollapsiblePanel>
+        <CollapsiblePanel class="panel backpack-panel" label="Your backpack">
           <p class="eyebrow">{{ me?.activity === 'Extracted' ? 'EXTRACTED THIS RAID' : 'YOUR BACKPACK / PRIVATE' }}</p>
           <h2>{{ loot.length }} items / {{ lootValue }} value</h2>
 
@@ -1776,10 +1867,10 @@ onBeforeUnmount(() => {
           <p v-if="!loot.length" class="empty">Nothing yet. The Raider is handling that. Allegedly.</p>
           <p class="privacy-note">Extracted loot is a session result, not persistent account inventory. Server restarts erase this local slice.</p>
           <p v-if="me?.activity === 'Extracted' && projection.status !== 'Completed'" class="privacy-note">Your Raider returned to Desperanza. Other actual Raiders are still completing this world.</p>
-        </section>
+        </CollapsiblePanel>
       </div>
 
-      <section v-for="encounter in projection.encounters" :key="encounter.encounterId" class="panel receipt">
+      <CollapsiblePanel v-for="encounter in projection.encounters" :key="encounter.encounterId" class="panel receipt" :label="`Shared encounter receipt at ${encounter.location}`">
         <p class="eyebrow">SHARED ENCOUNTER RECEIPT</p>
         <h2>{{ encounter.location }} / {{ encounter.resolution }}</h2>
         <p class="privacy-note">Actual participants: {{ participantNames(encounter.participantIds) }}</p>
@@ -1795,8 +1886,8 @@ onBeforeUnmount(() => {
         </div>
         <p v-for="award in encounter.awards" :key="award.instanceId" class="award">{{ award.recipientName }} recovered {{ award.itemName }}</p>
         <p class="privacy-note">Experimental salvage rules. Contesting costs eight seconds of recovery; cooperation takes two. No combat or theft yet.</p>
-      </section>
-      <section v-if="projection.robotEncounter" class="panel receipt">
+      </CollapsiblePanel>
+      <CollapsiblePanel v-if="projection.robotEncounter" class="panel receipt" :label="`Robot encounter receipt at ${projection.robotEncounter.location}`">
         <p class="eyebrow">SHARED ROBOT ENCOUNTER / PARTICIPANTS ONLY</p>
         <h2>{{ projection.robotEncounter.location }} / {{ projection.robotEncounter.resolution }}</h2>
         <p class="privacy-note">Actual participants: {{ participantNames(projection.robotEncounter.participantIds) }}</p>
@@ -1809,54 +1900,8 @@ onBeforeUnmount(() => {
             </tr></tbody>
           </table>
         </div>
-      </section>
+      </CollapsiblePanel>
       </div>
-
-      <!-- CONTINUOUS HANDLER COMMS FEED -->
-      <section class="panel comms">
-        <div class="comms-header">
-          <div>
-            <p class="eyebrow">CONTINUOUS COMMS JOURNAL / CROSS-RAID PARODY FEED</p>
-            <h2>Handler channel / {{ transport }}</h2>
-          </div>
-          <div class="comms-filter-tabs">
-            <button :class="{ active: commsFilter === 'all' }" class="filter-tab" @click="commsFilter = 'all'">All ({{ journalEntries.length }})</button>
-            <button :class="{ active: commsFilter === 'diary' }" class="filter-tab" @click="commsFilter = 'diary'">Diary</button>
-            <button :class="{ active: commsFilter === 'hub' }" class="filter-tab" @click="commsFilter = 'hub'">Hub</button>
-            <button :class="{ active: commsFilter === 'encounters' }" class="filter-tab" @click="commsFilter = 'encounters'">Encounters</button>
-          </div>
-        </div>
-
-        <div ref="commsContainerRef" class="comms-scroll" @scroll="onCommsScroll">
-          <ol>
-            <li v-for="event in filteredComms" :key="event.sourceEventId" :class="`channel-${event.channel.toLowerCase()}`">
-              <div class="comms-meta">
-                <code>{{ new Date(event.at).toLocaleTimeString() }}</code>
-                <span v-for="category in journalCategories(event)" :key="category" class="channel-badge" :class="`badge-${category.toLowerCase()}`">{{ category }}</span>
-                <span class="kind-tag">{{ event.kind }}</span>
-                <details>
-                  <summary class="kind-tag" :title="enrichmentExplanation(event.enrichmentStatus, event.enrichmentReason)">
-                    {{ narrationLabel(event.narrativeSource) }}
-                  </summary>
-                  <p class="comms-text">{{ enrichmentExplanation(event.enrichmentStatus, event.enrichmentReason) }}</p>
-                  <p class="comms-text">Source: {{ event.narrativeSource || 'CanonFallback' }} / Status: {{ event.enrichmentStatus || 'NotRequested' }}</p>
-                  <p v-if="event.enrichmentReason" class="comms-text">Reason: {{ event.enrichmentReason }}</p>
-                </details>
-                <span v-if="event.raidId" class="raid-tag">#{{ event.raidId.slice(0, 6) }}</span>
-              </div>
-              <p class="comms-text">{{ event.text }}</p>
-              <p v-if="event.flavor" class="comms-text">Optional Raider aside [Generated]: {{ event.flavor }}</p>
-            </li>
-          </ol>
-          <p v-if="!filteredComms.length" class="empty">No comms recorded in this channel yet.</p>
-        </div>
-
-        <div v-if="hasNewUnreadComms" class="unread-banner">
-          <button class="unread-jump" @click="scrollToBottom">
-            ↓ New transmission received (Click to jump to latest)
-          </button>
-        </div>
-      </section>
 
       <!-- SELL STASH MODAL DIALOG -->
       <div v-if="sellingGroup" class="modal-backdrop" @click.self="closeSellModal">

@@ -10,14 +10,16 @@ public sealed class LootCatalogTests
         new(id, name, value, rarity, "test", "Flavor", categories ?? [LootEligibilityCategory.Salvage]);
 
     private static OpportunityDefinition Opportunity(string id, string location, IReadOnlyList<string> fixedItems) =>
-        new(id, location, 10, fixedItems, 1, [LootEligibilityCategory.Salvage]);
+        new(id, location, 10, fixedItems, 1, [LootEligibilityCategory.Salvage],
+            OpportunityActivity.Searching, "Test opportunity", "A test opportunity begins.",
+            "Test opportunity completed.", false);
 
     [Fact]
     public void DefaultCatalogIsValidAndContainsReviewedScrapItems()
     {
         var catalog = LootCatalog.Default;
 
-        Assert.Equal("desperanza-shared-loot-v4", catalog.ContentVersion);
+        Assert.Equal("desperanza-shared-loot-v5", catalog.ContentVersion);
         Assert.NotEmpty(catalog.Items);
         Assert.NotEmpty(catalog.Opportunities);
 
@@ -198,7 +200,9 @@ public sealed class LootCatalogTests
             10,
             ["residential-salvage"],
             1,
-            [LootEligibilityCategory.Residential, LootEligibilityCategory.Salvage]);
+            [LootEligibilityCategory.Residential, LootEligibilityCategory.Salvage],
+            OpportunityActivity.Searching, "Configured table", "A configured table begins.",
+            "Configured table completed.", false);
         var catalog = new LootCatalog("category-test-v1",
             [residentialSalvage, salvage, robot], [table],
             [new("residential-salvage", 1), new("salvage", 1), new("robot", 1)]);
@@ -226,7 +230,9 @@ public sealed class LootCatalogTests
         var second = Item("second");
         var excluded = Item("excluded", categories: [LootEligibilityCategory.Robot]);
         var opportunity = new OpportunityDefinition("shared", "Unrelated Placement", 10, [], 3,
-            [LootEligibilityCategory.Salvage, LootEligibilityCategory.Residential]);
+            [LootEligibilityCategory.Salvage, LootEligibilityCategory.Residential],
+            OpportunityActivity.Searching, "Shared table", "A shared table begins.",
+            "Shared table completed.", false);
         var catalog = new LootCatalog("shared-test", [first, second, excluded], [opportunity],
             [new("second", 3), new("excluded", 100), new("first", 1)]);
 
@@ -250,8 +256,10 @@ public sealed class LootCatalogTests
         var added = Item("added", categories: [LootEligibilityCategory.Salvage, LootEligibilityCategory.Technology]);
         var opportunities = new[]
         {
-            new OpportunityDefinition("locker", "Market", 10, [], 1, [LootEligibilityCategory.Salvage]),
-            new OpportunityDefinition("robot-salvage", "Anywhere", 10, [], 1, [LootEligibilityCategory.Technology])
+            new OpportunityDefinition("locker", "Market", 10, [], 1, [LootEligibilityCategory.Salvage],
+                OpportunityActivity.Searching, "Locker", "A locker begins.", "Locker completed.", false),
+            new OpportunityDefinition("robot-salvage", "Anywhere", 10, [], 1, [LootEligibilityCategory.Technology],
+                OpportunityActivity.Salvaging, "Robot salvage", "Robot salvage begins.", "Robot salvage completed.", false)
         };
         var catalog = new LootCatalog("expanded", [old, added], opportunities,
             [new("old", 1), new("added", 1)]);
@@ -269,7 +277,9 @@ public sealed class LootCatalogTests
         }
         for (var seed = 0; seed < 64; seed++)
         {
-            Assert.Equal(catalog.CreateTableBackedWorldItems("raid", seed), renamed.CreateTableBackedWorldItems("raid", seed));
+            var opportunityIds = opportunities.Select(opportunity => opportunity.Id).ToArray();
+            Assert.Equal(catalog.CreateTableBackedWorldItems("raid", seed, opportunityIds),
+                renamed.CreateTableBackedWorldItems("raid", seed, opportunityIds));
             foreach (var opportunity in opportunities)
                 Assert.Equal(catalog.CreateOpportunityItems("raid", seed, opportunity.Id, "High", 0.5, 0.75),
                     renamed.CreateOpportunityItems("raid", seed, opportunity.Id, "High", 0.5, 0.75));
@@ -308,7 +318,9 @@ public sealed class LootCatalogTests
             10,
             ["cheap-common"],
             1,
-            [LootEligibilityCategory.Residential]);
+            [LootEligibilityCategory.Residential],
+            OpportunityActivity.Searching, "Residential table", "A residential table begins.",
+            "Residential table completed.", false);
         var catalog = new LootCatalog("weights-test-v1", [cheapCommon, expensiveCommon, highRarity], [table],
             [new("cheap-common", 1), new("expensive-common", 3), new("high-rarity", 100)]);
 
@@ -375,7 +387,7 @@ public sealed class LootCatalogTests
     {
         var catalog = LootCatalog.Default;
         var generated = catalog.CreateTableBackedWorldItems("ordered", 725);
-        var expectedOrder = catalog.Opportunities
+        var expectedOrder = catalog.SelectWorldOpportunities(725)
             .SelectMany(opportunity => Enumerable.Repeat(opportunity.Id, opportunity.DrawCount));
 
         Assert.Equal(expectedOrder, generated.Select(item => item.OpportunityId));

@@ -4,6 +4,8 @@
 
 - [Product and architecture brief](../docs/MULTIPLAYER_REBUILD_BRIEF.md): confirmed direction, proposed mechanics, and milestone acceptance criteria.
 - [Implementation progress](../docs/IMPLEMENTATION_PROGRESS.md): completed work, verification evidence, limitations, and next steps.
+- [Game design](../docs/GAME_DESIGN.md): gameplay rules and pacing; consult the relevant sections for gameplay changes and surface conflicts with the active progress checkpoint or brief rather than silently choosing one.
+- [AI systems design](../docs/AI_SYSTEMS_DESIGN.md): AI architecture and its own implementation phases/steps. Keep those distinct from G-series milestones and reconcile both against the progress checkpoint before planning AI work.
 - [README](../README.md): current behavior, local commands, experimental rules, and content provenance.
 
 Keep these roles distinct. Implemented prototype rules are not validated balance; proposed milestones are not approval to implement every mechanic.
@@ -23,6 +25,9 @@ Keep these roles distinct. Implemented prototype rules are not validated balance
 - Human encounters involve actual Raiders in the same current server-owned raid, never saved opponent snapshots presented as live participants.
 - Use one authoritative server timeline and shared world entities. Loot creation, transfer, consumption, and extraction must preserve unique ownership.
 - Crates are autonomous event/contest opportunities, not reflex-based claim races. Handler commands, when implemented, remain limited and optional.
+- The Raider runs its own economy (confirmed 2026-10-17, Godville-style): it sells, buys, equips, repairs, stashes, and departs on its own through a deterministic, trait-weighted, server-owned utility policy. Weapons come mainly from raid loot and sometimes from seeded, finite Desperanza trader stock. Do not add or extend Handler shop, sell, equip, repair, or loadout-staging controls; the existing Outfitter is transitional and slated for replacement.
+- The Handler interacts only through spendable Signal actions. Signals may temporarily nudge scoring weights (greed, spending, caution) but never pick a specific item or bypass validation. An absent Handler loses nothing owed.
+- AI models never decide Raider actions, purchases, prices, or outcomes. They may voice committed decisions with authored fallbacks. Any future hybrid that lets a model pick among pre-ranked legal options needs separate approval, must journal the pick for replay, and must fall back to the top deterministic choice.
 - Disconnecting a Handler does not withdraw their Raider or erase unfavorable outcomes. Server outages require an explicit recovery policy, not browser-side replay.
 - Preserve original parody identity. The sibling `afk-raiders` project is a read-only reference and selective content source, not an implementation dependency. Record source revisions for reused content; do not import its saves, local ticker, or balance by default.
 
@@ -30,10 +35,11 @@ Keep these roles distinct. Implemented prototype rules are not validated balance
 
 - Backend: ASP.NET Core (.NET 10), C# domain rules, SignalR delivery. Frontend: Vue 3, TypeScript, Vite. Do not introduce a second client-side gameplay engine.
 - Keep scheduling, transport, persistence, and presentation outside domain rules. Inject time and make randomness reproducible; process explicit deadlines in deterministic order.
-- Serialize raid mutations through the coordinator. Repeated scheduling must not repeat rewards or settlement; future commands need authorization, validation, and deduplication.
+- Serialize raid mutations through the coordinator. Repeated scheduling must not repeat rewards or settlement; future commands need authorization, validation, and deduplication. Autonomous trades are journaled events: each buy or sale commits exactly once, scarce trader stock is allocated in deterministic order, and coins or items are never duplicated.
 - Clients render filtered projections and submit intent only. Countdown animation and polling must never advance simulation or determine ownership.
 - Narration follows committed events. Never describe loot transfers, victories, or encounters that did not occur.
 - For UI/API failures, trace the action through the Vue component, client request, Vite proxy target, and ASP.NET route/handler; verify which server/version the browser is reaching rather than inferring the cause from the displayed error. Use an isolated verification server when a shared live server is in use; do not restart or mutate it for browser checks.
+- For Vue layout changes, verify populated states with representative short and long content, relevant equipment variants, and expanded/collapsed panels at the affected viewport; do not rely only on the default or empty state.
 - Keep development identities and in-memory raid endpoints unavailable in Production. Durable accounts and recovery are prerequisites for external release.
 - Preserve type safety and existing patterns. Surface errors explicitly; avoid silent fallbacks and unrelated refactors.
 
@@ -48,6 +54,7 @@ Keep these roles distinct. Implemented prototype rules are not validated balance
 - Treat the progress ledger's **Agent handoff checkpoint** and stable S-step checklists as the authoritative execution state. Read them at task start; do not infer progress from chat or session-local todos.
 - Before code changes, record the active step, bounded scope, prerequisites, unresolved decisions, and next action. Mark implementation **In progress** when it begins, not during proposal-only planning.
 - For unresolved gameplay choices, seek confirmation unless the user has authorized autonomous execution. Under that authorization, document assumptions as experimental before treating them as requirements.
+- When asked for a copy/paste prompt to start the next stage, verify the current checkpoint and relevant design-document step numbers, then include the complete usable prompt in that response rather than only promising to provide one.
 - When a user-raised gameplay idea is outside the active slice, record it in the progress ledger as explicitly deferred/future work with its relevant context; do not silently expand the current scope or let the idea disappear from the handoff.
 - Add focused deterministic tests for changed behavior, including absent Handlers, shared consequences, ownership, authorization, timing ties, and retry/repeated-settlement cases where applicable.
 - Update the progress ledger after each completed slice: status, implemented scope, verification date and evidence, limitations, and next step. Record pending or failing validation honestly; never mark a milestone complete on code presence alone.
