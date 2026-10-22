@@ -75,7 +75,7 @@ The model path is local configuration, not a bundled model. Set it in the same t
 
 ## G6: autonomous risk, residence and shared conditions (2026-10-14)
 
-Current rules version: **`desperanza-econ-2-v1`**. Core mechanics and return settlement run on the server without inference or mandatory Handler input.
+Current rules version: **`desperanza-econ-2-v2`**. Core mechanics and return settlement run on the server without inference or mandatory Handler input.
 
 - One world-scoped zone/condition/danger profile: Light Fog (Low), Apology Weather (Medium), or Overtime Red (High). Greed carried by eligible Raiders affects the next world's condition pool, not individual weather copies. Forecasts precede environmental impacts by 10 seconds; only actual living, nontraveling occupants at impact time are affected.
 - Greed grows while staying and searching; mood changes with damage/healing/support. Positive mood trims up to 5 raw damage before shields. Calm lowers greed by 12 and raises mood by 3; Pressure raises greed by 10 and lowers mood by 2. These change extraction willingness, valuable-item appetite and resilience, not just dialogue.
@@ -116,7 +116,7 @@ $env:AFK_AI_MODEL_PATH = 'C:\Users\DanJ2\Models\Phi-3.5-mini-onnx'
 dotnet run --project server\AFKRaiders.Server
 ```
 
-Reload and re-enroll after startup; check for `desperanza-econ-2-v1`. Restart clears in-memory duty, inventory and results. Model initialization may take a minute; authored gameplay/narration does not wait on inference.
+Reload and re-enroll after startup; check for `desperanza-econ-2-v2`. Restart clears in-memory duty, inventory and results. Model initialization may take a minute; authored gameplay/narration does not wait on inference.
 
 ### Historical pre-G6 Comms and area residence (2026-10-13)
 
@@ -239,7 +239,7 @@ LOOT-1 adds six ordinary items and three seed-selected opportunity variants per 
 | `arc_tech.json` | `arc_encrypted_drive_broken` |
 | `valuables.json` | `collector_plate_shattered` |
 
-ECON-2 reuses the AFK-original Aspperigo and Vernerider names and short flavor from `src/content/weapons.json`, reviewed at the same original revision `f62d088a41da951a1fbe9ed7215d2957a933ce50` with no source working-tree changes. Legacy weapon weights and balance are not imported; the online catalog's settled prices and equipment definitions remain authoritative. The loot-table and search/preparation references were inspected but do not supply new runtime rules. The Gear Weirdos finite-stock counter and owner-private sold-out/substitution narration use the versioned AFK-original trader archetype in [Traders](docs/lore/entities/traders.md); no new vendor character is introduced. Field weapon loot uses the existing shared opportunity/unique-item ownership path, then becomes full-durability equipment on settlement rather than stash loot.
+ECON-2 reuses the AFK-original Aspperigo and Vernerider names and short flavor from `src/content/weapons.json`, reviewed at the same original revision `f62d088a41da951a1fbe9ed7215d2957a933ce50` with no source working-tree changes. Legacy weapon weights and balance are not imported; the online catalog's settled prices and equipment definitions remain authoritative. The loot-table and search/preparation references were inspected but do not supply new runtime rules. The Gear Weirdos finite-stock counter and owner-private sold-out/substitution narration use the versioned AFK-original trader archetype in [Traders](docs/lore/entities/traders.md); no new vendor character is introduced. Field weapon loot uses the existing shared opportunity/unique-item ownership path, then becomes damaged owned equipment on settlement rather than stash loot. Per the 2026-10-22 revision, finds have 5%-60% durability; trader purchases remain full. Experimental condition selection is uniform across representable integer points from `ceil(max * 5%)` to `floor(max * 60%)`, deterministically keyed by the shared item instance ID (Aspperigo 1-6/10, Vernerider 1-7/12). Repeated settlement cannot reroll condition or overwrite later repairs. Existing trait thresholds and affordability still decide when the Raider repairs; balance is unvalidated.
 
 The source is the read-only sibling project `afk-raiders`; no legacy simulation, save data, or per-item gameplay behavior was imported. New drop weights, values, and activity cadence are experimental, not validated balance.
 

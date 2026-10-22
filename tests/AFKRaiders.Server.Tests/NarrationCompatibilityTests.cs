@@ -62,7 +62,7 @@ public sealed class NarrationCompatibilityTests(ITestOutputHelper output)
             }
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
         output.WriteLine($"Current narration and simulation fingerprint: {hash}");
-        // C6, LOOT-1, ECON-1, HUB-5, and ECON-2 intentionally change authored voice, rules, and projections.
-        Assert.Equal("AD3F0EC3C2B89FAEA9D2C786317CD3E4011D4E1EFE8FA282E14E04E9F012BDDE", hash);
+        // ECON-2 v2 intentionally changes the rules version for damaged field weapon finds.
+        Assert.Equal("2F08B779B7D6147A46A18D9EEC2852BE753216180A249FA80225F2DBFA76541D", hash);
     }
 }

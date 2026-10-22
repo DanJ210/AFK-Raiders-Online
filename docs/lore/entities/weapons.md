@@ -16,7 +16,7 @@ AFK Raiders weapons are improvised tools, misfiled hardware, and aggressively ov
 - Weapons should sound practical, but only just.
 - Higher tiers should feel like upgraded bad decisions, not heroic armaments.
 - Damage and durability are gameplay values; the joke lives in the naming and flavor.
-- Found weapons start at full durability and are owned equipment, not sellable loot or stash contents. The raider can own and repair weapons, but a failed raid can still force a loss before settlement.
+- Found weapons start at 5%-60% durability and are owned equipment, not sellable loot or stash contents (user revision 2026-10-22). Trader purchases remain at full durability. The raider can own and repair weapons, but a failed raid can still force a loss before settlement.
 - Do not use source-game weapon names or copy source flavor text.
 
 ## Runtime Notes

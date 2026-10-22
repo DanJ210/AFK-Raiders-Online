@@ -33,7 +33,16 @@ public static class FoundWeaponSettlement
                 continue;
             }
 
-            var weapon = ShopCatalog.CreateWeaponInstance(definition, item.InstanceId);
+            var minimumDurability = (int)Math.Ceiling(definition.DurabilityMax * 0.05);
+            var maximumDurability = (int)Math.Floor(definition.DurabilityMax * 0.60);
+            if (minimumDurability > maximumDurability)
+                throw new InvalidOperationException($"Found weapon '{item.CatalogId}' cannot represent 5%-60% durability.");
+            var durability = minimumDurability + (int)(RaidConditions.Roll(
+                0, $"found-weapon-durability:{item.InstanceId}") * (maximumDurability - minimumDurability + 1));
+            var weapon = ShopCatalog.CreateWeaponInstance(definition, item.InstanceId) with
+            {
+                CurrentDurability = durability
+            };
             ownedIds.Add(weapon.InstanceId, weapon);
             additions.Add(weapon);
         }
