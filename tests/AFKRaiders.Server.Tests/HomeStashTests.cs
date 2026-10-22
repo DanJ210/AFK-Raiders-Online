@@ -239,10 +239,10 @@ public sealed class HomeStashTests
     }
 
     [Fact]
-    public void CoordinatorAccumulatesLootAcrossMultipleRaidsAndTracksCoins()
+    public void CoordinatorSellsEligibleLootDuringArrivalPreparationAndTracksCoins()
     {
         var clock = new ManualTime();
-        var coordinator = new RaidCoordinator(clock, fastPacing: true);
+        var coordinator = new RaidCoordinator(clock, fastPacing: true, nextSeed: () => 1);
         var handler = coordinator.EnrollHandler("raider-one", "enrollment-g3");
 
         // First raid runs to completion (approx 90-110s)
@@ -250,14 +250,14 @@ public sealed class HomeStashTests
         coordinator.AdvanceRaids();
 
         var view1 = coordinator.GetHandlerProjection(handler.AccessToken);
-        Assert.True(view1.StashCount > 0);
-        var firstStashCount = view1.StashCount;
-        var firstStashValue = view1.StashValue;
-        Assert.Equal(0, view1.Coins);
+        Assert.Equal("Hoarder", view1.PrimaryTrait);
+        Assert.InRange(view1.StashCount, 0, 3);
+        Assert.True(view1.Coins >= 0);
         Assert.NotNull(view1.LastReturnSummary?.Payoff);
-        Assert.Equal(firstStashCount, view1.LastReturnSummary.Payoff.GrossSecuredCount);
-        Assert.Equal(firstStashValue, view1.LastReturnSummary.Payoff.GrossSecuredValue);
+        Assert.True(view1.LastReturnSummary.Payoff.GrossSecuredCount > 0);
         Assert.Equal(0, view1.LastReturnSummary.Payoff.UnitsAutoSold);
+        Assert.Contains(view1.LatestPreparationDecisions!, decision =>
+            decision.Kind == "PreparationSale");
 
         // Wait out home cooldown (60s) and next admission pulse (30s) -> 90s
         clock.Now += TimeSpan.FromSeconds(90);
@@ -271,71 +271,16 @@ public sealed class HomeStashTests
         coordinator.AdvanceRaids();
 
         var view2 = coordinator.GetHandlerProjection(handler.AccessToken);
-        // Stash accumulated items from both raids!
-        Assert.True(view2.StashCount > firstStashCount);
-        Assert.True(view2.StashValue > firstStashValue);
+        Assert.InRange(view2.StashCount, 0, 3);
         Assert.Equal(view2.StashCount, view2.Stash?.Count);
         Assert.Equal(view2.StashValue, view2.Stash?.Sum(i => i.Value));
-    }
-
-    [Fact]
-    public void CoordinatorManualSaleIsIdempotentAndUpdatesBalance()
-    {
-        var clock = new ManualTime();
-        var coordinator = new RaidCoordinator(clock, fastPacing: true);
-        var handler = coordinator.EnrollHandler("raider-one", "enrollment-sell");
-
-        // Run raid to get loot
-        clock.Now += TimeSpan.FromSeconds(300);
-        coordinator.AdvanceRaids();
-
-        var beforeSale = coordinator.GetHandlerProjection(handler.AccessToken);
-        Assert.NotEmpty(beforeSale.StashGroups!);
-        var targetGroup = beforeSale.StashGroups![0];
-
-        var request = new SellStashItemsRequest(
-            CommandId: "cmd-sell-1",
-            CatalogId: targetGroup.CatalogId,
-            Quantity: 1
-        );
-
-        var response1 = coordinator.SellStash(handler.AccessToken, request);
-        Assert.Equal("cmd-sell-1", response1.CommandId);
-        Assert.Equal(1, response1.ItemsSoldCount);
-        Assert.Equal(targetGroup.UnitValue, response1.CoinsGained);
-        Assert.Equal(targetGroup.UnitValue, response1.NewCoinsBalance);
-        Assert.Equal(beforeSale.StashCount - 1, response1.NewStashCount);
-        Assert.Equal(beforeSale.StashValue - targetGroup.UnitValue, response1.NewStashValue);
-
-        // Idempotent retry with same command ID returns identical response without deducting again
-        var response2 = coordinator.SellStash(handler.AccessToken, request);
-        Assert.Equal(response1.CommandId, response2.CommandId);
-        Assert.Equal(response1.CoinsGained, response2.CoinsGained);
-        Assert.Equal(response1.NewCoinsBalance, response2.NewCoinsBalance);
-        Assert.Equal(response1.NewStashCount, response2.NewStashCount);
-
-        var afterSale = coordinator.GetHandlerProjection(handler.AccessToken);
-        Assert.Equal(response1.NewCoinsBalance, afterSale.Coins);
-        Assert.Equal(response1.NewStashCount, afterSale.StashCount);
-        Assert.Contains(afterSale.Comms, item => item.Kind == "StashSale");
-    }
-
-    [Fact]
-    public void CoordinatorRejectInvalidCommandIdOrUnauthorizedSell()
-    {
-        var coordinator = new RaidCoordinator(new ManualTime(), fastPacing: true);
-        var handler = coordinator.EnrollHandler("raider-one", "enrollment-auth");
-
-        Assert.Throws<RaidAccessException>(() => coordinator.SellStash("invalid-token", new SellStashItemsRequest("cmd-1", CatalogId: "scrap", Quantity: 1)));
-        Assert.Throws<RaidCommandException>(() => coordinator.SellStash(handler.AccessToken, new SellStashItemsRequest("", CatalogId: "scrap", Quantity: 1)));
-        Assert.Throws<RaidCommandException>(() => coordinator.SellStash(handler.AccessToken, new SellStashItemsRequest("cmd-2")));
     }
 
     [Fact]
     public void PollingAndAdvancingDoesNotDoubleSettleExtractedLoot()
     {
         var clock = new ManualTime();
-        var coordinator = new RaidCoordinator(clock, fastPacing: true);
+        var coordinator = new RaidCoordinator(clock, fastPacing: true, nextSeed: () => 0);
         var handler = coordinator.EnrollHandler("raider-one", "enrollment-poll");
 
         clock.Now += TimeSpan.FromSeconds(300);
@@ -360,7 +305,7 @@ public sealed class HomeStashTests
     public void IndependentEarlyExtractorSettlesImmediatelyWithoutWaitingForOtherRaiders()
     {
         var clock = new ManualTime();
-        var coordinator = new RaidCoordinator(clock, fastPacing: true);
+        var coordinator = new RaidCoordinator(clock, fastPacing: true, nextSeed: () => 0);
         var first = coordinator.EnrollHandler("raider-one", "early-1");
         var second = coordinator.EnrollHandler("raider-two", "early-2");
 
@@ -385,12 +330,11 @@ public sealed class HomeStashTests
             if (v1.Status.StartsWith("Returned", StringComparison.Ordinal) && v2.Status == "In Raid")
             {
                 // Raider one extracted and settled immediately!
-                Assert.True(v1.StashCount > 0);
                 Assert.NotNull(v1.LastReturnSummary?.Payoff);
-                Assert.Equal(v1.StashCount, v1.LastReturnSummary.Payoff.GrossSecuredCount);
+                Assert.True(v1.LastReturnSummary.Payoff.GrossSecuredCount > 0);
+                Assert.Contains(v1.LatestPreparationDecisions!, decision => decision.Kind == "PreparationSale");
 
-                // Raider two is still in the world, unextracted, stash empty
-                Assert.Equal(0, v2.StashCount);
+                // Raider two remains in the world; its private stash is not part of this settlement.
                 Assert.Null(v2.LastReturnSummary);
                 break;
             }
@@ -403,61 +347,13 @@ public sealed class HomeStashTests
         var v1Final = coordinator.GetHandlerProjection(first.AccessToken);
         var v2Final = coordinator.GetHandlerProjection(second.AccessToken);
 
-        Assert.True(v1Final.StashCount > 0);
         Assert.NotNull(v2Final.LastReturnSummary);
         Assert.NotNull(v2Final.LastReturnSummary.Payoff);
-        Assert.Equal(v2Final.StashCount, v2Final.LastReturnSummary.Payoff.UnitsRetainedInStash);
-        if (v2Final.StashCount > 0)
-        {
-            // Discrete private stashes: raiders don't share item instances
-            var v1Ids = v1Final.Stash!.Select(i => i.InstanceId).ToHashSet();
-            var v2Ids = v2Final.Stash!.Select(i => i.InstanceId).ToHashSet();
-            Assert.Empty(v1Ids.Intersect(v2Ids));
-        }
+        Assert.Equal(v2Final.LastReturnSummary.Payoff.GrossSecuredCount,
+            v2Final.LastReturnSummary.Payoff.UnitsRetainedInStash + v2Final.LastReturnSummary.Payoff.UnitsAutoSold);
+        var v1Ids = v1Final.LastReturnSummary!.Payoff!.SecuredItems.Select(item => item.InstanceId).ToHashSet();
+        var v2Ids = v2Final.LastReturnSummary.Payoff!.SecuredItems.Select(item => item.InstanceId).ToHashSet();
+        Assert.Empty(v1Ids.Intersect(v2Ids));
     }
 
-    [Fact]
-    public void ConcurrentManualSalesAreThreadSafeAndConserveCoins()
-    {
-        var clock = new ManualTime();
-        var coordinator = new RaidCoordinator(clock, fastPacing: true);
-        var handler = coordinator.EnrollHandler("raider-one", "concurrent-handler");
-
-        // Run raid to get stash items
-        clock.Now += TimeSpan.FromSeconds(120);
-        coordinator.AdvanceRaids();
-
-        var view = coordinator.GetHandlerProjection(handler.AccessToken);
-        var initialStashCount = view.StashCount;
-        Assert.True(initialStashCount >= 4);
-
-        // Run 10 parallel sell commands with distinct command IDs (selling by catalog item)
-        // Some might succeed until items run out, some might throw InsufficientQuantity
-        var targetGroup = view.StashGroups![0];
-        int successfulSales = 0;
-        int totalCoinsFromResponses = 0;
-
-        Parallel.For(0, 10, i =>
-        {
-            try
-            {
-                var resp = coordinator.SellStash(handler.AccessToken, new SellStashItemsRequest(
-                    CommandId: $"concurrent-cmd-{i}",
-                    CatalogId: targetGroup.CatalogId,
-                    Quantity: 1
-                ));
-                Interlocked.Increment(ref successfulSales);
-                Interlocked.Add(ref totalCoinsFromResponses, resp.CoinsGained);
-            }
-            catch (RaidCommandException)
-            {
-                // Expected when available quantity is exhausted
-            }
-        });
-
-        var finalView = coordinator.GetHandlerProjection(handler.AccessToken);
-        Assert.Equal(successfulSales, initialStashCount - finalView.StashCount);
-        Assert.Equal(totalCoinsFromResponses, finalView.Coins);
-        Assert.Equal(finalView.StashCount, finalView.Stash!.Count);
-    }
 }

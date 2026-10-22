@@ -1,7 +1,7 @@
 namespace AFKRaiders.Server.Domain;
 
 /// <summary>
-/// A weapon definition available for purchase or standard issue in Desperanza.
+/// A weapon definition available for autonomous purchase or standard issue in Desperanza.
 /// Provenance: afk-raiders/src/content/weapons.json
 /// </summary>
 public sealed record WeaponDefinition(
@@ -19,7 +19,7 @@ public sealed record WeaponDefinition(
 );
 
 /// <summary>
-/// A medical or shield-recharger consumable available in Desperanza outfitter.
+/// A medical or shield-recharger consumable available in the Desperanza catalog.
 /// Provenance: afk-raiders/src/content/healing_items.json and shield_rechargers.json
 /// </summary>
 public sealed record SupplyDefinition(
@@ -35,7 +35,7 @@ public sealed record SupplyDefinition(
 );
 
 /// <summary>
-/// An instance of an owned weapon in the Handler's armory.
+/// An instance of a Raider-owned weapon.
 /// </summary>
 public sealed record OwnedWeapon(
     string InstanceId,
@@ -52,7 +52,7 @@ public sealed record OwnedWeapon(
 }
 
 /// <summary>
-/// A stack of consumable supplies in the Handler's home prep storage.
+/// A stack of Raider-owned consumables in Desperanza.
 /// </summary>
 public sealed record OwnedSupplyStack(
     string CatalogId,
@@ -78,86 +78,7 @@ public sealed record StagedSupplyItem(
 );
 
 /// <summary>
-/// Request to purchase an item from the Desperanza shop.
-/// </summary>
-public sealed record PurchaseShopItemRequest(
-    string CommandId,
-    string CatalogId,
-    int Quantity = 1
-);
-
-/// <summary>
-/// Response after an item purchase.
-/// </summary>
-public sealed record PurchaseShopItemResponse(
-    string CommandId,
-    string CatalogId,
-    int Quantity,
-    int TotalCost,
-    int RemainingCoins,
-    IReadOnlyList<OwnedWeapon>? NewWeapons = null,
-    IReadOnlyList<OwnedSupplyStack>? UpdatedSupplies = null
-);
-
-/// <summary>
-/// Request to equip an owned weapon.
-/// </summary>
-public sealed record EquipWeaponRequest(
-    string CommandId,
-    string WeaponInstanceId
-);
-
-/// <summary>
-/// Response after equipping a weapon.
-/// </summary>
-public sealed record EquipWeaponResponse(
-    string CommandId,
-    string WeaponInstanceId,
-    OwnedWeapon EquippedWeapon
-);
-
-/// <summary>
-/// Request to repair a damaged weapon at the workbench.
-/// </summary>
-public sealed record RepairWeaponRequest(
-    string CommandId,
-    string WeaponInstanceId
-);
-
-/// <summary>
-/// Response after repairing a weapon.
-/// </summary>
-public sealed record RepairWeaponResponse(
-    string CommandId,
-    string WeaponInstanceId,
-    int RepairCostPaid,
-    int RemainingCoins,
-    OwnedWeapon RepairedWeapon
-);
-
-/// <summary>
-/// Request to stage consumables for the operative's field loadout.
-/// </summary>
-public sealed record StageLoadoutRequest(
-    string CommandId,
-    IReadOnlyList<StagedSupplyRequestItem> StagedSupplies
-);
-
-public sealed record StagedSupplyRequestItem(
-    string CatalogId,
-    int Quantity
-);
-
-/// <summary>
-/// Response after staging the field loadout.
-/// </summary>
-public sealed record StageLoadoutResponse(
-    string CommandId,
-    IReadOnlyList<StagedSupplyItem> StagedSupplies
-);
-
-/// <summary>
-/// Full outfitter shop catalog view.
+/// Full Desperanza shop catalog view.
 /// </summary>
 public sealed record ShopCatalogView(
     IReadOnlyList<WeaponDefinition> Weapons,
@@ -202,8 +123,7 @@ public sealed record DesignateHiddenPocketResponse(
 );
 
 /// <summary>
-/// Authoritative Desperanza Outfitter Catalog.
-/// Provides canon weapons, healing items, and shield rechargers.
+/// Authoritative Desperanza catalog for weapons, medical items, and shield rechargers.
 /// </summary>
 public static class ShopCatalog
 {
@@ -232,8 +152,11 @@ public static class ShopCatalog
         WeaponsById["tea_kettle"];
 
     public static OwnedWeapon CreateWeaponInstance(WeaponDefinition def) =>
+        CreateWeaponInstance(def, $"wpn_{def.Id}_{Guid.NewGuid():N}"[..20]);
+
+    public static OwnedWeapon CreateWeaponInstance(WeaponDefinition def, string instanceId) =>
         new(
-            InstanceId: $"wpn_{def.Id}_{Guid.NewGuid():N}"[..20],
+            InstanceId: instanceId,
             CatalogId: def.Id,
             Name: def.Name,
             CurrentDurability: def.DurabilityMax,

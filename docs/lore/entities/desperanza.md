@@ -17,6 +17,8 @@ The hub should feel functional enough to keep humanity alive and absurd enough t
 | Pawn Desk | A quiet economy where cracked mugs become investment vehicles. | Coins, stash overflow, vendor jokes. |
 | Handler Certification Office | Paperwork that turns radio meddling into a career path. | Signal Handling progression, tutorial flavor. |
 | Wipe Counselor's Folding Chair | A future prestige station that insists forgetting everything is healthy. | Future reset/prestige feature jokes. |
+| Hatch Outpost | A bench by the Hatch where raiders sit, stare at the door, and call it resting. | HUB-5 optional rest stop after errands. |
+| Last Call Canteen | See [Traders](traders.md). | HUB-5 optional rest stop after errands. |
 
 ## Social Texture
 
@@ -44,3 +46,4 @@ The hub should feel functional enough to keep humanity alive and absurd enough t
 | Field Depot Counter | `deploy_field_depot_counter_promise` |
 | Pawn Desk | `hub_pawn_desk_cracked_mug_index`, `hub_pawn_clerk_squints`, `hub_pawn_desk_overflow_prophecy`, `extract_pawn_desk_valuation_intrusive` |
 | Handler Certification Office | `hub_handler_cert_office_signal_form`, `deploy_handler_cert_office_badge` |
+| Hatch Outpost | `hub.errand-rest-outpost` narration pool |

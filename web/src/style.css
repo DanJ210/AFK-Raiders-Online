@@ -110,6 +110,7 @@ code { color: #d8ded4; font: 11px Consolas, monospace; overflow-wrap: anywhere; 
 .avatar { display: grid; place-items: center; width: 34px; height: 34px; color: var(--lime); background: #283222; font: 11px Consolas, monospace; }
 .presence { margin-left: auto; }
 .empty { padding: 13px 0; color: #81897f; font-size: 11px; line-height: 1.6; }
+.current-errand { margin: 4px 0 8px; color: var(--muted); font-size: 12px; font-style: italic; }
 .objective { text-align: center; }
 .crate-graphic { display: grid; place-items: center; width: 78px; height: 65px; margin: 8px auto 16px; border: 1px solid #65734b; color: var(--lime); background: linear-gradient(145deg, #404b32, #242d20); font-size: 28px; box-shadow: 0 12px 35px #0005; }
 .objective h2 { margin-bottom: 6px; }
@@ -194,7 +195,6 @@ th { color: var(--muted); }
 .capacity-meter { width: 100%; height: 8px; background: #191b30; border-radius: 4px; overflow: hidden; margin: 8px 0; border: 1px solid #33385e; }
 .capacity-bar { height: 100%; transition: width 0.3s ease, background-color 0.3s ease; }
 .stash-subtext { color: var(--muted); font-size: 11px; margin: 4px 0 14px; line-height: 1.5; }
-.success-notice { padding: 9px 12px; margin-bottom: 12px; background: #1a2f26; border: 1px solid #3d8063; color: #7ae6b8; font-size: 11px; font-family: Consolas, monospace; }
 .stash-groups-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 400px; overflow-y: auto; padding-right: 4px; }
 .stash-group-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; background: #121325; border: 1px solid var(--line); border-radius: 2px; }
 .group-info { display: flex; flex-direction: column; gap: 3px; flex: 1; }
@@ -205,8 +205,6 @@ th { color: var(--muted); }
 .unit-price { color: var(--muted); font: 10px Consolas, monospace; }
 .total-price { color: #ffda79; font: 11px Consolas, monospace; font-weight: 700; }
 .mini-btn { min-height: 28px; padding: 0 10px; font-size: 10px; }
-.sell-btn { border-color: #615530; color: #ffd97d; background: #25221b; }
-.sell-btn:hover { background: #353022; border-color: #ffda79; color: #fff; }
 
 /* Haul Payoff Settlement Breakdown */
 .payoff-card { margin: 16px 0; padding: 14px; background: #0c0d1c; border: 1px solid #3c426e; border-radius: 2px; }
@@ -218,11 +216,6 @@ th { color: var(--muted); }
 .modal-backdrop { position: fixed; inset: 0; background: rgba(8, 9, 18, 0.85); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
 .modal-card { width: min(440px, 100%); background: #171932; border: 1px solid #4a547a; padding: 24px; box-shadow: 0 16px 48px #000a; }
 .modal-card h3 { margin: 8px 0 10px; font-size: 18px; }
-.sell-controls { margin: 18px 0; }
-.qty-input-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
-.qty-input-row input { margin-bottom: 0; max-width: 110px; }
-.quick-qty-buttons { display: flex; gap: 6px; flex: 1; }
-.sell-preview { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #101122; border: 1px solid var(--line); margin-bottom: 20px; }
 .modal-actions { display: flex; gap: 10px; }
 .modal-actions button { flex: 1; }
 
@@ -242,22 +235,16 @@ th { color: var(--muted); }
 .aar-bullet-marker { color: var(--lime); font-size: 14px; line-height: 1.4; user-select: none; }
 .aar-bullet-text { flex: 1; }
 
-/* Outfitter & Field Workshop */
-.outfitter-panel { margin-top: 14px; }
-.outfitter-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
-.outfitter-balance { text-align: right; }
-.outfitter-tabs { display: flex; gap: 8px; margin: 16px 0; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
-.outfitter-tab { background: #131526; border: 1px solid var(--line); color: var(--muted); padding: 8px 16px; font-size: 11px; font-weight: 700; border-radius: 2px; }
-.outfitter-tab.active { background: #202447; border-color: var(--lime); color: #fff; }
-.outfitter-tab:hover:not(.active) { background: #1b1e36; color: #d0d2eb; }
-.outfitter-content { display: flex; flex-direction: column; gap: 14px; }
-.outfitter-subheading { margin-bottom: 4px; }
+/* Autonomous Raider Preparation */
+.preparation-panel { margin-top: 14px; }
+.preparation-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
+.preparation-balance { text-align: right; }
+.preparation-content { display: flex; flex-direction: column; gap: 14px; }
 
 /* Weapons & Durability */
 .weapons-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .weapon-card { background: #101222; border: 1px solid var(--line); padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; border-radius: 2px; }
 .equipped-weapon-card { background: #12162b; border-color: #3c4a75; padding: 14px 16px; align-items: stretch; gap: 16px; }
-.equipped-weapon-card .weapon-card-actions { align-self: center; width: min(100%, 240px); }
 .weapon-card.is-equipped { border-color: #3b5b82; background: #11182c; }
 .weapon-main-info { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .weapon-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -268,12 +255,6 @@ th { color: var(--muted); }
 .repair-cost-tag { color: #ffda79; font: 10px Consolas, monospace; }
 .durability-meter { width: 100%; height: 5px; background: #1f2138; border-radius: 2px; overflow: hidden; margin-top: 4px; }
 .durability-bar { height: 100%; transition: width .3s ease; }
-.weapon-card-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-.shop-price { color: #ffd97d; font: 12px Consolas, monospace; margin-left: auto; }
-.buy-btn { background: #2f6948; color: #fff; border-color: #48a36f; }
-.buy-btn:hover:not(:disabled) { background: #3d8a5e; }
-.repair-btn { border-color: #615530; color: #ffd97d; background: #25221b; }
-.repair-btn:hover:not(:disabled) { background: #353022; color: #fff; }
 .appraise-btn { border-color: #40446b; color: #a9b5df; background: #17192f; }
 .appraise-btn:hover:not(:disabled) { background: #222646; color: #fff; }
 
@@ -287,9 +268,7 @@ th { color: var(--muted); }
 .supply-flavor { color: #8e94a8; font-size: 11px; font-style: italic; line-height: 1.4; }
 .supply-effects { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; color: #a9cf9b; font-weight: 600; }
 .supply-owned-stock { font-size: 11px; color: var(--muted); }
-.supply-card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-
-/* Field Staging */
+/* Raider-Owned Field Stock */
 .staging-banner { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px; background: #121429; border: 1px solid #33395c; border-radius: 2px; }
 .staging-g5-badge { font: 700 9px Consolas, monospace; color: #ffd166; background: #312818; padding: 2px 7px; border-radius: 2px; margin-top: 4px; display: inline-block; }
 .staging-limits-summary { display: flex; gap: 14px; }
@@ -299,9 +278,6 @@ th { color: var(--muted); }
 .staging-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; background: #101222; border: 1px solid var(--line); border-radius: 2px; }
 .staging-row-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .staging-row-info small { color: var(--muted); font-size: 11px; }
-.staging-controls { display: flex; align-items: center; gap: 8px; }
-.staged-qty-display { min-width: 24px; text-align: center; font: 700 13px Consolas, monospace; color: #fff; }
-.staging-actions { margin-top: 10px; }
 
 /* Item Appraisal Card & Modal (AI Step 3) */
 .appraisal-card-highlight { margin: 16px 0; padding: 14px 16px; background: #0e1224; border: 1px solid #324068; border-left: 3px solid #ffb703; border-radius: 2px; }

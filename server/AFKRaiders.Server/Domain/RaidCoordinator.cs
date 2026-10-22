@@ -9,6 +9,10 @@ public sealed class RaidCoordinator
     private static readonly TimeSpan AdmissionPulse = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan HomeInterval = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan HubActivityInterval = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan ErrandRecovery = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan ErrandStopDuration = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan ErrandRestMargin = TimeSpan.FromMinutes(2);
+    private static readonly string[] SaleDesks = ["Pawn Desk", "Coupon Barons", "OopsAll Claims Window"];
     private const int ReadyUpSignalCost = 2;
     private readonly TimeProvider time;
     private readonly IRaidNarrator narrator;
@@ -19,16 +23,20 @@ public sealed class RaidCoordinator
     private readonly Dictionary<string, HandlerState> handlers = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> handlerCredentials = new(StringComparer.Ordinal);
     private readonly ILootCatalog catalog;
+    private readonly TraderStockGenerator traderStockGenerator;
+    private readonly Dictionary<long, TraderCycleStock> traderStocks = [];
     private readonly bool fastPacing;
+    private bool committingPriorityPredecessors;
     private readonly Func<int> nextSeed;
     private DateTimeOffset nextAdmissionAt;
     private string? activeAutonomousRaidId;
 
-    public RaidCoordinator(TimeProvider time, IRaidNarrator? narrator = null, ILootCatalog? catalog = null, INarrativeGenerator? narrativeGenerator = null, bool fastPacing = false, Func<int>? nextSeed = null)
+    public RaidCoordinator(TimeProvider time, IRaidNarrator? narrator = null, ILootCatalog? catalog = null, INarrativeGenerator? narrativeGenerator = null, bool fastPacing = false, Func<int>? nextSeed = null, int? traderSeed = null)
     {
         this.time = time;
         this.narrator = narrator ?? new TemplateRaidNarrator();
         this.catalog = catalog ?? LootCatalog.Default;
+        traderStockGenerator = new TraderStockGenerator(traderSeed ?? RandomNumberGenerator.GetInt32(int.MaxValue), time);
         this.fastPacing = fastPacing;
         this.nextSeed = nextSeed ?? (() => RandomNumberGenerator.GetInt32(int.MaxValue));
         this.narrativeGenerator = narrativeGenerator ?? new TemplateNarrativeGenerator();
@@ -57,7 +65,10 @@ public sealed class RaidCoordinator
             }
 
             var accessToken = CreateSecret(32);
-            var state = new HandlerState(slot, Guid.NewGuid().ToString("N"), requestId, accessToken);
+            var state = new HandlerState(slot, Guid.NewGuid().ToString("N"), requestId, accessToken)
+            {
+                TraitSeed = nextSeed()
+            };
             state.EquippedWeaponInstanceId = state.OwnedWeapons[0].InstanceId;
             state.LastSignalRegenAt = time.GetUtcNow();
             BeginHomeStay(state, time.GetUtcNow(), initial: true);
@@ -66,6 +77,7 @@ public sealed class RaidCoordinator
             var initMsg = $"{DisplayName(slot)} starts autonomous duty from Desperanza. Standard-issue {state.OwnedWeapons[0].Name} assigned.";
             state.Events.Add(new HandlerEventView(1, time.GetUtcNow(), "DutyEnabled", initMsg));
             AddJournalEntry(state, null, time.GetUtcNow(), "DutyEnabled", "Hub", initMsg, $"hub:enroll:{state.Slot}");
+            PrepareForArrival(state);
             TryStartAutonomousWorld(time.GetUtcNow());
             return new EnrolledHandler(accessToken, ProjectHandler(state, time.GetUtcNow()));
         }
@@ -112,6 +124,8 @@ public sealed class RaidCoordinator
             AdvanceRaids();
             if (!state.IsHome)
                 throw new RaidCommandException("RaiderNotAtHome");
+            if (state.PreparationCompletedVisit != state.HomeVisit && state.PendingErrands.Count == 0)
+                throw new RaidCommandException("PreparationIncomplete");
 
             var now = time.GetUtcNow();
             if (state.DutyEnabled && state.HomeAvailableAt <= now)
@@ -119,6 +133,8 @@ public sealed class RaidCoordinator
             RegenerateSignal(state, now);
             if (state.SignalCurrent < ReadyUpSignalCost)
                 throw new RaidCommandException("InsufficientSignal");
+            if (state.PreparationCompletedVisit != state.HomeVisit)
+                HurryRemainingErrands(state, now);
             state.SignalCurrent -= ReadyUpSignalCost;
             state.DutyEnabled = true;
             state.HomeAvailableAt = now;
@@ -195,6 +211,8 @@ public sealed class RaidCoordinator
             {
                 AdvanceWorlds(nextAdmissionAt, revisions);
                 RefreshAutonomousMembership(nextAdmissionAt);
+                PrepareUncompletedHomeVisits();
+                ProcessDueErrands(nextAdmissionAt);
                 TryCloseAutonomousWorld(nextAdmissionAt);
                 RecordHubActivities(nextAdmissionAt);
                 RecordHomeReadiness(nextAdmissionAt);
@@ -203,6 +221,8 @@ public sealed class RaidCoordinator
             }
             AdvanceWorlds(now, revisions);
             RefreshAutonomousMembership(now);
+            PrepareUncompletedHomeVisits();
+            ProcessDueErrands(now);
             TryCloseAutonomousWorld(now);
             RecordHubActivities(now);
             RecordHomeReadiness(now);
@@ -320,11 +340,14 @@ public sealed class RaidCoordinator
             handler.SupplyStock[item.CatalogId] = Math.Max(0, handler.SupplyStock.GetValueOrDefault(item.CatalogId, 0) - item.Quantity);
         }
 
-        world.Simulation.AddAutonomousRaider(handler.PlayerId, handler.Slot, at, staged, handler.Personality, handler.VoiceState);
+        world.Simulation.AddAutonomousRaider(handler.PlayerId, handler.Slot, at, staged, handler.Personality,
+            handler.VoiceState, handler.PrimaryTrait);
         handler.CurrentRaidId = world.Simulation.RaidId;
         handler.IsHome = false;
         handler.HomeAvailableAt = null;
         handler.NextHubActivityAt = null;
+        handler.HubErrandLabel = null;
+        handler.PendingErrands.Clear();
         world.Simulation.Advance(at);
         var msg = $"{DisplayName(handler.Slot)} autonomously joins an ongoing raid from Desperanza.";
         handler.Events.Add(new HandlerEventView(handler.Events.Count + 1, at, "RaidAdmission", msg));
@@ -334,8 +357,19 @@ public sealed class RaidCoordinator
     private IEnumerable<HandlerState> EligibleHandlers(DateTimeOffset at) =>
         handlers.Values
             .Where(handler => handler.DutyEnabled && handler.IsHome && handler.CurrentRaidId is null
+                && handler.PreparationCompletedVisit == handler.HomeVisit
                 && (!handler.HomeAvailableAt.HasValue || handler.HomeAvailableAt.Value <= at))
             .OrderBy(handler => handler.Slot, StringComparer.Ordinal);
+
+    private void PrepareUncompletedHomeVisits()
+    {
+        foreach (var handler in handlers.Values
+            .Where(handler => handler.IsHome && handler.PreparationCompletedVisit != handler.HomeVisit)
+            .OrderBy(handler => handler.Slot, StringComparer.Ordinal))
+        {
+            PrepareForArrival(handler);
+        }
+    }
 
     private void RefreshAutonomousMembership(DateTimeOffset at)
     {
@@ -389,14 +423,17 @@ public sealed class RaidCoordinator
                 }
 
                 var previousStashValue = handler.Stash.TotalValue;
-                var transfer = handler.Stash.TransferHaul(handler.LastExtractedLoot);
+                var settledItems = FoundWeaponSettlement.Separate(
+                    handler.LastExtractedLoot, handler.OwnedWeapons, catalog);
+                handler.OwnedWeapons.AddRange(settledItems.WeaponsToKeep);
+                var transfer = handler.Stash.TransferHaul(settledItems.StashItems);
                 handler.Coins += transfer.OverflowCoinsGained;
 
                 var payoff = new HaulPayoffView(
                     SettlementId: $"settlement:{world.Simulation.RaidId}:{handler.PlayerId}",
-                    GrossSecuredCount: transfer.IncomingHaul.Count,
-                    GrossSecuredValue: transfer.IncomingHaul.Sum(i => i.Value),
-                    SecuredItems: transfer.IncomingHaul,
+                    GrossSecuredCount: handler.LastExtractedLoot.Count,
+                    GrossSecuredValue: handler.LastExtractedLoot.Sum(i => i.Value),
+                    SecuredItems: handler.LastExtractedLoot,
                     UnitsRetainedInStash: transfer.IncomingRetainedCount,
                     UnitsAutoSold: transfer.AutoSoldItems.Count,
                     AutoSoldItems: transfer.AutoSoldItems,
@@ -412,7 +449,7 @@ public sealed class RaidCoordinator
                 var damageTaken = Math.Max(0, projection.MyMaxHealth - projection.MyHealth);
                 var robotRes = projection.RobotEncounter?.Resolution;
                 var playerView = projection.Players.FirstOrDefault(p => p.PlayerId == handler.PlayerId);
-                var finalGreed = playerView?.Disposition == "Hoarder" ? 35 : 15;
+                var finalGreed = playerView?.PrimaryTrait == "Hoarder" ? 35 : 15;
 
                 if (isKnockedOut)
                 {
@@ -565,6 +602,15 @@ public sealed class RaidCoordinator
                     handler.Events.Add(new HandlerEventView(handler.Events.Count + 1, extractedAt, "StashOverflow", overflowMsg));
                     AddJournalEntry(handler, world.Simulation.RaidId, extractedAt, "StashOverflow", "Hub", overflowMsg, $"hub:overflow:{world.Simulation.RaidId}:{handler.Slot}");
                 }
+
+                PrepareForArrival(handler, paced: true);
+                foreach (var weapon in settledItems.WeaponsToKeep)
+                {
+                    var text = Content.NarrationContent.Default.Format(
+                        "hub.economy-found-weapon", weapon.Name);
+                    RecordPreparationDecision(handler, extractedAt, "FoundWeapon",
+                        $"found-weapon:{weapon.InstanceId}", text);
+                }
             }
         }
     }
@@ -586,8 +632,474 @@ public sealed class RaidCoordinator
         activeAutonomousRaidId = null;
     }
 
+    private void PrepareForArrival(HandlerState handler, bool paced = false)
+    {
+        if (handler.PreparationCompletedVisit == handler.HomeVisit)
+            return;
+
+        if (handler.PreparationStartedVisit != handler.HomeVisit)
+        {
+            handler.PreparationStartedVisit = handler.HomeVisit;
+            handler.LatestPreparationDecisions.Clear();
+            handler.PendingErrands.Clear();
+            handler.HubErrandLabel = null;
+            ScheduleArrivalErrands(handler, paced && !fastPacing);
+        }
+
+        if (handler.PendingErrands.Count > 0 && !handler.PendingErrands[0].Paced)
+            CommitDueErrands(handler, DateTimeOffset.MaxValue);
+    }
+
+    private RaiderPreparationPlan DecidePreparation(
+        HandlerState handler,
+        DateTimeOffset at,
+        int? reserveFloorOverride = null,
+        IReadOnlyDictionary<string, int>? availableStock = null)
+    {
+        var currentStaging = handler.StagedSupplies.Select(entry =>
+        {
+            var definition = Domain.ShopCatalog.Supplies.FirstOrDefault(supply =>
+                supply.Id.Equals(entry.Key, StringComparison.OrdinalIgnoreCase));
+            return new StagedSupplyItem(entry.Key, definition?.Name ?? entry.Key,
+                definition?.Category ?? "Consumable", entry.Value);
+        }).Where(item => item.Quantity > 0).ToArray();
+        return RaiderEconomyPolicy.Decide(
+            handler.PlayerId,
+            handler.HomeVisit,
+            handler.TraitSeed,
+            at,
+            handler.Coins,
+            handler.Stash.Items,
+            handler.OwnedWeapons,
+            handler.EquippedWeaponInstanceId,
+            handler.SupplyStock,
+            currentStaging,
+            catalog,
+            Domain.ShopCatalog.Weapons,
+            Domain.ShopCatalog.Supplies,
+            availableStock ?? TraderStockAt(at).AvailableQuantities,
+            reserveFloorOverride);
+    }
+
+    private TraderCycleStock TraderStockAt(DateTimeOffset at)
+    {
+        var cycleIndex = traderStockGenerator.CycleIndexAt(at);
+        if (!traderStocks.TryGetValue(cycleIndex, out var stock))
+        {
+            stock = new TraderCycleStock(traderStockGenerator.Generate(
+                at, Domain.ShopCatalog.Weapons, Domain.ShopCatalog.Supplies));
+            traderStocks.Add(cycleIndex, stock);
+        }
+        return stock;
+    }
+
+    private static bool CanBuyWeapon(
+        HandlerState handler,
+        TraderCycleStock stock,
+        string catalogId,
+        int reserveFloor) =>
+        Domain.ShopCatalog.TryGetWeapon(catalogId, out var definition)
+        && definition is not null
+        && definition.Value > 0
+        && stock.Remaining(catalogId) > 0
+        && handler.Coins >= definition.Value
+        && handler.Coins - definition.Value >= reserveFloor;
+
+    private static bool CanBuySupply(
+        HandlerState handler,
+        TraderCycleStock stock,
+        string catalogId,
+        int reserveFloor) =>
+        Domain.ShopCatalog.TryGetSupply(catalogId, out var definition)
+        && definition is not null
+        && stock.Remaining(catalogId) > 0
+        && handler.Coins >= definition.Value
+        && handler.Coins - definition.Value >= reserveFloor;
+
+    private static void EnsureTeaKettleFallback(HandlerState handler, DateTimeOffset at)
+    {
+        if (RaiderEconomyPolicy.BestUsableWeapon(handler.OwnedWeapons, Domain.ShopCatalog.Weapons) is not null)
+            return;
+        var fallbackId = RaiderEconomyPolicy.CreateWeaponInstanceId(
+            handler.PlayerId, handler.HomeVisit, "tea_kettle", "fallback");
+        if (!handler.OwnedWeapons.Any(weapon => weapon.InstanceId == fallbackId))
+        {
+            handler.OwnedWeapons.Add(Domain.ShopCatalog.CreateWeaponInstance(
+                Domain.ShopCatalog.GetStarterWeapon(), fallbackId));
+        }
+        RecordPreparationDecision(handler, at, "PreparationWeaponFallback", "fallback",
+            "Issued a free Tea Kettle at the Hatch Authority loaner desk because no usable owned weapon remained.");
+    }
+
+    private static void RecordUnavailablePurchase(
+        HandlerState handler,
+        DateTimeOffset at,
+        string catalogId,
+        bool soldOut,
+        string? action = null)
+    {
+        var name = Domain.ShopCatalog.TryGetWeapon(catalogId, out var weapon) && weapon is not null
+            ? weapon.Name
+            : Domain.ShopCatalog.TryGetSupply(catalogId, out var supply) && supply is not null
+                ? supply.Name
+                : catalogId;
+        if (soldOut)
+        {
+            var text = Content.NarrationContent.Default.Format("hub.economy-sold-out", name);
+            RecordPreparationDecision(handler, at, "PreparationPurchaseUnavailable",
+                action ?? $"unavailable:{catalogId}", text);
+        }
+    }
+
+    private static void RecordSubstitutePurchase(
+        HandlerState handler,
+        DateTimeOffset at,
+        string requestedCatalogId,
+        string purchasedCatalogId,
+        string desk)
+    {
+        var requestedName = CatalogItemName(requestedCatalogId);
+        var purchasedName = CatalogItemName(purchasedCatalogId);
+        var text = Content.NarrationContent.Default.Format(
+            "hub.economy-substitute", requestedName, purchasedName, desk);
+        RecordPreparationDecision(handler, at, "PreparationPurchaseSubstitute",
+            $"substitute:{requestedCatalogId}:{purchasedCatalogId}", text);
+    }
+
+    private static string CatalogItemName(string catalogId) =>
+        Domain.ShopCatalog.TryGetWeapon(catalogId, out var weapon) && weapon is not null
+            ? weapon.Name
+            : Domain.ShopCatalog.TryGetSupply(catalogId, out var supply) && supply is not null
+                ? supply.Name
+                : catalogId;
+
+    private void ScheduleArrivalErrands(HandlerState handler, bool paced)
+    {
+        var arrivedAt = handler.HomeArrivedAt
+            ?? throw new InvalidOperationException("A home visit must have an arrival time before preparation.");
+        var plan = DecidePreparation(handler, arrivedAt);
+
+        var stops = new List<(string Label, Action<DateTimeOffset> Commit)>();
+
+        if (plan.ItemInstanceIdsToSell.Count > 0)
+        {
+            var chunkCount = Math.Min(SaleDesks.Length, plan.ItemInstanceIdsToSell.Count);
+            var chunkSize = (plan.ItemInstanceIdsToSell.Count + chunkCount - 1) / chunkCount;
+            var chunks = plan.ItemInstanceIdsToSell.Chunk(chunkSize).ToArray();
+            for (var index = 0; index < chunks.Length; index++)
+            {
+                var chunk = chunks[index];
+                var desk = SaleDesks[index];
+                var action = chunks.Length == 1 ? "sale" : $"sale:{index}";
+                stops.Add(($"Selling salvage at the {desk}", at =>
+                {
+                    var sale = handler.Stash.SellByInstanceIds(chunk);
+                    handler.Coins = checked(handler.Coins + sale.CoinsGained);
+                    RecordPreparationDecision(handler, at, "PreparationSale", action,
+                        $"Sold {sale.SoldItems.Count} Home Stash items at the {desk} for {sale.CoinsGained} coins. Balance: {handler.Coins}.");
+                }));
+            }
+        }
+
+        if (plan.WeaponInstanceIdToRepair is { } repairId)
+        {
+            stops.Add(("At the Gear Weirdos repair bench", at =>
+            {
+                var index = handler.OwnedWeapons.FindIndex(weapon => weapon.InstanceId == repairId);
+                if (index < 0)
+                    throw new InvalidOperationException("Preparation selected a weapon the Raider does not own.");
+                var weapon = handler.OwnedWeapons[index];
+                if (weapon.CurrentDurability >= weapon.MaxDurability
+                    || handler.Coins < weapon.RepairCost
+                    || handler.Coins - weapon.RepairCost < plan.ReserveFloor)
+                    throw new InvalidOperationException("Preparation repair failed coordinator validation.");
+                handler.Coins -= weapon.RepairCost;
+                var repaired = weapon with { CurrentDurability = weapon.MaxDurability };
+                handler.OwnedWeapons[index] = repaired;
+                RecordPreparationDecision(handler, at, "PreparationRepair", $"repair:{repairId}",
+                    $"Repaired {repaired.Name} at the Gear Weirdos repair bench for {weapon.RepairCost} coins. Balance: {handler.Coins}.");
+            }));
+        }
+
+        if (plan.WeaponCatalogIdToBuy is { } weaponCatalogId
+            && plan.WeaponInstanceIdToBuy is not null)
+        {
+            stops.Add(("Browsing the Gear Weirdos weapon counter", at =>
+            {
+                CommitEarlierPriorityTraderErrands(handler, at);
+                var stock = TraderStockAt(at);
+                var selectedId = CanBuyWeapon(handler, stock, weaponCatalogId, plan.ReserveFloor)
+                    ? weaponCatalogId
+                    : DecidePreparation(handler, at, plan.ReserveFloor, stock.AvailableQuantities)
+                        .WeaponCatalogIdToBuy;
+                if (selectedId is null
+                    || !CanBuyWeapon(handler, stock, selectedId, plan.ReserveFloor))
+                {
+                    RecordUnavailablePurchase(handler, at, weaponCatalogId,
+                        stock.Remaining(weaponCatalogId) == 0);
+                    EnsureTeaKettleFallback(handler, at);
+                    return;
+                }
+
+                var definition = Domain.ShopCatalog.Weapons.Single(weapon =>
+                    weapon.Id.Equals(selectedId, StringComparison.OrdinalIgnoreCase));
+                var purchased = Domain.ShopCatalog.CreateWeaponInstance(definition,
+                    RaiderEconomyPolicy.CreateWeaponInstanceId(handler.PlayerId, handler.HomeVisit, selectedId));
+                if (!stock.TryBuy(selectedId, 1))
+                    throw new InvalidOperationException("Trader weapon stock changed during a serialized purchase.");
+                handler.Coins -= definition.Value;
+                handler.OwnedWeapons.Add(purchased);
+                RecordPreparationDecision(handler, at, "PreparationWeaponPurchase", $"weapon:{selectedId}",
+                    $"Bought {purchased.Name} at the Gear Weirdos weapon counter for {definition.Value} coins. Balance: {handler.Coins}.");
+                if (!selectedId.Equals(weaponCatalogId, StringComparison.OrdinalIgnoreCase))
+                    RecordSubstitutePurchase(handler, at, weaponCatalogId, selectedId, "Gear Weirdos");
+            }));
+        }
+
+        if (plan.CreateTeaKettleFallback)
+        {
+            stops.Add(("At the Hatch Authority loaner desk", at =>
+            {
+                EnsureTeaKettleFallback(handler, at);
+            }));
+        }
+
+        if (plan.WeaponInstanceIdToEquip is { } equipId)
+        {
+            stops.Add(("Checking gear at the locker", at =>
+            {
+                var equipped = RaiderEconomyPolicy.BestUsableWeapon(
+                    handler.OwnedWeapons, Domain.ShopCatalog.Weapons)
+                    ?? throw new InvalidOperationException("Preparation has no usable owned weapon after fallback.");
+                handler.EquippedWeaponInstanceId = equipped.InstanceId;
+                RecordPreparationDecision(handler, at, "PreparationWeaponEquipped", $"equip:{equipped.InstanceId}",
+                    $"Equipped {equipped.Name} ({equipped.CurrentDurability}/{equipped.MaxDurability} durability).");
+            }));
+        }
+
+        foreach (var (purchase, purchaseIndex) in plan.SupplyPurchases.Select((purchase, index) => (purchase, index)))
+        {
+            if (!Domain.ShopCatalog.TryGetSupply(purchase.CatalogId, out var definition) || definition is null
+                || purchase.Quantity <= 0)
+                throw new InvalidOperationException("Preparation selected an invalid supply purchase.");
+            var desk = SupplyDesk(definition.Category);
+            stops.Add(($"Shopping at the {desk}", at =>
+            {
+                CommitEarlierPriorityTraderErrands(handler, at);
+                var stock = TraderStockAt(at);
+                var acquired = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                for (var unit = 0; unit < purchase.Quantity; unit++)
+                {
+                    var selectedId = CanBuySupply(handler, stock, purchase.CatalogId, plan.ReserveFloor)
+                        ? purchase.CatalogId
+                        : DecidePreparation(handler, at, plan.ReserveFloor, stock.AvailableQuantities)
+                            .SupplyPurchases.FirstOrDefault()?.CatalogId;
+                    if (selectedId is null || !CanBuySupply(handler, stock, selectedId, plan.ReserveFloor))
+                        break;
+
+                    var selected = Domain.ShopCatalog.Supplies.Single(supply =>
+                        supply.Id.Equals(selectedId, StringComparison.OrdinalIgnoreCase));
+                    if (!stock.TryBuy(selectedId, 1))
+                        throw new InvalidOperationException("Trader supply stock changed during a serialized purchase.");
+                    handler.Coins -= selected.Value;
+                    handler.SupplyStock[selected.Id] = checked(
+                        handler.SupplyStock.GetValueOrDefault(selected.Id) + 1);
+                    acquired[selected.Id] = acquired.GetValueOrDefault(selected.Id) + 1;
+                    if (!selectedId.Equals(purchase.CatalogId, StringComparison.OrdinalIgnoreCase))
+                        RecordSubstitutePurchase(handler, at, purchase.CatalogId, selectedId, desk);
+                }
+
+                foreach (var (catalogId, quantity) in acquired)
+                {
+                    var bought = Domain.ShopCatalog.Supplies.Single(supply =>
+                        supply.Id.Equals(catalogId, StringComparison.OrdinalIgnoreCase));
+                    var totalCost = checked(bought.Value * quantity);
+                    RecordPreparationDecision(handler, at, "PreparationSupplyPurchase",
+                        $"supply:{purchaseIndex}:{catalogId}",
+                        $"Bought {quantity}x {bought.Name} at the {SupplyDesk(bought.Category)} for {totalCost} coins. Balance: {handler.Coins}.");
+                }
+                var purchasedCount = acquired.Values.Sum();
+                if (purchasedCount < purchase.Quantity)
+                    RecordUnavailablePurchase(handler, at, purchase.CatalogId,
+                        stock.Remaining(purchase.CatalogId) == 0,
+                        $"supply:{purchaseIndex}");
+            }));
+        }
+
+        if (plan.UpdateStagedSupplies || plan.SupplyPurchases.Count > 0)
+        {
+            stops.Add(("Packing supplies at the Field Depot Counter", at =>
+            {
+                var actualStaging = DecidePreparation(handler, at, plan.ReserveFloor,
+                    new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
+                var medicalCount = 0;
+                var rechargerCount = 0;
+                foreach (var item in actualStaging.StagedSupplies)
+                {
+                    if (item.Quantity <= 0
+                        || !Domain.ShopCatalog.TryGetSupply(item.CatalogId, out var definition)
+                        || definition is null
+                        || handler.SupplyStock.GetValueOrDefault(definition.Id) < item.Quantity)
+                        throw new InvalidOperationException("Preparation staging failed coordinator validation.");
+                    if (definition.Category == "Medical")
+                        medicalCount += item.Quantity;
+                    else if (definition.Category == "ShieldRecharger")
+                        rechargerCount += item.Quantity;
+                }
+                if (medicalCount > ShopCatalog.MaxStagedMedicalCount
+                    || rechargerCount > ShopCatalog.MaxStagedRechargerCount)
+                    throw new InvalidOperationException("Preparation staging exceeded a category limit.");
+
+                handler.StagedSupplies.Clear();
+                foreach (var item in actualStaging.StagedSupplies)
+                    handler.StagedSupplies[item.CatalogId] = item.Quantity;
+                RecordPreparationDecision(handler, at, "PreparationSuppliesStaged", "stage",
+                    $"Staged {medicalCount} medical supplies and {rechargerCount} rechargers from Raider-owned stock at the Field Depot Counter.");
+            }));
+        }
+
+        stops.Add(("Wrapping up errands", at =>
+        {
+            RecordPreparationDecision(handler, at, "PreparationReady", "ready",
+                $"{DisplayName(handler.Slot)} is ready in Desperanza as a {plan.PrimaryTrait}; {handler.Coins} coins remain.");
+            handler.PreparationCompletedVisit = handler.HomeVisit;
+        }));
+
+        if (!paced)
+        {
+            foreach (var (label, commit) in stops)
+                handler.PendingErrands.Add(new PreparationErrand(arrivedAt, label, commit, Paced: false, Optional: false));
+            return;
+        }
+
+        var recoverAt = arrivedAt + ErrandRecovery;
+        var restIndex = (int)(StableHash($"{handler.Slot}:{handler.HomeVisit}:rest") % 2);
+        var restPool = restIndex == 0 ? "hub.errand-rest-canteen" : "hub.errand-rest-outpost";
+        var restPlace = restIndex == 0 ? "Last Call Canteen" : "Hatch Outpost";
+        var budget = HomeInterval - ErrandRecovery - ErrandRestMargin;
+        var stopDuration = TimeSpan.FromTicks(Math.Min(ErrandStopDuration.Ticks, budget.Ticks / (stops.Count + 1)));
+
+        handler.PendingErrands.Add(new PreparationErrand(recoverAt, "Collecting themselves after the raid", at =>
+        {
+            var lines = Content.NarrationContent.Default.Pool("hub.errand-recover");
+            RecordPreparationDecision(handler, at, "PreparationRecover", "recover",
+                lines[handler.HomeVisit % lines.Count]);
+        }, Paced: true, Optional: false));
+        for (var index = 0; index < stops.Count; index++)
+        {
+            handler.PendingErrands.Add(new PreparationErrand(recoverAt + stopDuration * (index + 1),
+                stops[index].Label, stops[index].Commit, Paced: true, Optional: false));
+        }
+        var restAt = recoverAt + stopDuration * (stops.Count + 1);
+        handler.PendingErrands.Add(new PreparationErrand(restAt, $"Resting at the {restPlace}", at =>
+        {
+            var lines = Content.NarrationContent.Default.Pool(restPool);
+            RecordPreparationDecision(handler, at, "PreparationRest", "rest",
+                lines[handler.HomeVisit % lines.Count]);
+        }, Paced: true, Optional: true));
+        handler.NextHubActivityAt = restAt + HubActivityInterval;
+    }
+
+    private void CommitDueErrands(HandlerState handler, DateTimeOffset upTo)
+    {
+        while (handler.PendingErrands.Count > 0 && handler.PendingErrands[0].DueAt <= upTo)
+        {
+            var errand = handler.PendingErrands[0];
+            handler.PendingErrands.RemoveAt(0);
+            errand.Commit(errand.DueAt);
+            handler.HubErrandLabel = errand.Paced ? errand.Label : null;
+        }
+    }
+
+    private void CommitEarlierPriorityTraderErrands(HandlerState current, DateTimeOffset at)
+    {
+        if (committingPriorityPredecessors)
+            return;
+        committingPriorityPredecessors = true;
+        try
+        {
+            foreach (var earlier in handlers.Values
+                .Where(handler => handler != current
+                    && handler.IsHome
+                    && handler.HomeArrivedAt <= current.HomeArrivedAt
+                    && (handler.HomeArrivedAt < current.HomeArrivedAt
+                        || string.CompareOrdinal(handler.PlayerId, current.PlayerId) < 0)
+                    && handler.PendingErrands.Any(IsTraderPurchaseErrand))
+                .OrderBy(handler => handler.HomeArrivedAt)
+                .ThenBy(handler => handler.PlayerId, StringComparer.Ordinal))
+            {
+                while (earlier.PendingErrands.Count > 0 && !earlier.PendingErrands[0].Optional)
+                {
+                    var errand = earlier.PendingErrands[0];
+                    earlier.PendingErrands.RemoveAt(0);
+                    errand.Commit(at);
+                    earlier.HubErrandLabel = errand.Paced ? errand.Label : null;
+                }
+            }
+        }
+        finally
+        {
+            committingPriorityPredecessors = false;
+        }
+    }
+
+    private static bool IsTraderPurchaseErrand(PreparationErrand errand) =>
+        errand.Label == "Browsing the Gear Weirdos weapon counter"
+        || errand.Label.StartsWith("Shopping at the ", StringComparison.Ordinal);
+
+    private void HurryRemainingErrands(HandlerState handler, DateTimeOffset at)
+    {
+        handler.PendingErrands.RemoveAll(errand => errand.Optional);
+        while (handler.PendingErrands.Count > 0)
+        {
+            var errand = handler.PendingErrands[0];
+            handler.PendingErrands.RemoveAt(0);
+            errand.Commit(errand.DueAt < at ? errand.DueAt : at);
+        }
+        handler.HubErrandLabel = "Hurrying to the Hatch";
+    }
+
+    private void ProcessDueErrands(DateTimeOffset at)
+    {
+        foreach (var handler in handlers.Values
+            .Where(handler => handler.IsHome && handler.PendingErrands.Count > 0)
+            .OrderBy(handler => handler.HomeArrivedAt)
+            .ThenBy(handler => handler.PlayerId, StringComparer.Ordinal)
+            .ThenBy(handler => handler.PendingErrands[0].DueAt))
+        {
+            CommitDueErrands(handler, at);
+        }
+    }
+
+    private static string SupplyDesk(string category) => category switch
+    {
+        "Medical" => "Stitch-It Aid Window",
+        "ShieldRecharger" => "Bravado Battery Kiosk",
+        _ => "Field Depot Counter"
+    };
+
+    private static uint StableHash(string value) =>
+        BitConverter.ToUInt32(SHA256.HashData(Encoding.UTF8.GetBytes(value)), 0);
+
+    private static void RecordPreparationDecision(
+        HandlerState handler,
+        DateTimeOffset at,
+        string kind,
+        string action,
+        string text)
+    {
+        var sourceEventId = $"hub:preparation:{handler.HomeVisit}:{action}";
+        if (!handler.PreparationEventIds.Add(sourceEventId))
+            return;
+        handler.Events.Add(new HandlerEventView(handler.Events.Count + 1, at, kind, text));
+        handler.LatestPreparationDecisions.Add(new PreparationDecisionView(at, kind, text));
+        AddJournalEntry(handler, null, at, kind, "Hub", text, sourceEventId, location: "Desperanza");
+    }
+
     private void BeginHomeStay(HandlerState handler, DateTimeOffset at, bool initial = false)
     {
+        handler.HomeVisit++;
+        handler.HomeArrivedAt = at;
         handler.HomeAvailableAt = at + (fastPacing
             ? initial ? TimeSpan.Zero : TimeSpan.FromSeconds(60)
             : HomeInterval);
@@ -637,7 +1149,7 @@ public sealed class RaidCoordinator
                 handler.Slot,
                 DisplayName(handler.Slot),
                 handler.HomeAvailableAt is { } availableAt && availableAt > at
-                    ? "Hanging out in Desperanza"
+                    ? handler.HubErrandLabel ?? "Hanging out in Desperanza"
                     : handler.DutyEnabled ? "Ready for duty in Desperanza" : "At home in Desperanza / duty paused",
                 handler.HomeAvailableAt))
             .ToArray();
@@ -687,6 +1199,7 @@ public sealed class RaidCoordinator
             Weapons: Domain.ShopCatalog.Weapons,
             Supplies: Domain.ShopCatalog.Supplies
         );
+        var traderStockView = TraderStockAt(at).Project();
 
         RegenerateSignal(handler, at);
 
@@ -699,205 +1212,10 @@ public sealed class RaidCoordinator
             equippedWeapon, handler.OwnedWeapons.ToArray(), supplyList, stagedList, shopCatalogView,
             handler.SignalCurrent, handler.SignalMax, raidProjection?.MyHiddenPocketInstanceId,
             GetHubResidents(at), handler.IsHome,
-            handler.IsHome && (!handler.DutyEnabled || handler.HomeAvailableAt > at), ReadyUpSignalCost);
-    }
-
-    public PurchaseShopItemResponse PurchaseShopItem(string accessToken, PurchaseShopItemRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.CommandId) || request.CommandId.Length > 100)
-        {
-            throw new RaidCommandException("InvalidCommandId");
-        }
-        if (request.Quantity <= 0 || request.Quantity > 99)
-        {
-            throw new RaidCommandException("InvalidQuantity");
-        }
-
-        lock (gate)
-        {
-            var state = GetAuthorizedHandler(accessToken);
-            if (state.ProcessedShopCommands.TryGetValue(request.CommandId, out var existing))
-            {
-                return existing;
-            }
-
-            int totalCost;
-            List<OwnedWeapon>? newWeapons = null;
-            List<OwnedSupplyStack>? updatedSupplies = null;
-            string purchaseSummary;
-
-            if (Domain.ShopCatalog.TryGetWeapon(request.CatalogId, out var weaponDef) && weaponDef is not null)
-            {
-                totalCost = weaponDef.Value * request.Quantity;
-                if (state.Coins < totalCost)
-                {
-                    throw new RaidCommandException("InsufficientCoins");
-                }
-
-                state.Coins -= totalCost;
-                newWeapons = new List<OwnedWeapon>();
-                for (var i = 0; i < request.Quantity; i++)
-                {
-                    var instance = Domain.ShopCatalog.CreateWeaponInstance(weaponDef);
-                    state.OwnedWeapons.Add(instance);
-                    newWeapons.Add(instance);
-                }
-
-                if (string.IsNullOrWhiteSpace(state.EquippedWeaponInstanceId) && newWeapons.Count > 0)
-                {
-                    state.EquippedWeaponInstanceId = newWeapons[0].InstanceId;
-                }
-
-                purchaseSummary = $"Purchased {request.Quantity}x {weaponDef.Name} for {totalCost} coins.";
-            }
-            else if (Domain.ShopCatalog.TryGetSupply(request.CatalogId, out var supplyDef) && supplyDef is not null)
-            {
-                totalCost = supplyDef.Value * request.Quantity;
-                if (state.Coins < totalCost)
-                {
-                    throw new RaidCommandException("InsufficientCoins");
-                }
-
-                state.Coins -= totalCost;
-                state.SupplyStock[supplyDef.Id] = state.SupplyStock.GetValueOrDefault(supplyDef.Id, 0) + request.Quantity;
-                updatedSupplies = [new OwnedSupplyStack(
-                    CatalogId: supplyDef.Id,
-                    Name: supplyDef.Name,
-                    Category: supplyDef.Category,
-                    Quantity: state.SupplyStock[supplyDef.Id],
-                    CostPerUnit: supplyDef.Value,
-                    HealAmount: supplyDef.HealAmount,
-                    ReviveAmount: supplyDef.ReviveAmount,
-                    ChargeAmount: supplyDef.ChargeAmount,
-                    Rarity: supplyDef.Rarity,
-                    Flavor: supplyDef.Flavor
-                )];
-
-                purchaseSummary = $"Purchased {request.Quantity}x {supplyDef.Name} for {totalCost} coins into prep stock.";
-            }
-            else
-            {
-                throw new RaidCommandException("InvalidCatalogItem");
-            }
-
-            var response = new PurchaseShopItemResponse(
-                CommandId: request.CommandId,
-                CatalogId: request.CatalogId,
-                Quantity: request.Quantity,
-                TotalCost: totalCost,
-                RemainingCoins: state.Coins,
-                NewWeapons: newWeapons,
-                UpdatedSupplies: updatedSupplies
-            );
-
-            state.ProcessedShopCommands[request.CommandId] = response;
-
-            var now = time.GetUtcNow();
-            state.Events.Add(new HandlerEventView(state.Events.Count + 1, now, "ShopPurchase", purchaseSummary));
-            AddJournalEntry(state, null, now, "ShopPurchase", "Hub", purchaseSummary, $"hub:shop:{request.CommandId}");
-
-            return response;
-        }
-    }
-
-    public EquipWeaponResponse EquipWeapon(string accessToken, EquipWeaponRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.CommandId) || request.CommandId.Length > 100)
-        {
-            throw new RaidCommandException("InvalidCommandId");
-        }
-
-        lock (gate)
-        {
-            var state = GetAuthorizedHandler(accessToken);
-            if (state.ProcessedEquipCommands.TryGetValue(request.CommandId, out var existing))
-            {
-                return existing;
-            }
-
-            var target = state.OwnedWeapons.FirstOrDefault(w => w.InstanceId == request.WeaponInstanceId);
-            if (target is null)
-            {
-                throw new RaidCommandException("WeaponNotOwned");
-            }
-
-            if (target.CurrentDurability <= 0)
-            {
-                throw new RaidCommandException("BrokenWeaponCannotBeEquipped");
-            }
-
-            state.EquippedWeaponInstanceId = target.InstanceId;
-
-            var response = new EquipWeaponResponse(
-                CommandId: request.CommandId,
-                WeaponInstanceId: target.InstanceId,
-                EquippedWeapon: target
-            );
-
-            state.ProcessedEquipCommands[request.CommandId] = response;
-
-            var now = time.GetUtcNow();
-            var msg = $"Equipped {target.Name} (Durability: {target.CurrentDurability}/{target.MaxDurability}) for field operations.";
-            state.Events.Add(new HandlerEventView(state.Events.Count + 1, now, "WeaponEquipped", msg));
-            AddJournalEntry(state, null, now, "WeaponEquipped", "Hub", msg, $"hub:equip:{request.CommandId}");
-
-            return response;
-        }
-    }
-
-    public RepairWeaponResponse RepairWeapon(string accessToken, RepairWeaponRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.CommandId) || request.CommandId.Length > 100)
-        {
-            throw new RaidCommandException("InvalidCommandId");
-        }
-
-        lock (gate)
-        {
-            var state = GetAuthorizedHandler(accessToken);
-            if (state.ProcessedRepairCommands.TryGetValue(request.CommandId, out var existing))
-            {
-                return existing;
-            }
-
-            var index = state.OwnedWeapons.FindIndex(w => w.InstanceId == request.WeaponInstanceId);
-            if (index < 0)
-            {
-                throw new RaidCommandException("WeaponNotOwned");
-            }
-
-            var weapon = state.OwnedWeapons[index];
-            if (weapon.CurrentDurability >= weapon.MaxDurability)
-            {
-                throw new RaidCommandException("WeaponAlreadyAtMaxDurability");
-            }
-
-            if (state.Coins < weapon.RepairCost)
-            {
-                throw new RaidCommandException("InsufficientCoins");
-            }
-
-            state.Coins -= weapon.RepairCost;
-            var repaired = weapon with { CurrentDurability = weapon.MaxDurability };
-            state.OwnedWeapons[index] = repaired;
-
-            var response = new RepairWeaponResponse(
-                CommandId: request.CommandId,
-                WeaponInstanceId: repaired.InstanceId,
-                RepairCostPaid: weapon.RepairCost,
-                RemainingCoins: state.Coins,
-                RepairedWeapon: repaired
-            );
-
-            state.ProcessedRepairCommands[request.CommandId] = response;
-
-            var now = time.GetUtcNow();
-            var msg = $"Repaired {repaired.Name} to full durability ({repaired.MaxDurability}/{repaired.MaxDurability}) for {weapon.RepairCost} coins.";
-            state.Events.Add(new HandlerEventView(state.Events.Count + 1, now, "WeaponRepaired", msg));
-            AddJournalEntry(state, null, now, "WeaponRepaired", "Hub", msg, $"hub:repair:{request.CommandId}");
-
-            return response;
-        }
+            handler.IsHome && (!handler.DutyEnabled || handler.HomeAvailableAt > at), ReadyUpSignalCost,
+            handler.PrimaryTrait.ToString(), handler.LatestPreparationDecisions.ToArray(),
+            handler.IsHome ? handler.HubErrandLabel : null,
+            traderStockView);
     }
 
     internal void DamageWeaponForTesting(string accessToken, string instanceId, int damage)
@@ -914,90 +1232,32 @@ public sealed class RaidCoordinator
         }
     }
 
-    internal void ApplyWeaponDamage(string accessToken, string instanceId, int damage) =>
-        DamageWeaponForTesting(accessToken, instanceId, damage);
-
-    public StageLoadoutResponse StageLoadout(string accessToken, StageLoadoutRequest request)
+    internal void ResetPreparationForTesting(
+        string accessToken,
+        int coins,
+        DateTimeOffset arrivedAt)
     {
-        if (string.IsNullOrWhiteSpace(request.CommandId) || request.CommandId.Length > 100)
-        {
-            throw new RaidCommandException("InvalidCommandId");
-        }
-
         lock (gate)
         {
-            var state = GetAuthorizedHandler(accessToken);
-            if (state.ProcessedStageCommands.TryGetValue(request.CommandId, out var existing))
-            {
-                return existing;
-            }
-
-            var stagedItems = new List<StagedSupplyItem>();
-            var medCount = 0;
-            var rechCount = 0;
-
-            foreach (var item in request.StagedSupplies)
-            {
-                if (item.Quantity <= 0) continue;
-                if (!Domain.ShopCatalog.TryGetSupply(item.CatalogId, out var def) || def is null)
-                {
-                    throw new RaidCommandException($"InvalidSupplyItem:{item.CatalogId}");
-                }
-
-                var available = state.SupplyStock.GetValueOrDefault(item.CatalogId, 0);
-                if (available < item.Quantity)
-                {
-                    throw new RaidCommandException($"InsufficientStock:{item.CatalogId}");
-                }
-
-                if (string.Equals(def.Category, "Medical", StringComparison.OrdinalIgnoreCase))
-                {
-                    medCount += item.Quantity;
-                }
-                else if (string.Equals(def.Category, "ShieldRecharger", StringComparison.OrdinalIgnoreCase))
-                {
-                    rechCount += item.Quantity;
-                }
-
-                stagedItems.Add(new StagedSupplyItem(
-                    CatalogId: def.Id,
-                    Name: def.Name,
-                    Category: def.Category,
-                    Quantity: item.Quantity
-                ));
-            }
-
-            if (medCount > Domain.ShopCatalog.MaxStagedMedicalCount)
-            {
-                throw new RaidCommandException("ExceededMedicalStageLimit");
-            }
-            if (rechCount > Domain.ShopCatalog.MaxStagedRechargerCount)
-            {
-                throw new RaidCommandException("ExceededRechargerStageLimit");
-            }
-
-            state.StagedSupplies.Clear();
-            foreach (var staged in stagedItems)
-            {
-                state.StagedSupplies[staged.CatalogId] = staged.Quantity;
-            }
-
-            var response = new StageLoadoutResponse(
-                CommandId: request.CommandId,
-                StagedSupplies: stagedItems
-            );
-
-            state.ProcessedStageCommands[request.CommandId] = response;
-
-            var now = time.GetUtcNow();
-            var totalCount = medCount + rechCount;
-            var msg = $"Staged field loadout with {totalCount} consumables ({medCount} Medical, {rechCount} Rechargers) for next raid (Active in G5).";
-            state.Events.Add(new HandlerEventView(state.Events.Count + 1, now, "LoadoutStaged", msg));
-            AddJournalEntry(state, null, now, "LoadoutStaged", "Hub", msg, $"hub:stage:{request.CommandId}");
-
-            return response;
+            var handler = GetAuthorizedHandler(accessToken);
+            handler.HomeVisit++;
+            handler.IsHome = true;
+            handler.CurrentRaidId = null;
+            handler.Coins = coins;
+            handler.HomeArrivedAt = arrivedAt;
+            handler.HomeAvailableAt = arrivedAt + HomeInterval;
+            handler.PreparationStartedVisit = 0;
+            handler.PreparationCompletedVisit = 0;
+            handler.PreparationEventIds.Clear();
+            handler.LatestPreparationDecisions.Clear();
+            handler.PendingErrands.Clear();
+            handler.HubErrandLabel = null;
+            PrepareForArrival(handler, paced: true);
         }
     }
+
+    internal void ApplyWeaponDamage(string accessToken, string instanceId, int damage) =>
+        DamageWeaponForTesting(accessToken, instanceId, damage);
 
     public ItemAppraisalView AppraiseItem(string accessToken, string catalogId, string? itemName = null)
     {
@@ -1054,58 +1314,6 @@ public sealed class RaidCoordinator
             AddJournalEntry(state, null, now, "ItemAppraisal", "Hub", logText, $"hub:appraise:{catalogId}:{DateTimeOffset.UtcNow.Ticks}");
 
             return appraisal;
-        }
-    }
-
-    public SellStashResponse SellStash(string accessToken, SellStashItemsRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.CommandId) || request.CommandId.Length > 100)
-        {
-            throw new RaidCommandException("InvalidCommandId");
-        }
-
-        lock (gate)
-        {
-            var state = GetAuthorizedHandler(accessToken);
-
-            if (state.ProcessedSellCommands.TryGetValue(request.CommandId, out var existing))
-            {
-                return existing;
-            }
-
-            SellStashResult result;
-            if (request.InstanceIds is { Count: > 0 })
-            {
-                result = state.Stash.SellByInstanceIds(request.InstanceIds);
-            }
-            else if (!string.IsNullOrWhiteSpace(request.CatalogId) && request.Quantity.HasValue)
-            {
-                result = state.Stash.SellByCatalogId(request.CatalogId, request.Quantity.Value);
-            }
-            else
-            {
-                throw new RaidCommandException("InvalidSellRequest");
-            }
-
-            state.Coins += result.CoinsGained;
-            var response = new SellStashResponse(
-                request.CommandId,
-                result.SoldItems.Count,
-                result.CoinsGained,
-                state.Coins,
-                state.Stash.Count,
-                state.Stash.TotalValue,
-                result.SoldItems
-            );
-
-            state.ProcessedSellCommands[request.CommandId] = response;
-
-            var now = time.GetUtcNow();
-            var msg = $"Sold {result.SoldItems.Count} items from Home Stash for {result.CoinsGained} coins.";
-            state.Events.Add(new HandlerEventView(state.Events.Count + 1, now, "StashSale", msg));
-            AddJournalEntry(state, null, now, "StashSale", "Hub", msg, $"hub:sell:{request.CommandId}");
-
-            return response;
         }
     }
 
@@ -1486,6 +1694,39 @@ public sealed class RaidCoordinator
         CryptographicOperations.FixedTimeEquals(Convert.FromHexString(left), Convert.FromHexString(right));
     private sealed record RaidState(string? InviteHash, RaidSimulation Simulation);
     private sealed record PlayerPrincipal(string RaidId, string PlayerId);
+    private sealed record PreparationErrand(
+        DateTimeOffset DueAt, string Label, Action<DateTimeOffset> Commit, bool Paced, bool Optional);
+
+    private sealed class TraderCycleStock(TraderStockSnapshot snapshot)
+    {
+        private readonly Dictionary<string, int> remaining = snapshot.Items
+            .Where(item => item.Quantity is not null)
+            .ToDictionary(item => item.CatalogId, item => item.Quantity!.Value,
+                StringComparer.OrdinalIgnoreCase);
+
+        public IReadOnlyDictionary<string, int> AvailableQuantities => remaining
+            .Where(entry => entry.Value > 0)
+            .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
+
+        public int Remaining(string catalogId) => remaining.GetValueOrDefault(catalogId);
+
+        public bool TryBuy(string catalogId, int quantity)
+        {
+            if (quantity <= 0 || Remaining(catalogId) < quantity)
+                return false;
+            remaining[catalogId] -= quantity;
+            return true;
+        }
+
+        public TraderStockView Project() => new(
+            snapshot.CycleIndex,
+            snapshot.Items.Select(item => new TraderStockItemView(
+                item.CatalogId,
+                item.Name,
+                item.Category,
+                item.Quantity is null ? null : Remaining(item.CatalogId),
+                item.UnitPrice)).ToArray());
+    }
 
     private sealed class HandlerState(string slot, string playerId, string enrollmentRequestId, string accessToken)
     {
@@ -1493,10 +1734,20 @@ public sealed class RaidCoordinator
         public string PlayerId { get; } = playerId;
         public string EnrollmentRequestId { get; } = enrollmentRequestId;
         public string AccessToken { get; } = accessToken;
+        public int TraitSeed { get; init; }
+        public RaiderPrimaryTrait PrimaryTrait => RaiderEconomyPolicy.TraitFromSeed(TraitSeed);
         public bool DutyEnabled { get; set; } = true;
         public bool IsHome { get; set; } = true;
         public bool HomeReadinessLogged { get; set; }
         public DateTimeOffset? HomeAvailableAt { get; set; }
+        public DateTimeOffset? HomeArrivedAt { get; set; }
+        public int HomeVisit { get; set; }
+        public int PreparationStartedVisit { get; set; }
+        public int PreparationCompletedVisit { get; set; }
+        public HashSet<string> PreparationEventIds { get; } = new(StringComparer.Ordinal);
+        public List<PreparationDecisionView> LatestPreparationDecisions { get; } = [];
+        public List<PreparationErrand> PendingErrands { get; } = [];
+        public string? HubErrandLabel { get; set; }
         public DateTimeOffset? NextHubActivityAt { get; set; }
         public int HubActivitySequence { get; set; }
         public HashSet<string> ProcessedReadyCommands { get; } = new(StringComparer.Ordinal);
@@ -1510,16 +1761,11 @@ public sealed class RaidCoordinator
         public int Coins { get; set; }
         public HomeStash Stash { get; } = new();
         public HashSet<string> SettledRaidIds { get; } = new(StringComparer.Ordinal);
-        public Dictionary<string, SellStashResponse> ProcessedSellCommands { get; } = new(StringComparer.Ordinal);
 
         public List<OwnedWeapon> OwnedWeapons { get; } = [Domain.ShopCatalog.CreateWeaponInstance(Domain.ShopCatalog.GetStarterWeapon())];
         public string? EquippedWeaponInstanceId { get; set; }
         public Dictionary<string, int> SupplyStock { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, int> StagedSupplies { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public Dictionary<string, PurchaseShopItemResponse> ProcessedShopCommands { get; } = new(StringComparer.Ordinal);
-        public Dictionary<string, EquipWeaponResponse> ProcessedEquipCommands { get; } = new(StringComparer.Ordinal);
-        public Dictionary<string, RepairWeaponResponse> ProcessedRepairCommands { get; } = new(StringComparer.Ordinal);
-        public Dictionary<string, StageLoadoutResponse> ProcessedStageCommands { get; } = new(StringComparer.Ordinal);
         public int SignalCurrent { get; set; } = 3;
         public RaiderVoiceState? VoiceState { get; set; }
         public int SignalMax { get; set; } = 5;
@@ -1565,9 +1811,16 @@ public sealed record HandlerProjection(
     IReadOnlyList<HubResidentView>? HubResidents = null,
     bool IsHome = false,
     bool CanReadyUp = false,
-    int ReadyUpSignalCost = 2);
+    int ReadyUpSignalCost = 2,
+    string PrimaryTrait = "Cautious",
+    IReadOnlyList<PreparationDecisionView>? LatestPreparationDecisions = null,
+    string? HubErrand = null,
+    TraderStockView? TraderStock = null);
+public sealed record TraderStockView(long CycleIndex, IReadOnlyList<TraderStockItemView> Items);
+public sealed record TraderStockItemView(string CatalogId, string Name, string Category, int? Quantity, int UnitPrice);
 public sealed record HubResidentView(string Slot, string DisplayName, string Status, DateTimeOffset? HomeAvailableAt);
 public sealed record HandlerEventView(int Sequence, DateTimeOffset At, string Kind, string Text);
+public sealed record PreparationDecisionView(DateTimeOffset At, string Kind, string Text);
 
 public sealed record ReturnSummaryView(
     string RaidId,

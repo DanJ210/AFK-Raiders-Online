@@ -186,20 +186,3 @@ public sealed record HaulPayoffView(
     int StashValueAfter,
     int CoinsBalanceAfter
 );
-
-public sealed record SellStashItemsRequest(
-    string CommandId,
-    IReadOnlyList<string>? InstanceIds = null,
-    string? CatalogId = null,
-    int? Quantity = null
-);
-
-public sealed record SellStashResponse(
-    string CommandId,
-    int ItemsSoldCount,
-    int CoinsGained,
-    int NewCoinsBalance,
-    int NewStashCount,
-    int NewStashValue,
-    IReadOnlyList<ItemView> SoldItems
-);

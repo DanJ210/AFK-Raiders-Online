@@ -7,7 +7,7 @@ namespace AFKRaiders.Server.Domain;
 
 public sealed class RaidSimulation
 {
-    public const string RulesVersion = "desperanza-g6-v3";
+    public const string RulesVersion = "desperanza-econ-2-v1";
     public static readonly TimeSpan AdmissionWindow = TimeSpan.FromSeconds(20);
     public const int MaxRaiders = 2;
     private const int PodDeploymentSeconds = 60;
@@ -189,7 +189,8 @@ public sealed class RaidSimulation
     }
 
     public void AddAutonomousRaider(string playerId, string slot, DateTimeOffset at, IEnumerable<StagedSupplyItem>? stagedSupplies = null,
-        RaiderPersonality? personality = null, RaiderVoiceState? voiceState = null)
+        RaiderPersonality? personality = null, RaiderVoiceState? voiceState = null,
+        RaiderPrimaryTrait? primaryTrait = null)
     {
         if (slot is not ("raider-one" or "raider-two"))
         {
@@ -214,7 +215,7 @@ public sealed class RaidSimulation
         }
 
         departed = true;
-        raiders.Add(CreateRaider(playerId, slot, at, stagedSupplies, personality));
+        raiders.Add(CreateRaider(playerId, slot, at, stagedSupplies, personality, primaryTrait));
         RestoreVoiceState(playerId, voiceState);
         Revision++;
         var added = raiders.Single(raider => raider.PlayerId == playerId);
@@ -265,13 +266,14 @@ public sealed class RaidSimulation
     }
 
     private SimRaider CreateRaider(string playerId, string slot, DateTimeOffset readyAt, IEnumerable<StagedSupplyItem>? stagedSupplies = null,
-        RaiderPersonality? personality = null)
+        RaiderPersonality? personality = null, RaiderPrimaryTrait? primaryTrait = null)
     {
-        var hoarder = Factor(slot, "disposition") % 2 == 0;
+        var trait = primaryTrait ?? RaiderEconomyPolicy.TraitFromSeed(Factor(slot, "primary-trait"));
+        var hoarder = trait == RaiderPrimaryTrait.Hoarder;
         var name = slot == "raider-one" ? "Mira \"Refund\" Malone" : "Dev \"Wet Socks\" Kowalski";
         var firstBranch = Factor(slot, "first-branch") % 2 == 0 ? "Salvage Yard" : "Service Depot";
         var secondBranch = firstBranch == "Salvage Yard" ? "Service Depot" : "Salvage Yard";
-        var raider = new SimRaider(playerId, slot, name, hoarder ? "Hoarder" : "Cautious",
+        var raider = new SimRaider(playerId, slot, name, trait.ToString(),
             hoarder ? 35 : 15, 4 + Factor(slot, "aptitude") % 5, Factor(slot, "initiative") % 6,
             new Queue<string>(["Market", firstBranch, "Market", secondBranch, "Extraction Platform"]))
         {
@@ -486,7 +488,7 @@ public sealed class RaidSimulation
         var salvageOpportunity = opportunities.Single(opportunity => opportunity.Location == "Salvage Yard");
         return new RaidProjection(RaidId, Revision, RulesVersion, serverTime, Status,
             StartsAt + AdmissionWindow, NextActivityAt, riskReward ? Zone : "Scrapyard",
-            OrderedRaiders().Select(raider => new PlayerView(raider.PlayerId, raider.Name, raider.Disposition,
+            OrderedRaiders().Select(raider => new PlayerView(raider.PlayerId, raider.Name, raider.PrimaryTrait,
                 raider.Location, raider.Activity, raider.Destination, raider.ActivityEndsAt)).ToArray(),
             locations.Select(location => new LocationView(location.Name, location.Neighbors.ToArray())).ToArray(),
             new CrateView(salvageOpportunity.Id, salvageOpportunity.Location, OpportunityStatus(salvageOpportunity),
@@ -779,9 +781,9 @@ public sealed class RaidSimulation
             return;
         }
         var factors = participants.Select(raider => new ContestFactorView(raider.PlayerId, raider.Name,
-            raider.Disposition, raider.Greed, raider.Aptitude, raider.Backpack.Sum(item => item.Value),
+            raider.PrimaryTrait, raider.Greed, raider.Aptitude, raider.Backpack.Sum(item => item.Value),
             raider.Initiative, Score(raider))).ToArray();
-        var contested = participants.Length > 1 && participants.Any(raider => raider.Disposition == "Hoarder");
+        var contested = participants.Length > 1 && participants.Any(raider => raider.PrimaryTrait == "Hoarder");
         var recipients = contested
             ? participants.OrderByDescending(Score).ThenBy(raider => raider.Slot, StringComparer.Ordinal).Take(1).ToArray()
             : participants;
@@ -1203,10 +1205,10 @@ public sealed class RaidSimulation
             var key = RaiderCommsContent.PoolKey(kind, activity);
             var recipients = raiders.Where(r => participants.Contains(r.PlayerId)).ToArray();
             var voiceIndex = recipients.Max(r => r.VoiceCounts.GetValueOrDefault(key));
-            var disposition = participants.Length == 1 ? participant.Disposition : null;
-            var voice = RaiderCommsContent.Line(kind, activity, voiceIndex, disposition, rotate: true);
+            var primaryTrait = participants.Length == 1 ? participant.PrimaryTrait : null;
+            var voice = RaiderCommsContent.Line(kind, activity, voiceIndex, primaryTrait, rotate: true);
             while (recipients.Any(r => r.LastVoice == voice))
-                voice = RaiderCommsContent.Line(kind, activity, ++voiceIndex, disposition, rotate: true);
+                voice = RaiderCommsContent.Line(kind, activity, ++voiceIndex, primaryTrait, rotate: true);
             foreach (var recipient in recipients)
             {
                 recipient.VoiceCounts[key] = voiceIndex + 1;
@@ -1219,7 +1221,7 @@ public sealed class RaidSimulation
             itemName, itemValue, itemInstanceId, opportunityId, reason, ThreadId: threadId,
             Channel: channel, Details: details, OriginalText: text);
         var projection = participant is null ? null : new RaiderProjection(participant.PlayerId, participant.Slot,
-            participant.Name, participant.Disposition, participant.Health, participant.MaxHealth,
+            participant.Name, participant.PrimaryTrait, participant.Health, participant.MaxHealth,
             participant.Greed, participant.Aptitude, participant.Initiative, participant.Backpack.Sum(i => i.Value));
         var formatted = narrator.FormatEvent(evt, participants.Length == 1 ? projection : null);
         events.Add(new RaidEventView(
@@ -1792,13 +1794,13 @@ public sealed class RaidSimulation
 
     internal sealed record PendingHandlerAction(string ActionId, string ActionType, string PlayerId, DateTimeOffset QueuedAt);
 
-    private sealed class SimRaider(string playerId, string slot, string name, string disposition, int greed, int aptitude, int initiative,
+    private sealed class SimRaider(string playerId, string slot, string name, string primaryTrait, int greed, int aptitude, int initiative,
         Queue<string> route)
     {
         public string PlayerId { get; } = playerId;
         public string Slot { get; } = slot;
         public string Name { get; } = name;
-        public string Disposition { get; } = disposition;
+        public string PrimaryTrait { get; } = primaryTrait;
         public int Greed { get; set; } = greed;
         public int Mood { get; set; } = 2;
         public DateTimeOffset AdmittedAt { get; set; }
@@ -1862,12 +1864,12 @@ public sealed record RaidProjection(string RaidId, int Revision, string RulesVer
     IReadOnlyList<HazardWarningView>? HazardWarnings = null);
 public sealed record OpportunityView(string OpportunityId, string Location, string Activity, string Title,
     string Status, DateTimeOffset? ClosesAt, int RemainingItems, IReadOnlyList<string> ParticipantIds);
-public sealed record PlayerView(string PlayerId, string DisplayName, string Disposition, string Location,
+public sealed record PlayerView(string PlayerId, string DisplayName, string PrimaryTrait, string Location,
     string Activity, string? Destination, DateTimeOffset? ActivityEndsAt);
 public sealed record LocationView(string Name, IReadOnlyList<string> Neighbors);
 public sealed record CrateView(string CrateId, string Location, string Status, int RemainingItems);
 public sealed record ItemView(string InstanceId, string CatalogId, string Name, int Value, string Flavor);
-public sealed record ContestFactorView(string PlayerId, string DisplayName, string Disposition, int Greed,
+public sealed record ContestFactorView(string PlayerId, string DisplayName, string PrimaryTrait, int Greed,
     int Aptitude, int BackpackValue, int Initiative, int Score);
 public sealed record ItemAwardView(string InstanceId, string ItemName, string RecipientId, string RecipientName);
 public sealed record EncounterView(string EncounterId, DateTimeOffset ResolvedAt, string Location, string Resolution,

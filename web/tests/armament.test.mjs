@@ -27,7 +27,7 @@ test('every owned weapon resolves its damage range and multiplier from the autho
     assert.doesNotMatch(weaponDamage(weapon.id), /undefined|\(x\)/)
   }
   assert.match(app, /weaponDamage\(equippedWeapon\.catalogId\)/)
-  assert.match(app, /weaponDamage\(wpn\.catalogId\)/)
+  assert.match(app, /weaponDamage\(weapon\.catalogId\)/)
   assert.doesNotMatch(app, /(?:equippedWeapon|wpn)\.(?:damageMin|damageMax|damageMultiplier)/)
 })
 

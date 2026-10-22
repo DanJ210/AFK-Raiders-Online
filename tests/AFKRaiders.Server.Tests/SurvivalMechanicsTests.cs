@@ -143,7 +143,7 @@ public sealed class SurvivalMechanicsTests
     }
 
     [Fact]
-    public void WeaponDurability_DepletesOnRaidConclusion_AndBlocksBrokenWeaponEquip()
+    public void WeaponDurability_DepletesOnRaidConclusion_AndAutonomousPreparationRepairsBrokenStarter()
     {
         // 5. Weapon durability depletion & broken weapon equip prevention
         var clock = new ManualTime();
@@ -167,21 +167,9 @@ public sealed class SurvivalMechanicsTests
         var updated = coordinator.GetHandlerProjection(token);
         var weapon = updated.OwnedWeapons?.FirstOrDefault(w => w.InstanceId == weaponInstanceId);
         Assert.NotNull(weapon);
-        Assert.Equal(0, weapon.CurrentDurability);
-        Assert.True(weapon.IsBroken, "Weapon at 0 durability must be marked broken");
-
-        // Attempting to equip a broken weapon must throw
-        var ex = Assert.Throws<RaidCommandException>(() =>
-            coordinator.EquipWeapon(token, new EquipWeaponRequest("cmd-1", weapon.InstanceId)));
-        Assert.Equal("BrokenWeaponCannotBeEquipped", ex.Reason);
-
-        // Give coins for repair if needed
-        var repairRes = coordinator.RepairWeapon(token, new RepairWeaponRequest("cmd-2", weapon.InstanceId));
-        Assert.Equal(weapon.MaxDurability, repairRes.RepairedWeapon.CurrentDurability);
-
-        // Can now equip successfully
-        var equipRes = coordinator.EquipWeapon(token, new EquipWeaponRequest("cmd-3", weapon.InstanceId));
-        Assert.Equal(weaponInstanceId, equipRes.EquippedWeapon.InstanceId);
+        Assert.True(weapon.CurrentDurability > 0, "Arrival preparation repairs the free Tea Kettle fallback.");
+        Assert.False(weapon.IsBroken);
+        Assert.Equal(weaponInstanceId, updated.EquippedWeapon?.InstanceId);
     }
 
     [Fact]

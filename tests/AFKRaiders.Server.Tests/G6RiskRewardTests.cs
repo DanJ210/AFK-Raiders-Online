@@ -137,8 +137,11 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
                     early.AddRange(a.Select(i => i.Item));
                     late.AddRange(b.Select(i => i.Item));
                 }
-            output.WriteLine($"{danger}: early={early.Average(i => i.Value):F2}, late={late.Average(i => i.Value):F2}");
-            Assert.True(late.Average(i => i.Value) >= early.Average(i => i.Value) * 1.05);
+            var earlySalvage = early.Where(i => catalog.GetItem(i.CatalogId).Category != "weapons").ToArray();
+            var lateSalvage = late.Where(i => catalog.GetItem(i.CatalogId).Category != "weapons").ToArray();
+            output.WriteLine($"{danger}: early={earlySalvage.Average(i => i.Value):F2}, " +
+                $"late={lateSalvage.Average(i => i.Value):F2}, field weapons={early.Count - earlySalvage.Length}");
+            Assert.True(lateSalvage.Average(i => i.Value) >= earlySalvage.Average(i => i.Value) * 1.05);
             Assert.All(early.Concat(late), i => Assert.Equal(catalog.GetItem(i.CatalogId).Value, i.Value));
             Assert.True(RaidConditions.HazardOdds(danger, 1) > RaidConditions.HazardOdds(danger, 0));
         }
@@ -363,7 +366,7 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void FrozenEightHourRecurringCohortMeasuresNetAndDistinctReturns()
+    public void FrozenEightHourRecurringCohortMeasuresSettlementsAndNonnegativeBalances()
     {
         foreach (var attended in new[] { false, true })
         {
@@ -380,7 +383,6 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
                 var settlements = new HashSet<string>();
                 var lastCalm = new Dictionary<string, DateTimeOffset>();
                 var calledWorlds = new HashSet<string>();
-                var securedBySlot = Slots.ToDictionary(s => s, _ => 0);
                 for (var t = 0; t <= 8 * 3600; t += 5)
                 {
                     clock.Now = Start.AddSeconds(t);
@@ -393,7 +395,6 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
                         {
                             if (summary.Outcome == "Extracted") extracted++; else knockedOut++;
                             net += payoff.GrossSecuredValue;
-                            securedBySlot[p.Slot] += payoff.GrossSecuredValue;
                         }
                         if (p.Raid is not { } raid) continue;
                         conditions.Add(raid.Condition!.Danger);
@@ -425,13 +426,14 @@ public sealed class G6RiskRewardTests(ITestOutputHelper output)
                     var p = coordinator.GetHandlerProjection(handler.AccessToken);
                     Assert.Equal(p.FullJournal!.Count, p.FullJournal.Select(e => e.SourceEventId).Distinct().Count());
                     Assert.Equal(p.Stash!.Count, p.Stash.Select(i => i.InstanceId).Distinct().Count());
-                    Assert.Equal(securedBySlot[p.Slot], p.StashValue + p.Coins);
+                    Assert.True(p.Coins >= 0);
+                    Assert.All(p.SupplyStock!, supply => Assert.True(supply.Quantity >= 0));
                 }
             }
             output.WriteLine($"8h recurring {(attended ? "attended" : "unattended")}: " +
                 $"returns={extracted + knockedOut}, extracts={extracted}, KO={knockedOut}, " +
                 $"net secured={net}, mean per return={net / (double)(extracted + knockedOut):F2}, " +
-                $"observed danger={string.Join(",", conditions.Order())}. Starter gear/supplies cost=0; no purchases.");
+                $"observed danger={string.Join(",", conditions.Order())}. Raider economy trades are active; balance is not validated.");
             Assert.True(net > 0);
             Assert.True(extracted > 0 && knockedOut > 0);
             if (!attended) Assert.Contains("High", conditions);

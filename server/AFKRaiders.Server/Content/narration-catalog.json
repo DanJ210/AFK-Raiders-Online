@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contentVersion": "desperanza-narration-v3",
+  "contentVersion": "desperanza-narration-v5",
   "pools": [
     {
       "id": "survival.downed",
@@ -312,6 +312,28 @@
       ]
     },
     {
+      "id": "voice.brawler",
+      "lines": [
+        "I have elected to make this problem regret its posture.",
+        "The plan is direct. The paperwork can catch up afterward.",
+        "I am applying confidence at a range best measured in apologies.",
+        "My tactical reserve consists of forward momentum and one bandage.",
+        "I heard a problem. It appears to have volunteered for a meeting.",
+        "I am keeping my shield charged and my argument louder."
+      ]
+    },
+    {
+      "id": "voice.gadgeteer",
+      "lines": [
+        "I packed the adapter. Now I need to identify what it adapts.",
+        "This battery has been assigned three jobs and a supervisory title.",
+        "I have a tool for this. The tool is currently evaluating me.",
+        "The equipment is ready. Its instructions remain theoretical.",
+        "I am optimizing the plan around the device I brought by mistake.",
+        "Every spare component is essential once the correct component is known."
+      ]
+    },
+    {
       "id": "voice.general",
       "lines": [
         "I'm filing that under cautiously optimistic.",
@@ -417,6 +439,31 @@
         "Watched Hydroponic Arguments debate lettuce custody. The lettuce declined to testify.",
         "Visited the Water Ration Desk to practice heroic sipping. No water changed ownership.",
         "Hatch Authority stamped the waiting form WAITING. Progress remains mostly ink."
+      ]
+    },
+    {
+      "id": "hub.errand-recover",
+      "lines": [
+        "Sat on the Security Stamp Maze bench for a minute, breathing until the hands agreed to stop shaking.",
+        "Drank one regulation cup from the Water Ration Desk. Counted limbs. Total unchanged. Morale: cautiously stamped.",
+        "Leaned against the tube-pod wall until the floor stopped behaving like a raid. Paperwork can wait one minute.",
+        "Took a minute on a ComfortCo cot. It failed politely, which felt supportive."
+      ]
+    },
+    {
+      "id": "hub.errand-rest-canteen",
+      "lines": [
+        "Settled into the Last Call Canteen with synth-coffee and a strong opinion about crates.",
+        "Claimed a stool at the Last Call Canteen. The stool has seen worse raids and says so.",
+        "Last Call Canteen gossip: someone swears the tubes are improving. Nobody makes eye contact."
+      ]
+    },
+    {
+      "id": "hub.errand-rest-outpost",
+      "lines": [
+        "Walked up to the Hatch Outpost to watch the tube board and pretend it is a plan.",
+        "Resting at the Hatch Outpost. The Exit Strategy Booth map is upside down; confidence remains upright.",
+        "Parked at the Hatch Outpost bench. Hatch Authority stamps the air occasionally for practice."
       ]
     }
   ],
@@ -892,6 +939,18 @@
     {
       "id": "simulation.it-emits-a-high-pitched",
       "text": "It emits a high-pitched warning tone that is somehow worse than silence."
+    },
+    {
+      "id": "hub.economy-sold-out",
+      "text": "The {0} was already gone at the counter. The Raider left without buying it; the shelf has been notified."
+    },
+    {
+      "id": "hub.economy-substitute",
+      "text": "The {0} was gone, so the Raider bought {1} at the {2} instead. The receipt calls this adaptation."
+    },
+    {
+      "id": "hub.economy-found-weapon",
+      "text": "Recovered {0} from the field. It is now owned equipment, not stash salvage."
     }
   ],
   "enrichmentEventKinds": [

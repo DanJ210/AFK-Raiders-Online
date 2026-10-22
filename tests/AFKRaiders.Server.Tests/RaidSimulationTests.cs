@@ -31,6 +31,17 @@ public sealed class RaidSimulationTests
         return simulation;
     }
 
+    private static RaidSimulation CreateWithTrait(int seed, RaiderPrimaryTrait trait, bool reverseOrder)
+    {
+        var simulation = new RaidSimulation("test-raid", Start, seed, fastPacing: true);
+        if (reverseOrder)
+            simulation.AddAutonomousRaider("two", "raider-two", Start.AddSeconds(20), primaryTrait: trait);
+        simulation.AddAutonomousRaider("one", "raider-one", Start.AddSeconds(20), primaryTrait: trait);
+        if (!reverseOrder)
+            simulation.AddAutonomousRaider("two", "raider-two", Start.AddSeconds(20), primaryTrait: trait);
+        return simulation;
+    }
+
     [Fact]
     public void PerRaiderDeadlinesProduceDistinctDestinationsWithoutHandlerInput()
     {
@@ -123,8 +134,15 @@ public sealed class RaidSimulationTests
     [Fact]
     public void CrossingCautiousRaidersShareReceiptAndDivideUniqueSalvage()
     {
-        var simulation = Create(11);
-        simulation.Advance(Start.AddMinutes(3));
+        var simulation = Enumerable.Range(0, 512)
+            .Select(seed => Create(seed))
+            .First(candidate =>
+            {
+                candidate.Advance(Start.AddMinutes(3));
+                var projection = candidate.Project("one", Start);
+                return projection.Players.All(player => player.PrimaryTrait == "Cautious")
+                    && projection.Encounters.SingleOrDefault()?.Resolution == "Cooperation";
+            });
         var one = simulation.Project("one", Start);
         var two = simulation.Project("two", Start);
         var receipt = Assert.Single(one.Encounters);
@@ -132,7 +150,7 @@ public sealed class RaidSimulationTests
         Assert.Equal(["one", "two"], receipt.ParticipantIds);
         Assert.Equal(JsonSerializer.Serialize(one.Encounters), JsonSerializer.Serialize(two.Encounters));
         Assert.Equal(2, receipt.Awards.Select(item => item.RecipientId).Distinct().Count());
-        Assert.All(receipt.Factors, factor => Assert.Equal("Cautious", factor.Disposition));
+        Assert.All(receipt.Factors, factor => Assert.Equal("Cautious", factor.PrimaryTrait));
         var expectedPerRaider = one.Robot.Status == "Defeated" ? 3 : 2;
         Assert.Equal(expectedPerRaider, one.MyExtractedLoot.Count);
         Assert.Equal(expectedPerRaider, two.MyExtractedLoot.Count);
@@ -186,12 +204,17 @@ public sealed class RaidSimulationTests
     [Fact]
     public void ExactScoreTieUsesStableIdentityOrderNotJoinOrder()
     {
-        var simulation = Create(193, reverseOrder: true);
-        simulation.Advance(Start.AddMinutes(3));
-        var receipt = Assert.Single(simulation.Project("one", Start).Encounters);
-        Assert.Equal("Contest", receipt.Resolution);
-        Assert.Equal(receipt.Factors[0].Score, receipt.Factors[1].Score);
-        Assert.All(receipt.Awards, award => Assert.Equal("one", award.RecipientId));
+        var tied = Enumerable.Range(0, 512)
+            .Select(seed => CreateWithTrait(seed, RaiderPrimaryTrait.Hoarder, reverseOrder: true))
+            .Select(simulation =>
+            {
+                simulation.Advance(Start.AddMinutes(3));
+                return (Simulation: simulation, Receipt: simulation.Project("one", Start).Encounters.SingleOrDefault());
+            })
+            .FirstOrDefault(candidate => candidate.Receipt is { Resolution: "Contest", Factors.Count: 2 }
+                && candidate.Receipt.Factors[0].Score == candidate.Receipt.Factors[1].Score);
+        Assert.NotNull(tied.Receipt);
+        Assert.All(tied.Receipt!.Awards, award => Assert.Equal("one", award.RecipientId));
     }
 
     [Theory]

@@ -22,7 +22,7 @@ public static class RaiderCommsContent
         _ => NarrationContent.Default.Pool("tasks.general")
     };
 
-    public static string Line(string kind, string? activity, long sequence, string? disposition = null, bool rotate = false)
+    public static string Line(string kind, string? activity, long sequence, string? primaryTrait = null, bool rotate = false)
     {
         IReadOnlyList<string> lines = (kind, activity) switch
         {
@@ -58,8 +58,12 @@ public static class RaiderCommsContent
                 NarrationContent.Default.Pool("voice.robot"),
             ("ExtractionStarted" or "Extracted", _) =>
                 NarrationContent.Default.Pool("voice.exit"),
-            _ when disposition == "Hoarder" =>
+            _ when primaryTrait == "Hoarder" =>
                 NarrationContent.Default.Pool("voice.hoarder"),
+            _ when primaryTrait == "Brawler" =>
+                NarrationContent.Default.Pool("voice.brawler"),
+            _ when primaryTrait == "Gadgeteer" =>
+                NarrationContent.Default.Pool("voice.gadgeteer"),
             _ =>
                 NarrationContent.Default.Pool("voice.general")
         };

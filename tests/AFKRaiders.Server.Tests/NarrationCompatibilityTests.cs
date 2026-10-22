@@ -2,10 +2,11 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AFKRaiders.Server.Domain;
+using Xunit.Abstractions;
 
 namespace AFKRaiders.Server.Tests;
 
-public sealed class NarrationCompatibilityTests
+public sealed class NarrationCompatibilityTests(ITestOutputHelper output)
 {
     [Fact]
     public void BundledNarrationAndCurrentSimulationHaveAStableCompatibilityFingerprint()
@@ -60,7 +61,8 @@ public sealed class NarrationCompatibilityTests
                 lines.Add(JsonSerializer.Serialize(sim.Project("two", start.AddHours(1))));
             }
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
-        // C6 and LOOT-1 intentionally change authored templates and project the selected field activity.
-        Assert.Equal("DD00D7AF0E4D74DF32B2E742A24245C3EAC8F00B7FEA7B2AA5B8AFDE414C8FAE", hash);
+        output.WriteLine($"Current narration and simulation fingerprint: {hash}");
+        // C6, LOOT-1, ECON-1, HUB-5, and ECON-2 intentionally change authored voice, rules, and projections.
+        Assert.Equal("AD3F0EC3C2B89FAEA9D2C786317CD3E4011D4E1EFE8FA282E14E04E9F012BDDE", hash);
     }
 }

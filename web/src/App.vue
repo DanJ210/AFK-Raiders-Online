@@ -7,13 +7,13 @@ import { HubConnectionBuilder, type HubConnection } from '@microsoft/signalr'
 import CollapsiblePanel from './components/CollapsiblePanel.vue'
 
 type PlayerView = {
-  playerId: string; displayName: string; disposition: string; location: string
+  playerId: string; displayName: string; primaryTrait: string; location: string
   activity: string; destination: string | null; activityEndsAt: string | null
 }
 type ItemView = { instanceId: string; catalogId: string; name: string; value: number; flavor: string }
 type EncounterView = {
   encounterId: string; resolvedAt: string; location: string; participantIds: string[]; resolution: string; reason: string
-  factors: { playerId: string; displayName: string; disposition: string; greed: number
+  factors: { playerId: string; displayName: string; primaryTrait: string; greed: number
     aptitude: number; backpackValue: number; initiative: number; score: number }[]
   awards: { instanceId: string; itemName: string; recipientId: string; recipientName: string }[]
 }
@@ -58,6 +58,10 @@ type StagedSupplyItem = {
 type ShopCatalogView = {
   weapons: WeaponDefinition[]; supplies: SupplyDefinition[]
 }
+type TraderStockItemView = {
+  catalogId: string; name: string; category: string; quantity: number | null; unitPrice: number
+}
+type TraderStockView = { cycleIndex: number; items: TraderStockItemView[] }
 type LootCatalogView = { items: { id: string; rarity: number }[] }
 type ItemAppraisalView = {
   catalogId: string; itemName: string; appraisal: string
@@ -146,6 +150,10 @@ type HandlerProjection = {
   signalCurrent?: number
   signalMax?: number
   secretHiddenPocketInstanceId?: string | null
+  primaryTrait: string
+  latestPreparationDecisions?: { at: string; kind: string; text: string }[] | null
+  hubErrand?: string | null
+  traderStock?: TraderStockView | null
 }
 type HandlerSupportActionResponse = {
   commandId: string
@@ -160,14 +168,9 @@ type DesignateHiddenPocketResponse = {
   success: boolean
   message: string
 }
-type SellStashResponse = {
-  commandId: string; itemsSoldCount: number; coinsGained: number
-  newCoinsBalance: number; newStashCount: number; newStashValue: number
-  soldItems: ItemView[]
-}
 type EnrollResponse = { accessToken: string; projection: HandlerProjection }
 
-const expectedRulesVersion = 'desperanza-g6-v3'
+const expectedRulesVersion = 'desperanza-econ-2-v1'
 const requestedIdentity = new URLSearchParams(window.location.search).get('handler')
 const slot = ref<'raider-one' | 'raider-two'>(requestedIdentity === 'two' ? 'raider-two' : 'raider-one')
 const session = shallowRef<HandlerAccess | null>(null)
@@ -187,10 +190,6 @@ const commsFilter = ref<'all' | 'diary' | 'hub' | 'encounters'>('all')
 const commsContainerRef = ref<HTMLElement | null>(null)
 const userHoldingScroll = ref(false)
 const hasNewUnreadComms = ref(false)
-const sellingGroup = ref<StashGroupView | null>(null)
-const sellQuantity = ref<number>(1)
-const selling = ref(false)
-const sellSuccessMessage = ref('')
 let serverOffset = 0
 let connection: HubConnection | null = null
 let liveRaidId: string | null = null
@@ -309,48 +308,7 @@ function clearSession(targetSlot?: string, message?: string) {
   }
 }
 
-function openSellModal(group: StashGroupView) {
-  sellingGroup.value = group
-  sellQuantity.value = 1
-  sellSuccessMessage.value = ''
-}
-
-function closeSellModal() {
-  sellingGroup.value = null
-  sellQuantity.value = 1
-}
-
-async function executeSell(group: StashGroupView, qty: number) {
-  const access = session.value
-  if (!access) return
-  selling.value = true
-  error.value = ''
-  sellSuccessMessage.value = ''
-  try {
-    const commandId = `sell:${crypto.randomUUID()}`
-    const response = await request<SellStashResponse>('/api/dev/handler/stash/sell', access, {
-      method: 'POST',
-      body: JSON.stringify({
-        commandId,
-        catalogId: group.catalogId,
-        quantity: qty
-      })
-    })
-    sellSuccessMessage.value = `Sold ${response.itemsSoldCount}x ${group.name} for +${response.coinsGained} spendable coins.`
-    sellingGroup.value = null
-    await refreshProjection()
-  } catch (cause) {
-    if (cause instanceof Error && cause.message.includes('401')) {
-      clearSession(access.slot, 'Development session expired after server restart. Please start autonomous duty to enroll.')
-    } else {
-      error.value = cause instanceof Error ? cause.message : 'Unable to complete sale'
-    }
-  } finally {
-    selling.value = false
-  }
-}
-
-// OUTFITTER, ARMORY & APPRAISAL STATE (G4 & AI-3)
+// Read-only committed equipment, inventory, and preparation decisions.
 const shopCatalog = computed(() => handlerProjection.value?.shopCatalog ?? null)
 const lootCatalog = ref<LootCatalogView | null>(null)
 const catalogError = ref('')
@@ -364,15 +322,13 @@ const catalogRarities = computed(() => new Map([
 function itemRarity(catalogId: string) {
   return rarityAttributes(catalogRarities.value.get(catalogId))
 }
-const outfitterTab = ref<'armory' | 'supplies' | 'staging'>('armory')
-const outfitterMessage = ref('')
-const outfitterActionPending = ref(false)
 const appraising = ref(false)
 const appraisalModal = ref<(ItemAppraisalView & { estimatedValue: number }) | null>(null)
-const stagedDraft = ref<Record<string, number>>({})
 
 const equippedWeapon = computed(() => handlerProjection.value?.equippedWeapon ?? null)
 const ownedWeapons = computed(() => handlerProjection.value?.ownedWeapons ?? [])
+const primaryTrait = computed(() => handlerProjection.value?.primaryTrait ?? 'Unknown')
+const latestPreparationDecisions = computed(() => handlerProjection.value?.latestPreparationDecisions ?? [])
 
 function weaponDamage(catalogId: string): string {
   const definition = shopCatalog.value?.weapons.find(weapon => weapon.id === catalogId)
@@ -388,39 +344,6 @@ const topAppraisedItem = computed(() => {
   return summary?.items.find(item => item.catalogId === summary.topItemAppraisal?.catalogId)
 })
 
-const stagedMedicalCount = computed(() => {
-  let count = 0
-  for (const [id, qty] of Object.entries(stagedDraft.value)) {
-    const def = shopCatalog.value?.supplies.find(s => s.id === id)
-    if (def && def.category === 'Medical') count += qty
-  }
-  return count
-})
-
-const stagedRechargerCount = computed(() => {
-  let count = 0
-  for (const [id, qty] of Object.entries(stagedDraft.value)) {
-    const def = shopCatalog.value?.supplies.find(s => s.id === id)
-    if (def && def.category === 'ShieldRecharger') count += qty
-  }
-  return count
-})
-
-watch([
-  () => handlerProjection.value?.playerId,
-  () => JSON.stringify(stagedSupplies.value),
-], () => {
-  const draft: Record<string, number> = {}
-  for (const item of stagedSupplies.value) {
-    draft[item.catalogId] = item.quantity
-  }
-  stagedDraft.value = draft
-}, { immediate: true })
-
-function getOwnedSupplyQuantity(catalogId: string): number {
-  return ownedSupplies.value.find(s => s.catalogId === catalogId)?.quantity ?? 0
-}
-
 async function fetchItemCatalogs() {
   if (catalogLoading.value) return
   catalogLoading.value = true
@@ -435,106 +358,6 @@ async function fetchItemCatalogs() {
     catalogError.value = `Loot catalog could not be loaded. Loot rarity may be unavailable. ${cause instanceof Error ? cause.message : 'Unable to contact the local server'}`
   } finally {
     catalogLoading.value = false
-  }
-}
-
-async function purchaseShopItem(catalogId: string, quantity: number = 1) {
-  const access = session.value
-  if (!access || outfitterActionPending.value) return
-  outfitterActionPending.value = true
-  outfitterMessage.value = ''
-  try {
-    const commandId = `buy:${crypto.randomUUID()}`
-    await request<unknown>('/api/dev/handler/shop/purchase', access, {
-      method: 'POST',
-      body: JSON.stringify({ commandId, catalogId, quantity })
-    })
-    outfitterMessage.value = `Acquisition authorized: ${catalogId} (x${quantity}).`
-    await refreshProjection()
-  } catch (cause) {
-    outfitterMessage.value = cause instanceof Error ? `Purchase failed: ${cause.message}` : 'Purchase failed'
-  } finally {
-    outfitterActionPending.value = false
-  }
-}
-
-async function equipWeapon(weaponInstanceId: string) {
-  const access = session.value
-  if (!access || outfitterActionPending.value) return
-  outfitterActionPending.value = true
-  outfitterMessage.value = ''
-  try {
-    const commandId = `equip:${crypto.randomUUID()}`
-    await request<unknown>('/api/dev/handler/equipment/equip', access, {
-      method: 'POST',
-      body: JSON.stringify({ commandId, weaponInstanceId })
-    })
-    outfitterMessage.value = `Armament equipped successfully.`
-    await refreshProjection()
-  } catch (cause) {
-    outfitterMessage.value = cause instanceof Error ? `Equip failed: ${cause.message}` : 'Equip failed'
-  } finally {
-    outfitterActionPending.value = false
-  }
-}
-
-async function repairWeapon(weaponInstanceId: string) {
-  const access = session.value
-  if (!access || outfitterActionPending.value) return
-  outfitterActionPending.value = true
-  outfitterMessage.value = ''
-  try {
-    const commandId = `repair:${crypto.randomUUID()}`
-    const res = await request<{ repairCostPaid: number }>('/api/dev/handler/equipment/repair', access, {
-      method: 'POST',
-      body: JSON.stringify({ commandId, weaponInstanceId })
-    })
-    outfitterMessage.value = `Weapon serviced: ${res.repairCostPaid} ¢ deducted. Durability restored.`
-    await refreshProjection()
-  } catch (cause) {
-    outfitterMessage.value = cause instanceof Error ? `Repair failed: ${cause.message}` : 'Repair failed'
-  } finally {
-    outfitterActionPending.value = false
-  }
-}
-
-function adjustStagedDraft(catalogId: string, delta: number, category: string) {
-  const current = stagedDraft.value[catalogId] ?? 0
-  const owned = getOwnedSupplyQuantity(catalogId)
-  const maxCategory = category === 'Medical' ? 4 : 2
-  const currentCategoryCount = category === 'Medical' ? stagedMedicalCount.value : stagedRechargerCount.value
-
-  const nextVal = current + delta
-  if (nextVal < 0) return
-  if (nextVal > owned) return
-  if (delta > 0 && currentCategoryCount >= maxCategory) return
-
-  stagedDraft.value = {
-    ...stagedDraft.value,
-    [catalogId]: nextVal
-  }
-}
-
-async function saveStagedLoadout() {
-  const access = session.value
-  if (!access || outfitterActionPending.value) return
-  outfitterActionPending.value = true
-  outfitterMessage.value = ''
-  try {
-    const commandId = `stage:${crypto.randomUUID()}`
-    const stagedSupplies = Object.entries(stagedDraft.value)
-      .filter(([_, qty]) => qty > 0)
-      .map(([catalogId, quantity]) => ({ catalogId, quantity }))
-    await request<unknown>('/api/dev/handler/loadout/stage', access, {
-      method: 'POST',
-      body: JSON.stringify({ commandId, stagedSupplies })
-    })
-    outfitterMessage.value = `Field loadout staged for next deployment.`
-    await refreshProjection()
-  } catch (cause) {
-    outfitterMessage.value = cause instanceof Error ? `Staging failed: ${cause.message}` : 'Staging failed'
-  } finally {
-    outfitterActionPending.value = false
   }
 }
 
@@ -1089,279 +912,111 @@ onBeforeUnmount(() => {
           </div>
         </CollapsiblePanel>
 
-        <!-- OUTFITTER & ARMORY WORKSHOP PANEL (G4 & AI-3) -->
-        <CollapsiblePanel class="panel outfitter-panel" label="Outfitter and field workshop">
-          <div class="outfitter-header">
+        <CollapsiblePanel class="panel preparation-panel" label="Raider loadout and inventory">
+          <div class="preparation-header">
             <div>
-              <p class="eyebrow">EQUIPMENT &amp; LOGISTICS / DESPERANZA OUTFITTER</p>
-              <h2>Outfitter &amp; Field Workshop</h2>
-              <span class="dev-stash-badge">CANON GEAR / STAGED CUSTODY</span>
+              <p class="eyebrow">AUTONOMOUS PREPARATION / DESPERANZA</p>
+              <h2>Raider Loadout &amp; Inventory</h2>
+              <span class="dev-stash-badge">RAIDER-OWNED / READ ONLY</span>
             </div>
-            <div class="outfitter-balance">
+            <div class="preparation-balance">
               <span class="label">SPENDABLE COINS</span>
               <strong class="coin-display">{{ coins }} ¢</strong>
             </div>
           </div>
+          <p class="panel-note">The Raider prepares on each Desperanza arrival. Handler presence does not affect purchases, repairs, equipment, or field staging.</p>
+          <p class="privacy-note">Primary trait: <strong>{{ primaryTrait }}</strong></p>
 
-          <p class="panel-note">Requisition weapons, procure medical/shield field supplies, repair damaged armaments, and stage tactical consumables for field deployment.</p>
-
-          <p v-if="outfitterMessage" class="success-notice">{{ outfitterMessage }}</p>
-
-          <div class="outfitter-tabs">
-            <button :class="{ active: outfitterTab === 'armory' }" class="outfitter-tab" @click="outfitterTab = 'armory'">Armory &amp; Workshop</button>
-            <button :class="{ active: outfitterTab === 'supplies' }" class="outfitter-tab" @click="outfitterTab = 'supplies'">Field Supplies</button>
-            <button :class="{ active: outfitterTab === 'staging' }" class="outfitter-tab" @click="outfitterTab = 'staging'">
-              Field Staging ({{ stagedSupplies.reduce((acc, s) => acc + s.quantity, 0) }} items)
-            </button>
-          </div>
-
-          <!-- TAB 1: ARMORY & WORKSHOP -->
-          <div v-if="outfitterTab === 'armory'" class="outfitter-content">
-            <div class="outfitter-subheading">
-              <p class="eyebrow">ACTIVE ARMAMENT</p>
-            </div>
-            <div v-if="equippedWeapon" class="weapon-card equipped-weapon-card" v-bind="rarityAttributes(equippedWeapon.rarity)">
-              <div class="weapon-main-info">
-                <div class="weapon-title-row">
-                  <span class="equipped-tag">EQUIPPED</span>
-                  <strong>{{ equippedWeapon.name }}</strong>
-                  <span class="rarity-badge">{{ rarityName(equippedWeapon.rarity) }}</span>
-                </div>
-                <small class="weapon-flavor">{{ equippedWeapon.flavor }}</small>
-                <div class="weapon-stats-row">
-                  <span>Dmg: <strong>{{ weaponDamage(equippedWeapon.catalogId) }}</strong></span>
-                  <span>Durability: <strong>{{ equippedWeapon.currentDurability }} / {{ equippedWeapon.maxDurability }}</strong></span>
-                  <span v-if="equippedWeapon.currentDurability < equippedWeapon.maxDurability" class="repair-cost-tag">
-                    Service Fee: {{ equippedWeapon.repairCost }} ¢
-                  </span>
-                </div>
-                <div class="durability-meter">
-                  <div class="durability-bar" :style="{
-                    width: `${Math.round((equippedWeapon.currentDurability / equippedWeapon.maxDurability) * 100)}%`,
-                    backgroundColor: (equippedWeapon.currentDurability / equippedWeapon.maxDurability) <= 0.25 ? '#e63946' : ((equippedWeapon.currentDurability / equippedWeapon.maxDurability) <= 0.5 ? '#f4a261' : '#2a9d8f')
-                  }"></div>
-                </div>
-              </div>
-              <div class="weapon-card-actions">
-                <button
-                  v-if="equippedWeapon.currentDurability < equippedWeapon.maxDurability"
-                  class="secondary mini-btn repair-btn"
-                  :disabled="outfitterActionPending || coins < equippedWeapon.repairCost"
-                  @click="repairWeapon(equippedWeapon.instanceId)"
-                >
-                  Repair ({{ equippedWeapon.repairCost }} ¢)
-                </button>
-                <button
-                  class="secondary mini-btn appraise-btn"
-                  :disabled="appraising"
-                  @click="requestAppraisal(equippedWeapon.catalogId, equippedWeapon.name, equippedWeapon.currentDurability * 10)"
-                >
-                  Appraise
-                </button>
-              </div>
-            </div>
-            <p v-else class="empty">No weapon equipped. Standard issue fallback in effect.</p>
-
-            <!-- OWNED WEAPONS IN STORAGE -->
-            <div class="outfitter-subheading" style="margin-top: 20px;">
-              <p class="eyebrow">OWNED ARSENAL ({{ ownedWeapons.length }} weapons)</p>
-            </div>
-            <div v-if="ownedWeapons.length" class="weapons-grid">
-              <div v-for="wpn in ownedWeapons" :key="wpn.instanceId" class="weapon-card" :class="{ 'is-equipped': equippedWeapon?.instanceId === wpn.instanceId }" v-bind="rarityAttributes(wpn.rarity)">
+          <div class="preparation-content">
+            <div>
+              <p class="eyebrow">EQUIPPED WEAPON</p>
+              <div v-if="equippedWeapon" class="weapon-card equipped-weapon-card" v-bind="rarityAttributes(equippedWeapon.rarity)">
                 <div class="weapon-main-info">
                   <div class="weapon-title-row">
-                    <span v-if="equippedWeapon?.instanceId === wpn.instanceId" class="equipped-tag">ACTIVE</span>
-                    <strong>{{ wpn.name }}</strong>
-                    <span class="rarity-badge">{{ rarityName(wpn.rarity) }}</span>
+                    <span class="equipped-tag">ACTIVE</span>
+                    <strong>{{ equippedWeapon.name }}</strong>
+                    <span class="rarity-badge">{{ rarityName(equippedWeapon.rarity) }}</span>
                   </div>
+                  <small class="weapon-flavor">{{ equippedWeapon.flavor }}</small>
                   <div class="weapon-stats-row">
-                    <span>Dmg: {{ weaponDamage(wpn.catalogId) }}</span>
-                    <span>Dur: {{ wpn.currentDurability }}/{{ wpn.maxDurability }}</span>
+                    <span>Damage: {{ weaponDamage(equippedWeapon.catalogId) }}</span>
+                    <span>Durability: {{ equippedWeapon.currentDurability }} / {{ equippedWeapon.maxDurability }}</span>
                   </div>
-                  <div class="durability-meter">
-                    <div class="durability-bar" :style="{
-                      width: `${Math.round((wpn.currentDurability / wpn.maxDurability) * 100)}%`,
-                      backgroundColor: (wpn.currentDurability / wpn.maxDurability) <= 0.25 ? '#e63946' : ((wpn.currentDurability / wpn.maxDurability) <= 0.5 ? '#f4a261' : '#2a9d8f')
-                    }"></div>
-                  </div>
-                </div>
-                <div class="weapon-card-actions">
-                  <button
-                    v-if="equippedWeapon?.instanceId !== wpn.instanceId"
-                    class="primary mini-btn"
-                    :disabled="outfitterActionPending"
-                    @click="equipWeapon(wpn.instanceId)"
-                  >
-                    Equip
-                  </button>
-                  <button
-                    v-if="wpn.currentDurability < wpn.maxDurability"
-                    class="secondary mini-btn repair-btn"
-                    :disabled="outfitterActionPending || coins < wpn.repairCost"
-                    @click="repairWeapon(wpn.instanceId)"
-                  >
-                    Repair ({{ wpn.repairCost }} ¢)
-                  </button>
-                  <button
-                    class="secondary mini-btn appraise-btn"
-                    :disabled="appraising"
-                    @click="requestAppraisal(wpn.catalogId, wpn.name, wpn.currentDurability * 10)"
-                  >
-                    Appraise
-                  </button>
                 </div>
               </div>
+              <p v-else class="empty">No committed weapon is currently projected.</p>
             </div>
 
-            <!-- SHOP WEAPONS REQUISITION -->
-            <div class="outfitter-subheading" style="margin-top: 24px;">
-              <p class="eyebrow">DESPERANZA QUARTERMASTER / WEAPON REQUISITIONS</p>
-            </div>
-            <div v-if="shopCatalog?.weapons.length" class="weapons-grid">
-              <div v-for="shopWpn in shopCatalog.weapons" :key="shopWpn.id" class="weapon-card shop-weapon-card" v-bind="rarityAttributes(shopWpn.rarity)">
-                <div class="weapon-main-info">
+            <div>
+              <p class="eyebrow">OWNED WEAPONS ({{ ownedWeapons.length }})</p>
+              <div v-if="ownedWeapons.length" class="weapons-grid">
+                <div v-for="weapon in ownedWeapons" :key="weapon.instanceId" class="weapon-card" v-bind="rarityAttributes(weapon.rarity)">
                   <div class="weapon-title-row">
-                    <strong>{{ shopWpn.name }}</strong>
-                    <span class="rarity-badge">{{ rarityName(shopWpn.rarity) }}</span>
-                    <strong class="shop-price">{{ shopWpn.value === 0 ? 'FREE' : `${shopWpn.value} ¢` }}</strong>
+                    <span v-if="equippedWeapon?.instanceId === weapon.instanceId" class="equipped-tag">EQUIPPED</span>
+                    <strong>{{ weapon.name }}</strong>
+                    <span class="rarity-badge">{{ rarityName(weapon.rarity) }}</span>
                   </div>
-                  <small class="weapon-flavor">{{ shopWpn.flavor }}</small>
                   <div class="weapon-stats-row">
-                    <span>Base Dmg: {{ shopWpn.damageMin }}–{{ shopWpn.damageMax }} (x{{ shopWpn.damageMultiplier }})</span>
-                    <span>Dur: {{ shopWpn.durabilityMax }}</span>
-                    <span>Service: {{ shopWpn.repairCost }} ¢</span>
+                    <span>Damage: {{ weaponDamage(weapon.catalogId) }}</span>
+                    <span>Durability: {{ weapon.currentDurability }} / {{ weapon.maxDurability }}</span>
                   </div>
                 </div>
-                <div class="weapon-card-actions">
-                  <button
-                    class="primary mini-btn buy-btn"
-                    :disabled="outfitterActionPending || (shopWpn.value > 0 && coins < shopWpn.value)"
-                    @click="purchaseShopItem(shopWpn.id, 1)"
-                  >
-                    {{ shopWpn.value === 0 ? 'Claim Free' : `Buy (${shopWpn.value} ¢)` }}
-                  </button>
-                  <button
-                    class="secondary mini-btn appraise-btn"
-                    :disabled="appraising"
-                    @click="requestAppraisal(shopWpn.id, shopWpn.name, shopWpn.value)"
-                  >
-                    Appraise
-                  </button>
-                </div>
               </div>
+              <p v-else class="empty">No owned weapons are currently projected.</p>
             </div>
-          </div>
 
-          <!-- TAB 2: FIELD SUPPLIES -->
-          <div v-if="outfitterTab === 'supplies'" class="outfitter-content">
-            <div class="outfitter-subheading">
-              <p class="eyebrow">FIELD CONSUMABLES CATALOG (STORED IN HOME PREP)</p>
-            </div>
-            <div v-if="shopCatalog?.supplies.length" class="supplies-grid">
-              <div v-for="item in shopCatalog.supplies" :key="item.id" class="supply-card" v-bind="rarityAttributes(item.rarity)">
-                <div class="supply-card-header">
-                  <div>
-                    <strong>{{ item.name }}</strong>
-                    <span class="supply-cat-tag" :class="item.category.toLowerCase()">{{ item.category === 'Medical' ? 'MED' : 'SHIELD' }}</span>
-                  </div>
-                  <strong class="shop-price">{{ item.value }} ¢</strong>
-                </div>
-                <small class="supply-flavor">{{ item.flavor }}</small>
-                <div class="supply-effects">
-                  <span v-if="item.healAmount > 0">Heals: +{{ item.healAmount }} HP</span>
-                  <span v-if="item.reviveAmount > 0">Revive: +{{ item.reviveAmount }} HP</span>
-                  <span v-if="item.chargeAmount > 0">Shield: +{{ item.chargeAmount }} pts</span>
-                </div>
-                <div class="supply-owned-stock">
-                  <span>Home Prep Stock: <strong>{{ getOwnedSupplyQuantity(item.id) }}</strong></span>
-                </div>
-                <div class="supply-card-actions">
-                  <button
-                    class="primary mini-btn"
-                    :disabled="outfitterActionPending || coins < item.value"
-                    @click="purchaseShopItem(item.id, 1)"
-                  >
-                    Buy 1 ({{ item.value }} ¢)
-                  </button>
-                  <button
-                    v-if="coins >= item.value * 5"
-                    class="secondary mini-btn"
-                    :disabled="outfitterActionPending"
-                    @click="purchaseShopItem(item.id, 5)"
-                  >
-                    Buy 5 ({{ item.value * 5 }} ¢)
-                  </button>
-                  <button
-                    class="secondary mini-btn appraise-btn"
-                    :disabled="appraising"
-                    @click="requestAppraisal(item.id, item.name, item.value)"
-                  >
-                    Appraise
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- TAB 3: LOADOUT STAGING -->
-          <div v-if="outfitterTab === 'staging'" class="outfitter-content">
             <div class="staging-banner">
               <div>
-                <p class="eyebrow">FIELD LOADOUT PREPARATION</p>
-                <h3>Consumable Tactical Deployment</h3>
-                <span class="staging-g5-badge">(Prepared for Field / Active in G5)</span>
+                <p class="eyebrow">RAIDER-OWNED SUPPLIES</p>
+                <h3>Field stock and staged loadout</h3>
               </div>
               <div class="staging-limits-summary">
-                <div :class="{ limitReached: stagedMedicalCount >= 4 }">
+                <div>
                   <span class="label">MEDICAL STAGED</span>
-                  <strong>{{ stagedMedicalCount }} / 4 max</strong>
+                  <strong>{{ stagedSupplies.filter(item => item.category === 'Medical').reduce((count, item) => count + item.quantity, 0) }} / 4</strong>
                 </div>
-                <div :class="{ limitReached: stagedRechargerCount >= 2 }">
+                <div>
                   <span class="label">RECHARGERS STAGED</span>
-                  <strong>{{ stagedRechargerCount }} / 2 max</strong>
+                  <strong>{{ stagedSupplies.filter(item => item.category === 'ShieldRecharger').reduce((count, item) => count + item.quantity, 0) }} / 2</strong>
                 </div>
               </div>
             </div>
-
-            <p class="panel-note">Consumables staged here are packed into the Raider's loadout for field encounters. Unused supplies remain safe in inventory across returns.</p>
-
-            <div v-if="shopCatalog?.supplies.length" class="staging-items-list">
-              <div v-for="supply in shopCatalog.supplies" :key="supply.id" class="staging-row" v-bind="rarityAttributes(supply.rarity)">
+            <div v-if="ownedSupplies.length" class="staging-items-list">
+              <div v-for="supply in ownedSupplies" :key="supply.catalogId" class="staging-row" v-bind="rarityAttributes(supply.rarity)">
                 <div class="staging-row-info">
                   <strong>{{ supply.name }}</strong>
                   <span class="supply-cat-tag" :class="supply.category.toLowerCase()">{{ supply.category === 'Medical' ? 'MED' : 'SHIELD' }}</span>
-                  <small>Owned in prep: {{ getOwnedSupplyQuantity(supply.id) }}</small>
-                </div>
-                <div class="staging-controls">
-                  <button
-                    type="button"
-                    class="secondary mini-btn"
-                    :disabled="(stagedDraft[supply.id] ?? 0) <= 0"
-                    @click="adjustStagedDraft(supply.id, -1, supply.category)"
-                  >
-                    –
-                  </button>
-                  <span class="staged-qty-display">{{ stagedDraft[supply.id] ?? 0 }}</span>
-                  <button
-                    type="button"
-                    class="secondary mini-btn"
-                    :disabled="(stagedDraft[supply.id] ?? 0) >= getOwnedSupplyQuantity(supply.id) || (supply.category === 'Medical' && stagedMedicalCount >= 4) || (supply.category === 'ShieldRecharger' && stagedRechargerCount >= 2)"
-                    @click="adjustStagedDraft(supply.id, +1, supply.category)"
-                  >
-                    +
-                  </button>
+                  <small>Owned: {{ supply.quantity }}</small>
+                  <small>Staged: {{ stagedSupplies.find(item => item.catalogId === supply.catalogId)?.quantity ?? 0 }}</small>
                 </div>
               </div>
             </div>
+            <p v-else class="empty">No medical or shield stock is currently owned.</p>
 
-            <div class="staging-actions">
-              <button
-                class="primary"
-                :disabled="outfitterActionPending"
-                @click="saveStagedLoadout"
-              >
-                {{ outfitterActionPending ? 'Staging...' : 'Authorize Staged Field Loadout' }}
-              </button>
+            <div>
+              <p class="eyebrow">SHARED DESPERANZA TRADER STOCK / CYCLE {{ handlerProjection?.traderStock?.cycleIndex ?? '—' }}</p>
+              <div v-if="handlerProjection?.traderStock?.items.length" class="staging-items-list">
+                <div v-for="item in handlerProjection.traderStock.items" :key="item.catalogId" class="staging-row">
+                  <div class="staging-row-info">
+                    <strong>{{ item.name }}</strong>
+                    <span class="supply-cat-tag">{{ item.category }}</span>
+                    <small>{{ item.quantity === null ? 'Always available' : item.quantity > 0 ? `Remaining: ${item.quantity}` : 'Sold out this cycle' }}</small>
+                    <small>Catalog price: {{ item.unitPrice }} ¢</small>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="empty">Trader stock is not currently projected.</p>
+            </div>
+
+            <div>
+              <p class="eyebrow">LATEST COMMITTED PREPARATION DECISIONS</p>
+              <p v-if="handlerProjection?.hubErrand" class="current-errand">Now: {{ handlerProjection.hubErrand }}</p>
+              <ol v-if="latestPreparationDecisions.length" class="preparation-decisions">
+                <li v-for="decision in latestPreparationDecisions" :key="`${decision.at}-${decision.kind}-${decision.text}`">
+                  <time>{{ new Date(decision.at).toLocaleTimeString() }}</time> {{ decision.text }}
+                </li>
+              </ol>
+              <p v-else class="empty">No preparation pass has been committed for this Desperanza stay yet.</p>
             </div>
           </div>
         </CollapsiblePanel>
@@ -1383,9 +1038,7 @@ onBeforeUnmount(() => {
           <div class="capacity-meter">
             <div class="capacity-bar" :style="{ width: `${stashCapacityPercent}%`, backgroundColor: stashCapacityPercent >= 90 ? 'var(--color-danger, #e63946)' : 'var(--color-accent, #4cc9f0)' }"></div>
           </div>
-          <p class="stash-subtext">Total Stash Value: <strong>{{ stashValue }} scrap</strong> / Stored items are conserved across raids up to 120 units. Excess units auto-sell on arrival for face value.</p>
-
-          <p v-if="sellSuccessMessage" class="success-notice">{{ sellSuccessMessage }}</p>
+          <p class="stash-subtext">Total Stash Value: <strong>{{ stashValue }} scrap</strong> / Stored items are conserved across raids up to 120 units. Excess units auto-sell for face value; the Raider also sells eligible loot during autonomous preparation. The Handler cannot liquidate stash items.</p>
 
           <div v-if="stashGroups.length" class="stash-groups-list">
             <div v-for="group in stashGroups" :key="group.catalogId" class="stash-group-row" v-bind="itemRarity(group.catalogId)">
@@ -1397,7 +1050,6 @@ onBeforeUnmount(() => {
               <div class="group-values">
                 <span class="unit-price">{{ group.unitValue }} ¢/ea</span>
                 <span class="total-price">{{ group.totalValue }} ¢ total</span>
-                <button class="secondary mini-btn sell-btn" @click="openSellModal(group)">Liquidate</button>
                 <button class="secondary mini-btn appraise-btn" :disabled="appraising" @click="requestAppraisal(group.catalogId, group.name, group.unitValue)">Appraise</button>
               </div>
             </div>
@@ -1775,7 +1427,7 @@ onBeforeUnmount(() => {
           <h2>Who's in the scrapyard?</h2>
           <div v-for="player in projection.players" :key="player.playerId" class="player-row">
             <span><strong>{{ player.displayName }}</strong>
-              <small>{{ player.playerId === session?.playerId ? 'Your Raider' : 'Another actual Raider' }} / {{ player.disposition }}</small>
+              <small>{{ player.playerId === session?.playerId ? 'Your Raider' : 'Another actual Raider' }} / {{ player.primaryTrait }}</small>
               <small>{{ player.location }} / {{ player.activity }}<span v-if="player.destination"> to {{ player.destination }}</span></small></span>
               <small v-if="player.activityEndsAt">{{ secondsRemaining(player.activityEndsAt) }}s</small>
           </div>
@@ -1877,9 +1529,9 @@ onBeforeUnmount(() => {
         <p class="subhead">{{ encounter.reason }}</p>
         <div class="table-scroll">
           <table>
-            <thead><tr><th>Raider</th><th>Disposition</th><th>Greed</th><th>Aptitude</th><th>Bag value</th><th>Initiative</th><th>Score</th></tr></thead>
+            <thead><tr><th>Raider</th><th>Primary trait</th><th>Greed</th><th>Aptitude</th><th>Bag value</th><th>Initiative</th><th>Score</th></tr></thead>
             <tbody><tr v-for="factor in encounter.factors" :key="factor.playerId">
-              <td>{{ factor.displayName }}</td><td>{{ factor.disposition }}</td><td>{{ factor.greed }}</td><td>{{ factor.aptitude }}</td>
+              <td>{{ factor.displayName }}</td><td>{{ factor.primaryTrait }}</td><td>{{ factor.greed }}</td><td>{{ factor.aptitude }}</td>
               <td>{{ factor.backpackValue }}</td><td>{{ factor.initiative }}</td><td>{{ factor.score }}</td>
             </tr></tbody>
           </table>
@@ -1901,50 +1553,6 @@ onBeforeUnmount(() => {
           </table>
         </div>
       </CollapsiblePanel>
-      </div>
-
-      <!-- SELL STASH MODAL DIALOG -->
-      <div v-if="sellingGroup" class="modal-backdrop" @click.self="closeSellModal">
-        <div class="modal-card" v-bind="itemRarity(sellingGroup.catalogId)">
-          <p class="eyebrow">DESPERANZA SCRAP EXCHANGE / LIQUIDATION</p>
-          <h3>Sell {{ sellingGroup.name }}</h3>
-          <p class="panel-note">Unit price: <strong>{{ sellingGroup.unitValue }} ¢</strong> | Stored: <strong>{{ sellingGroup.quantity }} units</strong></p>
-
-          <div class="sell-controls">
-            <label for="sell-quantity">Quantity to liquidate:</label>
-            <div class="qty-input-row">
-              <input
-                id="sell-quantity"
-                type="number"
-                min="1"
-                :max="sellingGroup.quantity"
-                v-model.number="sellQuantity"
-              />
-              <div class="quick-qty-buttons">
-                <button type="button" class="secondary mini-btn" @click="sellQuantity = 1">1</button>
-                <button type="button" class="secondary mini-btn" @click="sellQuantity = Math.max(1, Math.floor(sellingGroup.quantity / 2))">Half</button>
-                <button type="button" class="secondary mini-btn" @click="sellQuantity = sellingGroup.quantity">All ({{ sellingGroup.quantity }})</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="sell-preview">
-            <span class="label">ESTIMATED PROCEEDS</span>
-            <strong class="highlight-coins">+{{ (sellQuantity || 0) * sellingGroup.unitValue }} spendable coins</strong>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="secondary" :disabled="selling" @click="closeSellModal">Cancel</button>
-            <button
-              type="button"
-              class="primary"
-              :disabled="selling || !sellQuantity || sellQuantity < 1 || sellQuantity > sellingGroup.quantity"
-              @click="executeSell(sellingGroup, sellQuantity)"
-            >
-              {{ selling ? 'Liquidating...' : `Confirm Sale (+${(sellQuantity || 0) * sellingGroup.unitValue} ¢)` }}
-            </button>
-          </div>
-        </div>
       </div>
 
       <!-- ITEM APPRAISAL MODAL DIALOG (AI SYSTEMS DESIGN STEP 3) -->

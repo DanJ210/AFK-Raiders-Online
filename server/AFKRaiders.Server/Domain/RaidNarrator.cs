@@ -77,7 +77,7 @@ public sealed record RaiderProjection(
     string PlayerId,
     string Slot,
     string Name,
-    string Disposition,
+    string PrimaryTrait,
     int Health,
     int MaxHealth,
     int Greed,
@@ -97,7 +97,7 @@ public sealed class TemplateRaidNarrator : IRaidNarrator
         {
             var rotates = evt.Details?.TryGetValue("VoiceIndex", out _) == true;
             var voiceIndex = rotates ? long.Parse(evt.Details!["VoiceIndex"], System.Globalization.CultureInfo.InvariantCulture) : evt.Sequence;
-            return $"{evt.OriginalText}\nRaider: {RaiderCommsContent.Line(evt.Kind, evt.Activity, voiceIndex, raider?.Disposition, rotates)}";
+            return $"{evt.OriginalText}\nRaider: {RaiderCommsContent.Line(evt.Kind, evt.Activity, voiceIndex, raider?.PrimaryTrait, rotates)}";
         }
         var name = raider?.Name ?? NarrationContent.Default.Format("narrator.the-operative");
         return evt.Kind switch

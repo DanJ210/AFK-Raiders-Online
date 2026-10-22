@@ -28,6 +28,8 @@ internal static class NarrationContracts
         "voice.robot",
         "voice.exit",
         "voice.hoarder",
+        "voice.brawler",
+        "voice.gadgeteer",
         "voice.general",
         "style.checking",
         "style.surveying",
@@ -38,6 +40,9 @@ internal static class NarrationContracts
         "style.general",
         "style.hub",
         "hub.activities",
+        "hub.errand-recover",
+        "hub.errand-rest-canteen",
+        "hub.errand-rest-outpost",
     ];
 
     internal static readonly IReadOnlyDictionary<string, int> TemplateArguments = new Dictionary<string, int>(StringComparer.Ordinal)
@@ -160,5 +165,8 @@ internal static class NarrationContracts
         ["simulation.autonomously-applied-recovering-hp-hp"] = 5,
         ["simulation.autonomously-triggered-restoring-shield-charge"] = 5,
         ["simulation.it-emits-a-high-pitched"] = 0,
+        ["hub.economy-sold-out"] = 1,
+        ["hub.economy-substitute"] = 3,
+        ["hub.economy-found-weapon"] = 1,
     };
 }

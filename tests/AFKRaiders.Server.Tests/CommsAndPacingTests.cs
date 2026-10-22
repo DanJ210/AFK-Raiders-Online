@@ -86,8 +86,11 @@ public sealed class CommsAndPacingTests
         });
     }
 
-    [Fact]
-    public void CallbackUpdatesJournalBySourceAndActiveThreadWithoutChangingFactsOrLeaking()
+    [Theory]
+    [InlineData(49)]
+    [InlineData(223)]
+    [InlineData(400)]
+    public void CallbackUpdatesJournalBySourceAndActiveThreadWithoutChangingFactsOrLeaking(int length)
     {
         var time = new Clock { Now = Start.AddSeconds(-30) };
         var narrator = new RecordingNarrator();
@@ -102,7 +105,8 @@ public sealed class CommsAndPacingTests
         var source = $"raid:{request.RaidId}:{request.EventSequence}";
         var entry = before.FullJournal!.Single(e => e.SourceEventId == source);
         Assert.Equal("Pending", entry.EnrichmentStatus);
-        const string aside = "I feel strategically embarrassed about my judgment.";
+        const string prefix = "I consider this paperwork ";
+        var aside = prefix + new string('a', length - prefix.Length - 1) + ".";
         request.OnResult!.Invoke(new(aside, "Generated"));
         var after = coordinator.GetHandlerProjection(one.AccessToken);
         var updated = Assert.Single(after.FullJournal!, e => e.SourceEventId == source);
@@ -205,7 +209,7 @@ public sealed class CommsAndPacingTests
         Assert.StartsWith("<|system|>\n", prompt);
         Assert.Contains("<|end|>\n<|user|>\n", prompt);
         Assert.EndsWith("<|end|>\n<|assistant|>\nI consider", prompt);
-        Assert.Contains("complete dry joke of at most 200 characters ending in a period", prompt);
+        Assert.Contains("complete dry joke of at most 400 characters ending in a period", prompt);
         Assert.Contains("First person, physical objects, not digital.", prompt);
         Assert.Contains("No actions, discoveries, other people, rewards or combat.", prompt);
         Assert.Contains("Examples: I distrust socks with executive ambitions. I consider optimism a defective compass.", prompt);
@@ -223,7 +227,7 @@ public sealed class CommsAndPacingTests
     [InlineData("This paperwork feels deeply judgmental.", "NotFirstPerson")]
     [InlineData("I found something shiny in the rubble.", "ForbiddenOutcomeOrActorWord:found")]
     [InlineData("I miss Rosa very much.", "UnknownProperNoun:Rosa")]
-    [InlineData("I", "LengthOutside8To200Characters")]
+    [InlineData("I", "LengthOutside8To400Characters")]
     public void AmbientRejectionHasSpecificReasonWithoutRepairingText(string text, string expectedReason)
     {
         Assert.Null(OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason, "Market"));
@@ -239,19 +243,19 @@ public sealed class CommsAndPacingTests
     }
 
     [Fact]
-    public void AmbientAcceptsFullTwoHundredCharactersAndMoreThanTwentyWordsWithoutTruncating()
+    public void AmbientAcceptsFullFourHundredCharactersAndMoreThanTwentyWordsWithoutTruncating()
     {
-        var text = "I consider " + string.Concat(Enumerable.Repeat("my dusty boots and ", 9)) + "a " + new string('a', 15) + ".";
-        Assert.Equal(200, text.Length);
+        var text = "I consider " + string.Concat(Enumerable.Repeat("my dusty boots and ", 19)) + "a " + new string('a', 25) + ".";
+        Assert.Equal(400, text.Length);
         Assert.True(text.Split(' ').Length > 20);
         Assert.Equal(text, OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason));
         Assert.Null(reason);
         Assert.Equal(text, OnnxGenAiNarrativeGenerator.AmbientLogPreview(text));
         var tooLong = text.Insert(text.Length - 1, "a");
-        Assert.Equal(201, tooLong.Length);
+        Assert.Equal(401, tooLong.Length);
         Assert.Null(OnnxGenAiNarrativeGenerator.ValidateAmbient(tooLong, out reason));
-        Assert.Equal("LengthOutside8To200Characters", reason);
-        Assert.Equal(tooLong[..200], OnnxGenAiNarrativeGenerator.AmbientLogPreview(tooLong));
+        Assert.Equal("LengthOutside8To400Characters", reason);
+        Assert.Equal(tooLong[..400], OnnxGenAiNarrativeGenerator.AmbientLogPreview(tooLong));
     }
 
     [Theory]
@@ -260,6 +264,10 @@ public sealed class CommsAndPacingTests
     [InlineData(141)]
     [InlineData(199)]
     [InlineData(200)]
+    [InlineData(201)]
+    [InlineData(223)]
+    [InlineData(399)]
+    [InlineData(400)]
     public void AmbientPreviewAndAcceptanceKeepTheWholeSentenceUpToTheLimit(int length)
     {
         const string prefix = "I consider this paperwork ";
@@ -276,8 +284,8 @@ public sealed class CommsAndPacingTests
     [InlineData("hurt")]
     public void LongerAsidesStillReportTheExactForbiddenWord(string deniedWord)
     {
-        var text = "I consider " + string.Concat(Enumerable.Repeat("my dusty boots and ", 7)) + deniedWord + ".";
-        Assert.InRange(text.Length, 141, 200);
+        var text = "I consider " + string.Concat(Enumerable.Repeat("my dusty boots and ", 17)) + deniedWord + ".";
+        Assert.InRange(text.Length, 201, 400);
         Assert.Null(OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason));
         Assert.Equal($"ForbiddenOutcomeOrActorWord:{deniedWord}", reason);
     }

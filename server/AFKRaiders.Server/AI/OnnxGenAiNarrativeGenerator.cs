@@ -178,7 +178,7 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
             || (t.Length > 8 && t[^1] is '.' or '!' or '?');
     }
 
-    internal const int AmbientMaxCharacters = 200;
+    internal const int AmbientMaxCharacters = 400;
     internal const int AmbientOutputTokens = 96;
     internal static string AmbientLogPreview(string text) =>
         text.Length > AmbientMaxCharacters ? text[..AmbientMaxCharacters] : text;

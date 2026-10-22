@@ -65,7 +65,7 @@ public sealed class ReviewedLootIntakeTests
     }
 
     [Fact]
-    public void IntakeAppendsSixReviewedEntriesAndKeepsOneFiniteOpportunityPerLocation()
+    public void IntakeKeepsReviewedEntriesAddsFieldWeaponsAndKeepsFiniteOpportunities()
     {
         var catalog = LootCatalog.Default;
         var expectedIds = CatalogCompatibilityTests.C3ItemIds
@@ -73,8 +73,9 @@ public sealed class ReviewedLootIntakeTests
             .Concat(["energy_core_spent", "prototype_chip_faulty"])
             .Concat(["right_boot", "single_sock_fancy", "old_photograph", "broken_servo",
                 "arc_encrypted_drive_broken", "collector_plate_shattered"])
+            .Concat(["aspperigo", "vernerider"])
             .ToArray();
-        Assert.Equal("desperanza-shared-loot-v5", catalog.ContentVersion);
+        Assert.Equal("desperanza-shared-loot-v6", catalog.ContentVersion);
         Assert.Equal(expectedIds, catalog.Items.Select(item => item.Id));
         Assert.Equal(expectedIds, catalog.Pool.Select(entry => entry.CatalogId));
         Assert.Equal(new[] { 35, 30, 25, 20, 18, 15, 22, 18, 25, 18, 20 },
@@ -91,7 +92,10 @@ public sealed class ReviewedLootIntakeTests
             Assert.True(catalog.Pool.Count(entry => catalog.GetItem(entry.CatalogId).EligibilityCategories
                 .Any(opportunity.EligibleCategories.Contains)) >= 5));
         Assert.All(catalog.Opportunities, opportunity => Assert.Equal(2, opportunity.DrawCount));
-        Assert.All(catalog.Items, item => Assert.InRange(item.Value, 5, 35));
+        Assert.All(catalog.Items.Where(item => item.Category != "weapons"),
+            item => Assert.InRange(item.Value, 5, 35));
+        Assert.Equal(new[] { 65, 140 },
+            catalog.Items.Where(item => item.Category == "weapons").Select(item => item.Value));
     }
 
     [Fact]

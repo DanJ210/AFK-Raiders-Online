@@ -9,7 +9,7 @@ Use source material only for the broad function: hub vendors give the player rec
 | Trader archetype | Canon identity | Content hooks |
 |---|---|---|
 | Pawn Desk | A valuation counter where cracked mugs become investment vehicles if described with enough confidence. | Stash overflow, sell jokes, extraction greed, future market UI. |
-| Gear Weirdos | Loadout sellers who believe every refurbished battery, shield plate, or cable has a destiny. | Shields, rechargers, risky purchases, deployment pep talks. |
+| Gear Weirdos | Loadout sellers who believe every refurbished battery, shield plate, or cable has a destiny. | Finite shared cycle stock, weapon offers, repairs, truthful sold-out/substitution Comms, and deployment pep talks. |
 | Coupon Barons | Discount mathematicians who treat barter rates like diplomacy. | Hub gossip, bargain events, coin jokes, mood penalties. |
 | Nearly Fresh Counter | Food vendors with a flexible legal relationship to freshness. | Mood events, snacks, healing-adjacent flavor, ration jokes. |
 | Bravado Battery Kiosk | A power stall where every cell is marketed as courageous. | Shield rechargers, battery loot, humming equipment jokes. |
@@ -17,6 +17,8 @@ Use source material only for the broad function: hub vendors give the player rec
 | OopsAll Claims Window | A logistics desk that can explain why the package is wrong but not where the correct one went. | Field caches, mislabeled crates, route errors, loot table flavor. |
 | Exit Strategy Booth | A map and extraction-advice stall with confidence inversely related to accuracy. | Extraction panic, route cards, LZ complications, greed warnings. |
 | HushTone Whisper Stall | A quiet-device vendor who speaks too softly near machines that listen too well. | Radio static, stealth jokes, Tattletale irony, signal flavor. |
+| Stitch-It Aid Window | A medical counter whose bandages come pre-folded with reassuring opinions. | HUB-5 errand stop for autonomous medical-supply purchases; healing confidence jokes. |
+| Last Call Canteen | A pub serving synth-coffee strong enough to count as a debrief. | HUB-5 optional rest stop after errands; morale and gossip flavor. |
 
 ## Writing Rules
 
@@ -39,3 +41,5 @@ Use source material only for the broad function: hub vendors give the player rec
 | OopsAll Claims Window | `hub_oopsall_claims_window_wrong_box`, `raid_oopsall_misdelivery_cache` |
 | Exit Strategy Booth | `hub_exit_strategy_booth_bad_map`, `raid_exit_strategy_bad_map` |
 | HushTone Whisper Stall | `raid_hushtone_static_confession` |
+| Stitch-It Aid Window | HUB-5 errand label/decision text (`RaidCoordinator.SupplyDesk`) |
+| Last Call Canteen | `hub.errand-rest-canteen` narration pool |

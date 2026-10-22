@@ -21,9 +21,10 @@ public static class LootEligibilityCategory
     public const string Salvage = "Salvage";
     public const string Robot = "Robot";
     public const string Technology = "Technology";
+    public const string Weapons = "Weapons";
 
     public static bool IsKnown(string category) =>
-        category is Residential or Salvage or Robot or Technology;
+        category is Residential or Salvage or Robot or Technology or Weapons;
 }
 
 /// <summary>
@@ -89,7 +90,7 @@ public interface ILootCatalog
 /// </summary>
 public sealed class LootCatalog : ILootCatalog
 {
-    public const string DefaultContentVersion = "desperanza-shared-loot-v5";
+    public const string DefaultContentVersion = "desperanza-shared-loot-v6";
 
     private readonly Dictionary<string, LootCatalogItem> itemsById;
     private readonly Dictionary<string, OpportunityDefinition> opportunitiesById;
@@ -352,16 +353,34 @@ public sealed class LootCatalog : ILootCatalog
     {
         var opp = opportunitiesById[opportunityId];
         var pool = EligiblePool(opp).ToArray();
-        var min = pool.Min(e => GetItem(e.CatalogId).Value);
-        var max = pool.Max(e => GetItem(e.CatalogId).Value);
+        var weaponWeights = pool.Select(entry =>
+            GetItem(entry.CatalogId).Category.Equals("weapons", StringComparison.OrdinalIgnoreCase)
+                ? entry.DropWeight
+                : 0).ToArray();
+        var nonWeaponItems = pool.Where((_, index) => weaponWeights[index] == 0)
+            .Select(entry => GetItem(entry.CatalogId)).ToArray();
+        var min = nonWeaponItems.Min(item => item.Value);
+        var max = nonWeaponItems.Max(item => item.Value);
+        var otherWeight = pool.Select((entry, index) =>
+            weaponWeights[index] == 0 ? entry.DropWeight : 0).Sum();
         var dangerBias = danger switch
         {
             "Low" => 0.0, "Medium" => 1.0, "High" => 2.0,
             _ => throw new ArgumentException("Unknown danger.", nameof(danger))
         };
-        var weights = pool.Select(e => e.DropWeight * (1 + (max == min ? 0 :
-            (GetItem(e.CatalogId).Value - min) / (double)(max - min)) *
-            Math.Max(0, dangerBias + 4 * Math.Clamp(exposure, 0, 1) + appetite))).ToArray();
+        var otherWeights = pool.Select((entry, index) =>
+        {
+            if (weaponWeights[index] > 0)
+                return 0d;
+            var item = GetItem(entry.CatalogId);
+            var valueBias = max == min ? 0 : (item.Value - min) / (double)(max - min);
+            return entry.DropWeight * (1 + valueBias *
+                Math.Max(0, dangerBias + 4 * Math.Clamp(exposure, 0, 1) + appetite));
+        }).ToArray();
+        var weaponScale = otherWeight == 0 ? 1 : otherWeights.Sum() / otherWeight;
+        var weights = pool.Select((entry, index) => weaponWeights[index] > 0
+            ? entry.DropWeight * weaponScale
+            : otherWeights[index]).ToArray();
         var result = new List<WorldItemInstance>();
         for (var draw = 0; draw < opp.DrawCount; draw++)
         {
