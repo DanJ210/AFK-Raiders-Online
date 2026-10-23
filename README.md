@@ -38,6 +38,8 @@ The Handler console shows home/hanging-out, queued, paused, and in-raid status; 
 
 Large Hub, raid, encounter-receipt, and Comms panels can be collapsed with their triangle controls and expanded again as needed. Panels start open; a reserved header gap keeps content clear of the control. Comms appears immediately above the shared Raider, map, and backpack panels. Collapse state lasts only while that panel remains mounted.
 
+Backpack item descriptions keep readable space at narrow panel widths; compact Pocket/Appraise actions wrap beneath the description when needed rather than squeezing it. Layout rule regression tests run with `node --test web\tests\backpackLayout.test.mjs`.
+
 Item cards and rows use a left-edge rarity bar from authoritative catalog metadata, independent of price: **1 Uncommon - gray, 2 Common - green, 3 Rare - blue, 4 Epic - purple, 5 Legendary - yellow, 6 Augmented - orange**. This applies to loot, safe-pocket contents, stash, equipment, supplies/staging, and item summaries/dialogs. Hover text names the rarity; equipment badges also show its name. Augmented is a reserved display tier, not newly implemented loot. Missing/unsupported rarity uses a dashed neutral bar and an unavailable tooltip; catalog loading failures show a retryable warning. Pocket protection remains a separate shield/tag, not a rarity.
 
 The Handler Outfitter mutation surface has been removed. The Raider Loadout & Inventory panel shows committed equipment, owned and staged supplies, coins, primary trait, latest preparation decisions, and current shared trader stock. Trader inventory rotates every ten-minute Hub cycle: the Tea Kettle is always free; one non-starter weapon and three supply types have finite stock at catalog prices. Trader commits are serialized and deduplicated. Preparation values are experimental, not validated balance. Route-retirement and read-only UI assertions run from the workspace root with `node --test web\tests\outfitter.test.mjs`.
@@ -75,7 +77,19 @@ The model path is local configuration, not a bundled model. Set it in the same t
 
 ## G6: autonomous risk, residence and shared conditions (2026-10-14)
 
-Current rules version: **`desperanza-econ-2-v2`**. Core mechanics and return settlement run on the server without inference or mandatory Handler input.
+Current rules version: **`desperanza-bal-0-v1`**. Core mechanics and return settlement run on the server without inference or mandatory Handler input.
+
+Terminal raid defeat loses the equipped gun, unprotected backpack loot and all remaining carried supplies. The one designated Secret Hidden Pocket item is still secured. Weapons, supplies, stash and coins left at home are not death penalties; subsequent autonomous preparation can still spend or sell them normally. Successful extraction retains the equipped weapon with the existing one-point wear and returns unused carried supplies. Loss settlement happens once and appears in owner-private Comms and the return report; autonomous recovery can equip a home weapon or obtain the free Tea Kettle rather than restoring the lost instance.
+
+**BAL-0 measurement (2026-10-22):** the home dashboard's **Raider stats** panel shows committed-event counts for the owner's Raider in total and by danger (raids, knockout rate, HP lost to robots vs hazards, medical/revive/recharger use, robot fights and outcomes, crossed paths, shared searches, contests, loot secured/lost, weapons found/lost) plus autonomous economy totals. Stats count each settlement and trade once, are never advanced by polling, and live in server memory: they reset on restart. The durable review artifact is the deterministic [BAL-0 baseline report](docs/balance/BAL-0-baseline.md). Regenerate it after rule changes:
+
+```powershell
+$env:AFK_BALANCE_REPORT_PATH = "$PWD\docs\balance\BAL-0-baseline.md"
+# Optional: $env:AFK_BALANCE_SEEDS = 24; $env:AFK_BALANCE_HOURS = 8
+dotnet test tests\AFKRaiders.Server.Tests\AFKRaiders.Server.Tests.csproj --filter "FullyQualifiedName~WriteBalanceReportWhenRequested"
+```
+
+`desperanza-bal-0-v1` also fixes autonomous packing: Raiders now stage medical supplies and rechargers they already own, instead of hoarding them at home and raiding without healing. Balance values remain experimental; weapons do not yet affect robot damage (BAL-1).
 
 - One world-scoped zone/condition/danger profile: Light Fog (Low), Apology Weather (Medium), or Overtime Red (High). Greed carried by eligible Raiders affects the next world's condition pool, not individual weather copies. Forecasts precede environmental impacts by 10 seconds; only actual living, nontraveling occupants at impact time are affected.
 - Greed grows while staying and searching; mood changes with damage/healing/support. Positive mood trims up to 5 raw damage before shields. Calm lowers greed by 12 and raises mood by 3; Pressure raises greed by 10 and lowers mood by 2. These change extraction willingness, valuable-item appetite and resilience, not just dialogue.
@@ -102,6 +116,8 @@ New failed live requests distinguish `Rejected:<validation reason>`, `InferenceD
 
 **Actor/outcome word configuration:** These safeguards are code-owned in [OnnxGenAiNarrativeGenerator.cs](server/AFKRaiders.Server/AI/OnnxGenAiNarrativeGenerator.cs), not the authored narration JSON or appsettings. `DeniedWords` contains outcome/discovery/reward/combat terms (for example `found`, `won`, `hurt`, `loot`) and other-actor terms/pronouns (for example `raider`, `someone`, `they`, `we`). `AllowedTermsFor` derives proper nouns from authoritative location/condition context and grants robot-vocabulary/name exemptions only for robot events. `ValidateAmbientCore` checks the list, and `ForbiddenOutcomeOrActorWord:<word>` names the exact blocked token. A harmless metaphor can still hit this conservative word filter; length changes do not remove that guard. Generation and delivery use the same validation. Specific false-positive policy changes need reviewed examples rather than disabling all actor/outcome checks.
 
+**Grounded possessives (COMMS-6):** Name and denied-word checks compare the base of ASCII `'s` possessives without changing accepted prose. For example, `Entry Tunnel's` is allowed when the server context contains `Entry Tunnel`; an unknown `Rosa's` still fails, and `robot's` remains blocked outside robot contexts. The reported 226-character tunnel aside passes intact at generation validation and journal delivery. This fixes a name-validation false positive, not a length or inference-budget problem; all existing limits remain.
+
 **Narration follow-up verification:** 157/157 server regressions passed (excluding the unchanged, previously verified eight-hour mechanics audit), 7/7 frontend tests and production build passed. Installed-model smoke accepted 6/6 distinct asides in 5.99-9.29s; native cancellation returned an explicit reason in 0.19s. An isolated live-model browser verified actual AI-enhanced/Ready journal delivery and expanded details. These samples do not prove the cause of the historical 41 failures or guarantee future acceptance. Restart your development backend to load the changes; this clears its existing in-memory sessions/results.
 
 Reviewed original content at `f62d088a41da951a1fbe9ed7215d2957a933ce50`: `src/content/zones/zone_conditions.json`, `zones/zones.json`, `robots.json`, `healing_items.json`, `raiding-events/ambient_events.json`, and `robot_encounter_activities.json`. Adapted themes/names under the tone/legal rules; no legacy simulation, saves or balance imported.
@@ -116,7 +132,7 @@ $env:AFK_AI_MODEL_PATH = 'C:\Users\DanJ2\Models\Phi-3.5-mini-onnx'
 dotnet run --project server\AFKRaiders.Server
 ```
 
-Reload and re-enroll after startup; check for `desperanza-econ-2-v2`. Restart clears in-memory duty, inventory and results. Model initialization may take a minute; authored gameplay/narration does not wait on inference.
+Reload and re-enroll after startup; check for `desperanza-bal-0-v1`. Restart clears in-memory duty, inventory and results. Model initialization may take a minute; authored gameplay/narration does not wait on inference.
 
 ### Historical pre-G6 Comms and area residence (2026-10-13)
 

@@ -172,6 +172,113 @@ public sealed class SurvivalMechanicsTests
         Assert.Equal(weaponInstanceId, updated.EquippedWeapon?.InstanceId);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TerminalSettlement_LosesOnlyCarriedEquipmentOnDefeat_AndCommitsOnce(bool protectPocket)
+    {
+        var defeats = 0;
+        var extractions = 0;
+        var pocketSalvages = 0;
+        for (var seed = 0; seed < 32; seed++)
+        {
+            var clock = new ManualTime();
+            var coordinator = new RaidCoordinator(clock, nextSeed: () => seed, traderSeed: 83);
+            var token = coordinator.EnrollHandler("raider-one", $"loss-{seed}").AccessToken;
+            coordinator.ResetPreparationForTesting(token, coins: seed % 2 == 0 ? 30 : 120, arrivedAt: clock.Now);
+            clock.Now += TimeSpan.FromSeconds(590);
+            coordinator.AdvanceRaids();
+            var prepared = coordinator.GetHandlerProjection(token);
+            var equipped = Assert.IsType<OwnedWeapon>(prepared.EquippedWeapon);
+            var homeWeapons = prepared.OwnedWeapons!.Where(w => w.InstanceId != equipped.InstanceId).ToArray();
+
+            clock.Now += TimeSpan.FromSeconds(10);
+            coordinator.AdvanceRaids();
+            var admitted = coordinator.GetHandlerProjection(token);
+            Assert.NotNull(admitted.Raid);
+            var homeStock = admitted.SupplyStock!.ToDictionary(s => s.CatalogId, s => s.Quantity);
+            var homeStash = admitted.Stash!.ToArray();
+            var coins = admitted.Coins;
+            coordinator.SetDuty(token, false);
+            string? pocketId = null;
+
+            for (var elapsed = 5; elapsed <= 1500; elapsed += 5)
+            {
+                clock.Now += TimeSpan.FromSeconds(5);
+                coordinator.AdvanceRaids();
+                var current = coordinator.GetHandlerProjection(token);
+                if (current.LastReturnSummary is not null)
+                    break;
+                if (protectPocket && pocketId is null && current.Raid?.MyInventory.FirstOrDefault() is { } item)
+                {
+                    var response = coordinator.DesignateHiddenPocket(token, new($"pocket-{seed}", item.InstanceId));
+                    Assert.True(response.Success);
+                    pocketId = item.InstanceId;
+                }
+            }
+
+            var returned = coordinator.GetHandlerProjection(token);
+            var summary = Assert.IsType<ReturnSummaryView>(returned.LastReturnSummary);
+            Assert.Equal(coins, returned.Coins);
+            foreach (var weapon in homeWeapons)
+                Assert.Contains(weapon, returned.OwnedWeapons!);
+            var losses = returned.FullJournal!.Where(e => e.Kind == "WeaponLost").ToArray();
+            if (summary.Outcome == "KnockedOut")
+            {
+                defeats++;
+                Assert.DoesNotContain(returned.OwnedWeapons!, w => w.InstanceId == equipped.InstanceId);
+                Assert.NotEqual(equipped.InstanceId, returned.EquippedWeapon?.InstanceId);
+                Assert.Single(losses);
+                Assert.Contains(equipped.Name, losses[0].Text);
+                Assert.Contains($"Equipped weapon lost: {equipped.Name}", summary.Highlights);
+                Assert.Equal(homeStock, returned.SupplyStock!.ToDictionary(s => s.CatalogId, s => s.Quantity));
+                if (pocketId is not null)
+                {
+                    pocketSalvages++;
+                    Assert.Equal(pocketId, Assert.Single(summary.Items).InstanceId);
+                }
+                else
+                {
+                    Assert.Empty(summary.Items);
+                    Assert.Equal(homeStash, returned.Stash);
+                }
+            }
+            else
+            {
+                extractions++;
+                Assert.Equal("Extracted", summary.Outcome);
+                Assert.Empty(losses);
+                var retained = Assert.Single(returned.OwnedWeapons!, w => w.InstanceId == equipped.InstanceId);
+                Assert.Equal(equipped.CurrentDurability - 1, retained.CurrentDurability);
+                foreach (var supply in returned.SupplyStock!)
+                    Assert.True(supply.Quantity >= homeStock.GetValueOrDefault(supply.CatalogId));
+            }
+
+            Parallel.For(0, 8, _ => coordinator.AdvanceRaids());
+            var retried = coordinator.GetHandlerProjection(token);
+            Assert.Equal(returned.OwnedWeapons, retried.OwnedWeapons);
+            Assert.Equal(returned.SupplyStock, retried.SupplyStock);
+            Assert.Equal(returned.Stash, retried.Stash);
+            Assert.Equal(returned.Coins, retried.Coins);
+            Assert.Equal(losses.Length, retried.FullJournal!.Count(e => e.Kind == "WeaponLost"));
+            if (summary.Outcome == "KnockedOut")
+            {
+                clock.Now += TimeSpan.FromMinutes(10);
+                coordinator.AdvanceRaids();
+                var recovered = coordinator.GetHandlerProjection(token);
+                Assert.NotNull(recovered.EquippedWeapon);
+                Assert.False(recovered.EquippedWeapon.IsBroken);
+                Assert.DoesNotContain(recovered.OwnedWeapons!, w => w.InstanceId == equipped.InstanceId);
+                Assert.Single(recovered.FullJournal!, e => e.Kind == "WeaponLost");
+            }
+        }
+
+        Assert.True(defeats > 0, "The seeded cohort must exercise terminal defeat.");
+        Assert.True(extractions > 0, "The seeded cohort must preserve successful extraction.");
+        if (protectPocket)
+            Assert.True(pocketSalvages > 0, "Defeat must exercise the designated pocket exception.");
+    }
+
     [Fact]
     public void HandlerSupportActions_ConsumeSignal_AndAreIdempotent()
     {

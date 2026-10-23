@@ -62,7 +62,7 @@ public sealed class NarrationCompatibilityTests(ITestOutputHelper output)
             }
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
         output.WriteLine($"Current narration and simulation fingerprint: {hash}");
-        // ECON-2 v2 intentionally changes the rules version for damaged field weapon finds.
-        Assert.Equal("2F08B779B7D6147A46A18D9EEC2852BE753216180A249FA80225F2DBFA76541D", hash);
+        // BAL-0 changes only the simulation's advertised rules version; supply staging is coordinator/policy-owned.
+        Assert.Equal("AADD06938FEC946BE083BF1AC9851EDFD4430CF4BCE953C34A492C606C11B01A", hash);
     }
 }

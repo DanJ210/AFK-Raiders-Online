@@ -30,6 +30,7 @@ public sealed class RaiderEconomyTests
         Assert.Equal(first.SupplyPurchases, second.SupplyPurchases);
         Assert.Equal(first.StagedSupplies, second.StagedSupplies);
         Assert.Equal(first.ReserveFloor, second.ReserveFloor);
+        Assert.Equal(first.RepairReserveFloor, second.RepairReserveFloor);
     }
 
     [Fact]
@@ -100,6 +101,25 @@ public sealed class RaiderEconomyTests
         Assert.False(repairPlan.CreateTeaKettleFallback);
         Assert.Equal(brokenKettle.InstanceId, repairPlan.WeaponInstanceIdToRepair);
         Assert.Null(repairPlan.WeaponInstanceIdToEquip);
+    }
+
+    [Fact]
+    public void FreeRecoveryRepairDoesNotRequireTheReserveOfADifferentOwnedWeapon()
+    {
+        var kettle = ShopCatalog.CreateWeaponInstance(ShopCatalog.GetStarterWeapon(), "broken-kettle")
+            with { CurrentDurability = 0 };
+        var aspperigo = ShopCatalog.CreateWeaponInstance(ShopCatalog.Weapons[1], "found-asp")
+            with { CurrentDurability = 2 };
+        var plan = Decide(seed: 0, coins: 10, weapons: [kettle, aspperigo],
+            equippedWeaponId: kettle.InstanceId);
+
+        Assert.Equal(kettle.InstanceId, plan.WeaponInstanceIdToRepair);
+        Assert.Equal(aspperigo.InstanceId, plan.WeaponInstanceIdToEquip);
+        Assert.Equal(4, plan.RepairReserveFloor);
+        Assert.Equal(aspperigo.RepairCost, plan.ReserveFloor);
+        Assert.True(10 - kettle.RepairCost >= plan.RepairReserveFloor);
+        Assert.True(10 < plan.ReserveFloor);
+        Assert.Empty(plan.SupplyPurchases);
     }
 
     [Fact]
@@ -222,6 +242,25 @@ public sealed class RaiderEconomyTests
             });
         Assert.Equal(1, Assert.Single(supplyPlan.SupplyPurchases).Quantity);
         Assert.Equal("bandage_white", supplyPlan.SupplyPurchases[0].CatalogId);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void OwnedSuppliesAreStagedWhenTheTraderHasNoneOfThem(int seed)
+    {
+        // The packing stop re-decides with an empty trader map; owned stock must still be packed.
+        var plan = Decide(seed,
+            supplyStock: new Dictionary<string, int> { ["bandage_white"] = 2 },
+            traderStock: new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.Empty(plan.SupplyPurchases);
+        Assert.True(plan.UpdateStagedSupplies);
+        var staged = Assert.Single(plan.StagedSupplies);
+        Assert.Equal("bandage_white", staged.CatalogId);
+        Assert.Equal(Math.Min(2, ShopCatalog.MaxStagedMedicalCount), staged.Quantity);
     }
 
     private static RaiderPreparationPlan Decide(

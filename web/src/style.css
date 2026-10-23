@@ -385,6 +385,10 @@ th { color: var(--muted); }
 .rarity-item[data-rarity="unavailable"] { border-left-style: dashed; }
 .item-row.rarity-item > span { min-width: 0; overflow-wrap: anywhere; flex: 1; }
 .item-row.rarity-item .item-row-actions { flex-wrap: wrap; justify-content: flex-end; }
+.backpack-panel .item-row { flex-wrap: wrap; padding-block: 10px; }
+.backpack-panel .item-row > span { flex: 1 1 160px; }
+.backpack-panel .item-row-actions { flex: 0 0 auto; max-width: 100%; margin-left: auto; }
+.backpack-panel .item-row-actions > button { width: auto; }
 
 @media (max-width: 900px) {
   .entry-dashboard { grid-template-columns: 1fr 1fr; }
@@ -407,3 +411,4 @@ th { color: var(--muted); }
 .comms-text, .thread-log-entry {
   white-space: pre-line;
 }
+.stats-panel { grid-column: 1 / -1; }

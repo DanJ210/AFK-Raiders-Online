@@ -95,4 +95,43 @@ public sealed class StructuredPromptTests
         Assert.NotNull(OnnxGenAiNarrativeGenerator.ValidateAmbient("I consider the Passive-Aggressor Drone overly sincere.", out _, terms));
         Assert.NotNull(OnnxGenAiNarrativeGenerator.ValidateAmbient("I distrust drones during Apology Weather.", out _, terms));
     }
+
+    [Fact]
+    public void Reported_tunnel_possessive_is_accepted_intact_within_the_existing_limit()
+    {
+        const string text = "I consider my trusty compass a quixotic guide in the Entry Tunnel's scrapyard maze, its needle dancing amidst apology weather's medium-danger whims, as I briskly navigate between metal mountains, leaving no two steps the same.";
+        var terms = OnnxGenAiNarrativeGenerator.AllowedTermsFor(new AmbientCommsContext("Entry Tunnel", "Travel",
+            EventKind: "Travel", Condition: "Apology Weather", Danger: "Medium"));
+        Assert.Equal(226, text.Length);
+        Assert.Equal(text, OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason, terms));
+        Assert.Null(reason);
+        Assert.Equal(text, OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out reason, "Entry Tunnel", "Apology Weather"));
+        Assert.Null(reason);
+    }
+
+    [Theory]
+    [InlineData("I consider the Salvage Yard's creaking deeply theatrical.")]
+    [InlineData("I consider Overtime Red's timing rather theatrical.")]
+    [InlineData("I consider Roomba Prime's brushes overly ambitious.")]
+    public void Grounded_possessives_preserve_robot_context_exemptions(string text)
+    {
+        Assert.Equal(text, OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason,
+            OnnxGenAiNarrativeGenerator.AllowedTermsFor(Robot())));
+        Assert.Null(reason);
+    }
+
+    [Theory]
+    [InlineData("I consider Rosa's compass deeply unreliable.", "UnknownProperNoun:Rosa's")]
+    [InlineData("I consider Roomba's brushes deeply unreliable.", "UnknownProperNoun:Roomba's")]
+    [InlineData("I consider that robot's brushes deeply unreliable.", "ForbiddenOutcomeOrActorWord:robot's")]
+    [InlineData("I consider that raider's compass deeply unreliable.", "ForbiddenOutcomeOrActorWord:raider's")]
+    [InlineData("I consider that reward's timing deeply unreliable.", "ForbiddenOutcomeOrActorWord:reward's")]
+    [InlineData("I consider the Entry Tunnel's compass deeply unreliable.", "UnknownProperNoun:Entry")]
+    public void Possessives_do_not_bypass_unknown_name_or_actor_outcome_guards(string text, string expected)
+    {
+        var terms = OnnxGenAiNarrativeGenerator.AllowedTermsFor(new AmbientCommsContext("Market", "Searching",
+            EventKind: "Search", RobotName: "Roomba Prime"));
+        Assert.Null(OnnxGenAiNarrativeGenerator.ValidateAmbient(text, out var reason, terms));
+        Assert.Equal(expected, reason);
+    }
 }

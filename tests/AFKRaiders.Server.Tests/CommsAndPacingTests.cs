@@ -90,7 +90,8 @@ public sealed class CommsAndPacingTests
     [InlineData(49)]
     [InlineData(223)]
     [InlineData(400)]
-    public void CallbackUpdatesJournalBySourceAndActiveThreadWithoutChangingFactsOrLeaking(int length)
+    [InlineData(226, true)]
+    public void CallbackUpdatesJournalBySourceAndActiveThreadWithoutChangingFactsOrLeaking(int length, bool useReportedAside = false)
     {
         var time = new Clock { Now = Start.AddSeconds(-30) };
         var narrator = new RecordingNarrator();
@@ -106,7 +107,10 @@ public sealed class CommsAndPacingTests
         var entry = before.FullJournal!.Single(e => e.SourceEventId == source);
         Assert.Equal("Pending", entry.EnrichmentStatus);
         const string prefix = "I consider this paperwork ";
-        var aside = prefix + new string('a', length - prefix.Length - 1) + ".";
+        var aside = useReportedAside
+            ? "I consider my trusty compass a quixotic guide in the Entry Tunnel's scrapyard maze, its needle dancing amidst apology weather's medium-danger whims, as I briskly navigate between metal mountains, leaving no two steps the same."
+            : prefix + new string('a', length - prefix.Length - 1) + ".";
+        Assert.Equal(length, aside.Length);
         request.OnResult!.Invoke(new(aside, "Generated"));
         var after = coordinator.GetHandlerProjection(one.AccessToken);
         var updated = Assert.Single(after.FullJournal!, e => e.SourceEventId == source);

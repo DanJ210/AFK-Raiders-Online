@@ -25,7 +25,8 @@ public sealed record RaiderPreparationPlan(
     IReadOnlyList<SupplyPurchasePlan> SupplyPurchases,
     IReadOnlyList<StagedSupplyItem> StagedSupplies,
     bool UpdateStagedSupplies,
-    int ReserveFloor);
+    int ReserveFloor,
+    int RepairReserveFloor);
 
 public static class RaiderEconomyPolicy
 {
@@ -217,8 +218,8 @@ public static class RaiderEconomyPolicy
                 definition.Value <= 0
                     ? 0
                     : Benefit(definition) * SupplyWeight(definition.Category, weights) / definition.Value))
-            .Where(candidate => candidate.Score > 0
-                && (traderStock is null || traderStock.GetValueOrDefault(candidate.Definition.Id) > 0))
+            // Trader stock limits purchases only (checked below); owned stock must stay stageable.
+            .Where(candidate => candidate.Score > 0)
             .OrderByDescending(candidate => candidate.Score)
             .ThenBy(candidate => candidate.CatalogOrder)
             .ThenBy(candidate => candidate.Definition.Id, StringComparer.Ordinal)
@@ -299,7 +300,10 @@ public static class RaiderEconomyPolicy
             supplyPurchases,
             stageChanged ? stagedItems : [],
             stageChanged,
-            Math.Max(percentageReserve, equippedRepairCost));
+            Math.Max(percentageReserve, equippedRepairCost),
+            Math.Max(percentageReserve, weaponToRepair is null
+                ? 0
+                : ownedWeapons.First(weapon => weapon.InstanceId == weaponToRepair).RepairCost));
     }
 
     private static TraitWeights Weights(RaiderPrimaryTrait trait) => trait switch

@@ -5,6 +5,7 @@ import { rarityAttributes, rarityName } from './rarity'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { HubConnectionBuilder, type HubConnection } from '@microsoft/signalr'
 import CollapsiblePanel from './components/CollapsiblePanel.vue'
+import RaiderStatsPanel, { type RaiderStatsView } from './components/RaiderStatsPanel.vue'
 
 type PlayerView = {
   playerId: string; displayName: string; primaryTrait: string; location: string
@@ -154,6 +155,7 @@ type HandlerProjection = {
   latestPreparationDecisions?: { at: string; kind: string; text: string }[] | null
   hubErrand?: string | null
   traderStock?: TraderStockView | null
+  stats?: RaiderStatsView | null
 }
 type HandlerSupportActionResponse = {
   commandId: string
@@ -170,7 +172,7 @@ type DesignateHiddenPocketResponse = {
 }
 type EnrollResponse = { accessToken: string; projection: HandlerProjection }
 
-const expectedRulesVersion = 'desperanza-econ-2-v2'
+const expectedRulesVersion = 'desperanza-bal-0-v1'
 const requestedIdentity = new URLSearchParams(window.location.search).get('handler')
 const slot = ref<'raider-one' | 'raider-two'>(requestedIdentity === 'two' ? 'raider-two' : 'raider-one')
 const session = shallowRef<HandlerAccess | null>(null)
@@ -1192,6 +1194,9 @@ onBeforeUnmount(() => {
             <span><strong>{{ item.name }} / {{ item.value }}</strong><small>{{ item.flavor }}</small></span>
           </div>
           <p v-if="!handlerProjection?.myLastExtractedLoot.length" class="empty">No secured raid result yet.</p>
+        </CollapsiblePanel>
+        <CollapsiblePanel class="panel stats-panel" label="Raider stats">
+          <RaiderStatsPanel :stats="handlerProjection?.stats" />
         </CollapsiblePanel>
       </div>
       <div v-if="projection && isRaidActive" class="active-raid">

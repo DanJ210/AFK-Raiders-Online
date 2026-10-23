@@ -73,7 +73,7 @@ Loot that makes it home goes into the **Stash** — a persistent collection that
    - Buy weapon tiers with coins.
    - Equip exactly one weapon for the next raid.
    - Repair owned weapons in HUB.
-   - Failed raid recovery can remove the currently equipped weapon.
+   - Online death-stakes clarification (2026-10-22): terminal defeat removes the equipped weapon, unprotected raid loot and remaining carried supplies, retaining only the designated one-item Secret Hidden Pocket exception. Home inventory and coins are not forfeited; autonomous preparation can equip a home weapon or obtain the free Tea Kettle. Successful extraction retains the weapon with existing one-point wear.
 - Healing loop:
    - Buy healing items into persistent stock.
    - Stage quantities into raid loadout.
@@ -99,6 +99,7 @@ The Raider now starts each raid with a basic **Makeshift Confidence Shield** lay
 - Shield durability wears down as shield charge is spent.
 - When a shield soaks part of a hit, the active-thread feed shows both the shield loss and the remaining HP damage so the mitigation is visible beside the fight or hazard that caused it.
 - For the MVP, returning to the HUB restores the starter shield to full charge and durability.
+- **Planned change (BAL-1S, user-confirmed 2026-10-22; not yet implemented):** shield durability will persist between raids and will no longer be restored for free. The Raider repairs it autonomously in Desperanza for coins. The deterministic decision belongs in `RaiderEconomyPolicy`, using trait-weighted repair thresholds and a protected coin-reserve floor; it is not a Handler action. Repair cost rises with the amount of durability restored, and harder dangers wear shields faster. Open details are tracked in the [BAL plan](IMPLEMENTATION_PROGRESS.md#bal---danger-difficulty-weapon-relevance-and-robot-loot-plan-proposed-2026-10-22).
 - In future phases, a loadout and store loop can decide which shield is equipped and how it persists.
 
 ### Weapon maintenance
@@ -106,7 +107,7 @@ The Raider now starts each raid with a basic **Makeshift Confidence Shield** lay
 - At zero durability, a weapon stays owned but cannot be equipped or used in combat until repaired in HUB at its catalog repair cost.
 - Online field weapon finds start at 5%-60% durability (confirmed 2026-10-22), rather than full condition; purchased weapons still start full. Existing trait-weighted repair thresholds and affordability checks remain unchanged, so a find does not force an immediate repair.
 - The Raider equips another usable owned weapon when needed. If none remains, the HUB restores/supplies the starter Tea Kettle for free and narrates it. Paid broken gear remains broken; this prevents an offline equipment softlock.
-- Shield rechargers cannot repair a zero-durability shield. Shields retain their existing free full HUB restoration for MVP; no paid shield-repair economy is introduced here.
+- Shield rechargers cannot repair a zero-durability shield. Shields retain their existing free full HUB restoration for MVP; no paid shield-repair economy is introduced here. BAL-1S (planned, see Shields) replaces this with paid autonomous shield repair.
 
 ### Resilience
 Mood also feeds a small hidden **resilience** bonus against robot damage:

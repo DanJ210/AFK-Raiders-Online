@@ -28,10 +28,11 @@ public sealed class RaidCoordinator
     private readonly bool fastPacing;
     private bool committingPriorityPredecessors;
     private readonly Func<int> nextSeed;
+    private readonly Func<string> nextId;
     private DateTimeOffset nextAdmissionAt;
     private string? activeAutonomousRaidId;
 
-    public RaidCoordinator(TimeProvider time, IRaidNarrator? narrator = null, ILootCatalog? catalog = null, INarrativeGenerator? narrativeGenerator = null, bool fastPacing = false, Func<int>? nextSeed = null, int? traderSeed = null)
+    public RaidCoordinator(TimeProvider time, IRaidNarrator? narrator = null, ILootCatalog? catalog = null, INarrativeGenerator? narrativeGenerator = null, bool fastPacing = false, Func<int>? nextSeed = null, int? traderSeed = null, Func<string>? nextId = null)
     {
         this.time = time;
         this.narrator = narrator ?? new TemplateRaidNarrator();
@@ -39,6 +40,7 @@ public sealed class RaidCoordinator
         traderStockGenerator = new TraderStockGenerator(traderSeed ?? RandomNumberGenerator.GetInt32(int.MaxValue), time);
         this.fastPacing = fastPacing;
         this.nextSeed = nextSeed ?? (() => RandomNumberGenerator.GetInt32(int.MaxValue));
+        this.nextId = nextId ?? (() => Guid.NewGuid().ToString("N"));
         this.narrativeGenerator = narrativeGenerator ?? new TemplateNarrativeGenerator();
         nextAdmissionAt = time.GetUtcNow() + AdmissionPulse;
     }
@@ -65,12 +67,13 @@ public sealed class RaidCoordinator
             }
 
             var accessToken = CreateSecret(32);
-            var state = new HandlerState(slot, Guid.NewGuid().ToString("N"), requestId, accessToken)
+            var state = new HandlerState(slot, nextId(), requestId, accessToken)
             {
                 TraitSeed = nextSeed()
             };
             state.EquippedWeaponInstanceId = state.OwnedWeapons[0].InstanceId;
             state.LastSignalRegenAt = time.GetUtcNow();
+            state.Stats.Start(time.GetUtcNow());
             BeginHomeStay(state, time.GetUtcNow(), initial: true);
             handlers.Add(slot, state);
             handlerCredentials.Add(Hash(accessToken), slot);
@@ -318,7 +321,7 @@ public sealed class RaidCoordinator
 
     private void CreateAutonomousWorld(DateTimeOffset at)
     {
-        var raidId = Guid.NewGuid().ToString("N");
+        var raidId = nextId();
         var momentum = EligibleHandlers(at).Select(h => h.Personality?.Greed ?? 0).DefaultIfEmpty(0).Max();
         var simulation = new RaidSimulation(raidId, at, nextSeed(), narrator, catalog, fastPacing: fastPacing,
             conditionMomentum: momentum);
@@ -398,14 +401,27 @@ public sealed class RaidCoordinator
 
             if (handler.SettledRaidIds.Add(world.Simulation.RaidId))
             {
-                // Weapon durability wear upon raid completion
+                OwnedWeapon? lostWeapon = null;
                 if (handler.EquippedWeaponInstanceId is not null)
                 {
                     var wIdx = handler.OwnedWeapons.FindIndex(w => w.InstanceId == handler.EquippedWeaponInstanceId);
                     if (wIdx >= 0)
                     {
                         var w = handler.OwnedWeapons[wIdx];
-                        handler.OwnedWeapons[wIdx] = w with { CurrentDurability = Math.Max(0, w.CurrentDurability - 1) };
+                        if (isKnockedOut)
+                        {
+                            lostWeapon = w;
+                            handler.OwnedWeapons.RemoveAt(wIdx);
+                            handler.EquippedWeaponInstanceId = null;
+                            var lossMessage = $"Lost equipped weapon {w.Name} on raid defeat.";
+                            handler.Events.Add(new HandlerEventView(handler.Events.Count + 1, extractedAt, "WeaponLost", lossMessage));
+                            AddJournalEntry(handler, world.Simulation.RaidId, extractedAt, "WeaponLost", "Hub",
+                                lossMessage, $"hub:weapon-lost:{world.Simulation.RaidId}:{handler.Slot}");
+                        }
+                        else
+                        {
+                            handler.OwnedWeapons[wIdx] = w with { CurrentDurability = Math.Max(0, w.CurrentDurability - 1) };
+                        }
                     }
                 }
 
@@ -426,6 +442,8 @@ public sealed class RaidCoordinator
                 var settledItems = FoundWeaponSettlement.Separate(
                     handler.LastExtractedLoot, handler.OwnedWeapons, catalog);
                 handler.OwnedWeapons.AddRange(settledItems.WeaponsToKeep);
+                handler.Stats.RecordRaid(RaidStatsSample.FromProjection(
+                    projection, handler.PlayerId, isKnockedOut, settledItems.WeaponsToKeep.Count, lostWeapon is not null));
                 var transfer = handler.Stash.TransferHaul(settledItems.StashItems);
                 handler.Coins += transfer.OverflowCoinsGained;
 
@@ -455,6 +473,8 @@ public sealed class RaidCoordinator
                 {
                     var cause = projection.MyCauseOfDefeat ?? "Combat trauma";
                     highlights.Add($"TERMINAL DEFEAT: {cause}");
+                    if (lostWeapon is not null)
+                        highlights.Add($"Equipped weapon lost: {lostWeapon.Name}");
                     var pocketItem = handler.LastExtractedLoot.FirstOrDefault();
                     if (pocketItem is not null)
                     {
@@ -726,6 +746,7 @@ public sealed class RaidCoordinator
         {
             handler.OwnedWeapons.Add(Domain.ShopCatalog.CreateWeaponInstance(
                 Domain.ShopCatalog.GetStarterWeapon(), fallbackId));
+            handler.Stats.RecordEconomy(e => e with { LoanerKettles = e.LoanerKettles + 1 });
         }
         RecordPreparationDecision(handler, at, "PreparationWeaponFallback", "fallback",
             "Issued a free Tea Kettle at the Hatch Authority loaner desk because no usable owned weapon remained.");
@@ -795,6 +816,11 @@ public sealed class RaidCoordinator
                 {
                     var sale = handler.Stash.SellByInstanceIds(chunk);
                     handler.Coins = checked(handler.Coins + sale.CoinsGained);
+                    handler.Stats.RecordEconomy(e => e with
+                    {
+                        ItemsSold = e.ItemsSold + sale.SoldItems.Count,
+                        CoinsFromSales = e.CoinsFromSales + sale.CoinsGained
+                    });
                     RecordPreparationDecision(handler, at, "PreparationSale", action,
                         $"Sold {sale.SoldItems.Count} Home Stash items at the {desk} for {sale.CoinsGained} coins. Balance: {handler.Coins}.");
                 }));
@@ -811,11 +837,19 @@ public sealed class RaidCoordinator
                 var weapon = handler.OwnedWeapons[index];
                 if (weapon.CurrentDurability >= weapon.MaxDurability
                     || handler.Coins < weapon.RepairCost
-                    || handler.Coins - weapon.RepairCost < plan.ReserveFloor)
-                    throw new InvalidOperationException("Preparation repair failed coordinator validation.");
+                    || handler.Coins - weapon.RepairCost < plan.RepairReserveFloor)
+                    throw new InvalidOperationException(
+                        $"Preparation repair failed coordinator validation for {weapon.CatalogId}: " +
+                        $"durability {weapon.CurrentDurability}/{weapon.MaxDurability}, " +
+                        $"coins {handler.Coins}, repair cost {weapon.RepairCost}, reserve {plan.RepairReserveFloor}.");
                 handler.Coins -= weapon.RepairCost;
                 var repaired = weapon with { CurrentDurability = weapon.MaxDurability };
                 handler.OwnedWeapons[index] = repaired;
+                handler.Stats.RecordEconomy(e => e with
+                {
+                    Repairs = e.Repairs + 1,
+                    CoinsOnRepairs = e.CoinsOnRepairs + weapon.RepairCost
+                });
                 RecordPreparationDecision(handler, at, "PreparationRepair", $"repair:{repairId}",
                     $"Repaired {repaired.Name} at the Gear Weirdos repair bench for {weapon.RepairCost} coins. Balance: {handler.Coins}.");
             }));
@@ -849,6 +883,11 @@ public sealed class RaidCoordinator
                     throw new InvalidOperationException("Trader weapon stock changed during a serialized purchase.");
                 handler.Coins -= definition.Value;
                 handler.OwnedWeapons.Add(purchased);
+                handler.Stats.RecordEconomy(e => e with
+                {
+                    WeaponsBought = e.WeaponsBought + 1,
+                    CoinsOnWeapons = e.CoinsOnWeapons + definition.Value
+                });
                 RecordPreparationDecision(handler, at, "PreparationWeaponPurchase", $"weapon:{selectedId}",
                     $"Bought {purchased.Name} at the Gear Weirdos weapon counter for {definition.Value} coins. Balance: {handler.Coins}.");
                 if (!selectedId.Equals(weaponCatalogId, StringComparison.OrdinalIgnoreCase))
@@ -905,6 +944,11 @@ public sealed class RaidCoordinator
                     handler.SupplyStock[selected.Id] = checked(
                         handler.SupplyStock.GetValueOrDefault(selected.Id) + 1);
                     acquired[selected.Id] = acquired.GetValueOrDefault(selected.Id) + 1;
+                    handler.Stats.RecordEconomy(e => e with
+                    {
+                        SuppliesBought = e.SuppliesBought + 1,
+                        CoinsOnSupplies = e.CoinsOnSupplies + selected.Value
+                    });
                     if (!selectedId.Equals(purchase.CatalogId, StringComparison.OrdinalIgnoreCase))
                         RecordSubstitutePurchase(handler, at, purchase.CatalogId, selectedId, desk);
                 }
@@ -1215,7 +1259,8 @@ public sealed class RaidCoordinator
             handler.IsHome && (!handler.DutyEnabled || handler.HomeAvailableAt > at), ReadyUpSignalCost,
             handler.PrimaryTrait.ToString(), handler.LatestPreparationDecisions.ToArray(),
             handler.IsHome ? handler.HubErrandLabel : null,
-            traderStockView);
+            traderStockView,
+            handler.Stats.Project());
     }
 
     internal void DamageWeaponForTesting(string accessToken, string instanceId, int damage)
@@ -1761,6 +1806,7 @@ public sealed class RaidCoordinator
         public int Coins { get; set; }
         public HomeStash Stash { get; } = new();
         public HashSet<string> SettledRaidIds { get; } = new(StringComparer.Ordinal);
+        public RaiderStatistics Stats { get; } = new();
 
         public List<OwnedWeapon> OwnedWeapons { get; } = [Domain.ShopCatalog.CreateWeaponInstance(Domain.ShopCatalog.GetStarterWeapon())];
         public string? EquippedWeaponInstanceId { get; set; }
@@ -1815,7 +1861,8 @@ public sealed record HandlerProjection(
     string PrimaryTrait = "Cautious",
     IReadOnlyList<PreparationDecisionView>? LatestPreparationDecisions = null,
     string? HubErrand = null,
-    TraderStockView? TraderStock = null);
+    TraderStockView? TraderStock = null,
+    RaiderStatsView? Stats = null);
 public sealed record TraderStockView(long CycleIndex, IReadOnlyList<TraderStockItemView> Items);
 public sealed record TraderStockItemView(string CatalogId, string Name, string Category, int? Quantity, int UnitPrice);
 public sealed record HubResidentView(string Slot, string DisplayName, string Status, DateTimeOffset? HomeAvailableAt);

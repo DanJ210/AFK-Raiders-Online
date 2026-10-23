@@ -352,14 +352,15 @@ public sealed class OnnxGenAiNarrativeGenerator : INarrativeGenerator, IDisposab
         foreach (var word in words.Skip(1))
         {
             var bare = word.Trim('\'', '-');
-            var approvedProperNoun = bare.Length > 0 && char.IsUpper(bare[0]) && allowed.Contains(bare);
-            if (DeniedWords.Contains(bare) && !exempt.Contains(bare) && !approvedProperNoun)
+            var baseWord = bare.EndsWith("'s", StringComparison.OrdinalIgnoreCase) ? bare[..^2] : bare;
+            var approvedProperNoun = baseWord.Length > 0 && char.IsUpper(baseWord[0]) && allowed.Contains(baseWord);
+            if (DeniedWords.Contains(baseWord) && !exempt.Contains(baseWord) && !approvedProperNoun)
             {
                 rejectionReason = $"ForbiddenOutcomeOrActorWord:{bare}";
                 return null;
             }
             // Capitalized words are names/places; only the given location/activity context may appear.
-            if (bare.Length > 0 && char.IsUpper(bare[0]) && !FirstPersonOpeners.Contains(bare) && !allowed.Contains(bare))
+            if (baseWord.Length > 0 && char.IsUpper(baseWord[0]) && !FirstPersonOpeners.Contains(bare) && !approvedProperNoun)
             {
                 rejectionReason = $"UnknownProperNoun:{bare}";
                 return null;
