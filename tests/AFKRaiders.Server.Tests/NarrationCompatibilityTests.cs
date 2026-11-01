@@ -62,7 +62,7 @@ public sealed class NarrationCompatibilityTests(ITestOutputHelper output)
             }
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
         output.WriteLine($"Current narration and simulation fingerprint: {hash}");
-        // BAL-0 changes only the simulation's advertised rules version; supply staging is coordinator/policy-owned.
-        Assert.Equal("AADD06938FEC946BE083BF1AC9851EDFD4430CF4BCE953C34A492C606C11B01A", hash);
+        // BAL-1 deliberately changes weapon damage, robot HP and the advertised rules version, not authored content.
+        Assert.Equal("7F1BBE6E566E3C17C0F3B8AE263F8979D5F4C3AABF660ED627BC59D3B80FBEBA", hash);
     }
 }

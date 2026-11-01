@@ -26,11 +26,11 @@ public static class RaidConditions
 
     public static DangerProfile Profile(string danger) => danger switch
     {
-        "Low" => new(900, 0.025, 10, 50, 8, "anxietick", "Anxietick",
+        "Low" => new(900, 0.025, 10, 12, 8, "anxietick", "Anxietick",
             "It approaches, reconsiders, then files a worried metronome report."),
-        "Medium" => new(960, 0.16, 22, 70, 10, "passive_aggressor", "Passive-Aggressor Drone",
+        "Medium" => new(960, 0.16, 22, 19, 10, "passive_aggressor", "Passive-Aggressor Drone",
             "It emits a disappointed sigh at industrial efficiency."),
-        "High" => new(1020, 0.20, 30, 90, 10, "roomba_prime", "Roomba Prime",
+        "High" => new(1020, 0.20, 30, 25, 10, "roomba_prime", "Roomba Prime",
             "Its cleaning mandate has escalated into a workplace grievance."),
         _ => throw new ArgumentException("Unknown danger profile.", nameof(danger))
     };

@@ -20,7 +20,9 @@ public sealed class HubErrandTests
     private static (RaidCoordinator Coordinator, ManualTime Clock, string Token, HandlerProjection Returned) RunToReturn()
     {
         var clock = new ManualTime();
-        var coordinator = new RaidCoordinator(clock, nextSeed: () => 0, traderSeed: 0);
+        var nextId = 0;
+        var coordinator = new RaidCoordinator(clock, nextSeed: () => 0, traderSeed: 0,
+            nextId: () => $"hub-errand-{nextId++}");
         var handler = coordinator.EnrollHandler("raider-one", "enroll");
         coordinator.ReadyUp(handler.AccessToken, new("go"));
         HandlerProjection view = coordinator.GetHandlerProjection(handler.AccessToken);

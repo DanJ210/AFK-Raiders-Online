@@ -7,7 +7,7 @@ namespace AFKRaiders.Server.Domain;
 
 public sealed class RaidSimulation
 {
-    public const string RulesVersion = "desperanza-bal-0-v1";
+    public const string RulesVersion = "desperanza-bal-1-v1";
     public static readonly TimeSpan AdmissionWindow = TimeSpan.FromSeconds(20);
     public const int MaxRaiders = 2;
     private const int PodDeploymentSeconds = 60;
@@ -16,7 +16,6 @@ public sealed class RaidSimulation
     private const int DecisionIntervalSeconds = 30;
     private static readonly TimeSpan RobotRoundInterval = TimeSpan.FromSeconds(5);
     private const int RobotRoundLimit = 3;
-    private const int RobotDamagePerRaider = 20;
     private const int RobotDamageToRaider = 10;
     private readonly int seed;
     private readonly IRaidNarrator narrator;
@@ -162,7 +161,8 @@ public sealed class RaidSimulation
     }
     public string Status => Completed ? "Completed" : !departed ? "Preparing" : "Raiding";
 
-    public void AddRaider(string playerId, string slot, DateTimeOffset now, IEnumerable<StagedSupplyItem>? stagedSupplies = null)
+    public void AddRaider(string playerId, string slot, DateTimeOffset now, IEnumerable<StagedSupplyItem>? stagedSupplies = null,
+        WeaponDefinition? equippedWeapon = null)
     {
         if (slot is not ("raider-one" or "raider-two"))
         {
@@ -182,7 +182,7 @@ public sealed class RaidSimulation
             throw new RaidAccessException("PlayerAlreadyJoined");
         }
 
-        raiders.Add(CreateRaider(playerId, slot, StartsAt + AdmissionWindow, stagedSupplies));
+        raiders.Add(CreateRaider(playerId, slot, StartsAt + AdmissionWindow, stagedSupplies, equippedWeapon: equippedWeapon));
         Revision++;
         var added = raiders.Single(raider => raider.PlayerId == playerId);
         Emit(now, "Deployment", [playerId], NarrationContent.Default.Format("narrator.checks-in-the-handler-is", added.Name));
@@ -190,7 +190,7 @@ public sealed class RaidSimulation
 
     public void AddAutonomousRaider(string playerId, string slot, DateTimeOffset at, IEnumerable<StagedSupplyItem>? stagedSupplies = null,
         RaiderPersonality? personality = null, RaiderVoiceState? voiceState = null,
-        RaiderPrimaryTrait? primaryTrait = null)
+        RaiderPrimaryTrait? primaryTrait = null, WeaponDefinition? equippedWeapon = null)
     {
         if (slot is not ("raider-one" or "raider-two"))
         {
@@ -215,7 +215,7 @@ public sealed class RaidSimulation
         }
 
         departed = true;
-        raiders.Add(CreateRaider(playerId, slot, at, stagedSupplies, personality, primaryTrait));
+        raiders.Add(CreateRaider(playerId, slot, at, stagedSupplies, personality, primaryTrait, equippedWeapon));
         RestoreVoiceState(playerId, voiceState);
         Revision++;
         var added = raiders.Single(raider => raider.PlayerId == playerId);
@@ -266,7 +266,7 @@ public sealed class RaidSimulation
     }
 
     private SimRaider CreateRaider(string playerId, string slot, DateTimeOffset readyAt, IEnumerable<StagedSupplyItem>? stagedSupplies = null,
-        RaiderPersonality? personality = null, RaiderPrimaryTrait? primaryTrait = null)
+        RaiderPersonality? personality = null, RaiderPrimaryTrait? primaryTrait = null, WeaponDefinition? equippedWeapon = null)
     {
         var trait = primaryTrait ?? RaiderEconomyPolicy.TraitFromSeed(Factor(slot, "primary-trait"));
         var hoarder = trait == RaiderPrimaryTrait.Hoarder;
@@ -281,7 +281,8 @@ public sealed class RaidSimulation
             ActivityStartedAt = readyAt,
             Greed = personality?.Greed ?? (hoarder ? 35 : 15),
             Mood = personality?.Mood ?? 2,
-            AdmittedAt = readyAt
+            AdmittedAt = readyAt,
+            Weapon = equippedWeapon ?? ShopCatalog.GetStarterWeapon()
         };
 
         if (stagedSupplies is not null)
@@ -618,7 +619,11 @@ public sealed class RaidSimulation
         var remainingHealth = robot.Health;
         foreach (var participant in participants)
         {
-            var damage = Math.Min(RobotDamagePerRaider, remainingHealth);
+            var weapon = participant.Weapon;
+            var key = FormattableString.Invariant(
+                $"bal-1:{RaidId.Length}:{RaidId}:{robot.Id.Length}:{robot.Id}:{robot.RoundsResolved}:{participant.PlayerId.Length}:{participant.PlayerId}");
+            var roll = weapon.DamageMin + (int)(RaidConditions.Roll(seed, key) * (weapon.DamageMax - weapon.DamageMin + 1));
+            var damage = Math.Min((int)Math.Round(roll * weapon.DamageMultiplier, MidpointRounding.AwayFromZero), remainingHealth);
             robot.DamageByPlayer[participant.PlayerId].Dealt += damage;
             remainingHealth -= damage;
         }
@@ -1747,8 +1752,8 @@ public sealed class RaidSimulation
         public string Name { get; set; } = "Roomba Prime";
         public string Location { get; } = "Service Depot";
         public string Flavor { get; set; } = NarrationContent.Default.Format("simulation.it-emits-a-high-pitched");
-        public int MaxHealth { get; set; } = 70;
-        public int Health { get; set; } = 70;
+        public int MaxHealth { get; set; } = 25;
+        public int Health { get; set; } = 25;
         public string Status { get; set; } = "Dormant";
         public int RoundsResolved { get; set; }
         public DateTimeOffset? StartedAt { get; set; }
@@ -1801,6 +1806,7 @@ public sealed class RaidSimulation
         public string Slot { get; } = slot;
         public string Name { get; } = name;
         public string PrimaryTrait { get; } = primaryTrait;
+        public required WeaponDefinition Weapon { get; init; }
         public int Greed { get; set; } = greed;
         public int Mood { get; set; } = 2;
         public DateTimeOffset AdmittedAt { get; set; }

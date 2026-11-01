@@ -253,7 +253,7 @@ public sealed class RaidSimulationTests
         Assert.DoesNotContain(result.Events, item => item.Kind == "CrossedPaths");
         Assert.Empty(result.MyInventory);
         Assert.Equal("Escaped", result.Robot.Status);
-        Assert.Equal(10, result.Robot.Health);
+        Assert.Equal(11, result.Robot.Health);
         Assert.Equal(22, result.MyHealth);
         Assert.Equal(10, result.MyShieldCharge);
         Assert.Equal(4, result.MyExtractedLoot.Count);

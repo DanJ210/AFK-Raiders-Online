@@ -331,6 +331,11 @@ public sealed class RaidCoordinator
 
     private void AdmitToAutonomousWorld(HandlerState handler, RaidState world, DateTimeOffset at)
     {
+        var equipped = handler.OwnedWeapons.SingleOrDefault(w => w.InstanceId == handler.EquippedWeaponInstanceId);
+        if (equipped is null || equipped.IsBroken
+            || !Domain.ShopCatalog.TryGetWeapon(equipped.CatalogId, out var weapon) || weapon is null)
+            throw new InvalidOperationException("Autonomous admission requires a usable equipped catalog weapon.");
+
         var staged = handler.StagedSupplies.Select(kv => new StagedSupplyItem(
             kv.Key,
             Domain.ShopCatalog.TryGetSupply(kv.Key, out var def) && def is not null ? def.Name : kv.Key,
@@ -344,7 +349,7 @@ public sealed class RaidCoordinator
         }
 
         world.Simulation.AddAutonomousRaider(handler.PlayerId, handler.Slot, at, staged, handler.Personality,
-            handler.VoiceState, handler.PrimaryTrait);
+            handler.VoiceState, handler.PrimaryTrait, weapon);
         handler.CurrentRaidId = world.Simulation.RaidId;
         handler.IsHome = false;
         handler.HomeAvailableAt = null;
