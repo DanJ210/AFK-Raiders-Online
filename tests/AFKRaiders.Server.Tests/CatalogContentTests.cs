@@ -28,6 +28,7 @@ public sealed class CatalogContentTests
     [InlineData("loot-catalog.json", "pool")]
     [InlineData("shop-catalog.json", "weapons")]
     [InlineData("shop-catalog.json", "supplies")]
+    [InlineData("shop-catalog.json", "shields")]
     public void CollectionsAreRequiredNonemptyAndCannotContainNull(string file, string collection)
     {
         foreach (var mutation in new[] { "missing", "null", "empty", "nullEntry" })
@@ -51,7 +52,7 @@ public sealed class CatalogContentTests
     public void UnsupportedSchemaVersionIsRejected(string file)
     {
         var document = BundledDocument(file);
-        document["schemaVersion"] = file == "loot-catalog.json" ? 1 : 2;
+        document["schemaVersion"] = 1;
         var exception = Assert.Throws<InvalidDataException>(() => Read(file, document.ToJsonString()));
         Assert.Contains("schemaVersion", exception.Message);
     }
@@ -228,6 +229,44 @@ public sealed class CatalogContentTests
         Assert.False(LootCatalog.Default.TryGetItem("SCRAP_METAL_BASIC", out _));
         Assert.True(Assert.IsAssignableFrom<IList<WeaponDefinition>>(ShopCatalog.Weapons).IsReadOnly);
         Assert.True(Assert.IsAssignableFrom<IList<SupplyDefinition>>(ShopCatalog.Supplies).IsReadOnly);
+    }
+
+    [Fact]
+    public void BundledShieldOffersAreTheThreeAcceptedExperimentalTiers()
+    {
+        Assert.Equal(
+            [("Light", "Green", 40, 421, 30), ("Medium", "Blue", 70, 462, 90), ("Heavy", "Pink", 100, 496, 300)],
+            ShopCatalog.Shields.Select(s => (s.Tier, s.Color, s.MaxCharge, s.MitigationPermille, s.Value)).ToArray());
+    }
+
+    [Theory]
+    [InlineData("reorderedTiers")]
+    [InlineData("missingTier")]
+    [InlineData("nonIncreasingCharge")]
+    [InlineData("nonIncreasingMitigation")]
+    [InlineData("nonIncreasingPrice")]
+    [InlineData("fullMitigation")]
+    [InlineData("duplicateId")]
+    public void InvalidShieldOffersAreRejected(string mutation)
+    {
+        var document = BundledDocument("shop-catalog.json");
+        var shields = document["shields"]!.AsArray();
+        switch (mutation)
+        {
+            case "reorderedTiers":
+                var light = shields[0]!.DeepClone();
+                shields[0] = shields[1]!.DeepClone();
+                shields[1] = light;
+                break;
+            case "missingTier": shields.RemoveAt(2); break;
+            case "nonIncreasingCharge": shields[1]!["maxCharge"] = 40; break;
+            case "nonIncreasingMitigation": shields[2]!["mitigationPermille"] = 462; break;
+            case "nonIncreasingPrice": shields[2]!["value"] = 90; break;
+            case "fullMitigation": shields[2]!["mitigationPermille"] = 1000; break;
+            case "duplicateId": shields[1]!["id"] = shields[0]!["id"]!.GetValue<string>(); break;
+        }
+        var exception = Assert.Throws<InvalidDataException>(() => Read("shop-catalog.json", document.ToJsonString()));
+        Assert.Contains("shop-catalog.json", exception.Message);
     }
 
     private static JsonObject BundledDocument(string file)

@@ -15,7 +15,8 @@ internal sealed record LootCatalogDocument(
 internal sealed record ShopCatalogDocument(
     int SchemaVersion,
     IReadOnlyList<WeaponDefinition> Weapons,
-    IReadOnlyList<SupplyDefinition> Supplies);
+    IReadOnlyList<SupplyDefinition> Supplies,
+    IReadOnlyList<ShieldDefinition> Shields);
 
 internal static class CatalogContent
 {
@@ -93,9 +94,9 @@ internal static class CatalogContent
     {
         const string source = "shop-catalog.json";
         var document = Read<ShopCatalogDocument>(stream, source);
-        Require(document.SchemaVersion == 1, source, "Unsupported schemaVersion; expected 1.");
-        Require(document.Weapons is { Count: > 0 } && document.Supplies is { Count: > 0 },
-            source, "Weapons and supplies must be nonempty arrays.");
+        Require(document.SchemaVersion == 2, source, "Unsupported schemaVersion; expected 2.");
+        Require(document.Weapons is { Count: > 0 } && document.Supplies is { Count: > 0 } && document.Shields is { Count: > 0 },
+            source, "Weapons, supplies and shields must be nonempty arrays.");
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var weapon in document.Weapons)
         {
@@ -121,10 +122,33 @@ internal static class CatalogContent
                 _ => false
             }, source, $"Supply '{supply.Id}' has an unsupported category or incompatible effects.");
         }
+        ShieldDefinition? previous = null;
+        var expectedTiers = new[] { ShieldTier.Light, ShieldTier.Medium, ShieldTier.Heavy };
+        Require(document.Shields.Count == expectedTiers.Length, source,
+            "Shields must define exactly the Light, Medium and Heavy tiers.");
+        for (var index = 0; index < document.Shields.Count; index++)
+        {
+            var shield = document.Shields[index];
+            Require(shield is not null, source, "Shields cannot contain null.");
+            Require(!string.IsNullOrWhiteSpace(shield.Id) && !string.IsNullOrWhiteSpace(shield.Name)
+                && !string.IsNullOrWhiteSpace(shield.Color) && !string.IsNullOrWhiteSpace(shield.Flavor),
+                source, "Shield entries require id, name, color and flavor.");
+            Require(ids.Add(shield.Id), source, $"Duplicate shop ID '{shield.Id}' (case-insensitive).");
+            Require(Enum.TryParse<ShieldTier>(shield.Tier, ignoreCase: false, out var tier) && tier == expectedTiers[index]
+                && shield.Tier == tier.ToString(),
+                source, $"Shield '{shield.Id}' must be tier '{expectedTiers[index]}' in Light, Medium, Heavy order.");
+            Require(shield.MaxCharge > 0 && shield.MitigationPermille is > 0 and < 1000 && shield.Value > 0,
+                source, $"Shield '{shield.Id}' has invalid charge, mitigation or value.");
+            Require(previous is null || (shield.MaxCharge > previous.MaxCharge
+                    && shield.MitigationPermille > previous.MitigationPermille && shield.Value > previous.Value),
+                source, $"Shield '{shield.Id}' must strictly improve charge, mitigation and value over the previous tier.");
+            previous = shield;
+        }
         return document with
         {
             Weapons = Array.AsReadOnly(document.Weapons.ToArray()),
-            Supplies = Array.AsReadOnly(document.Supplies.ToArray())
+            Supplies = Array.AsReadOnly(document.Supplies.ToArray()),
+            Shields = Array.AsReadOnly(document.Shields.ToArray())
         };
     }
 

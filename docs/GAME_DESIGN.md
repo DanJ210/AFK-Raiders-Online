@@ -93,14 +93,16 @@ The Raider has one manual **Secret Hidden Pocket** slot per raid:
 - On successful extraction, normal extraction transfer already keeps everything, so the pocket provides no extra duplicate item.
 
 ### Shields
-The current online build starts each raid with a basic **Makeshift Confidence Shield** layered on top of the normal health system:
+**BAL-1S implemented (2026-11-01, `desperanza-bal-1s-v1`; experimental balance):** the accepted defaults below are live. The rebased post-BAL-1 lab and production BAL-0 runs show lower KO, more Heavy deployment and higher spend than the pre-BAL-1 plausibility evidence; those departures are recorded, not tuned (BAL-4). See the [gate and measurement note](balance/BAL-1S-post-BAL-1-gate.md) and [ledger](IMPLEMENTATION_PROGRESS.md#bal-1s---shield-tiers-wear-and-paid-autonomous-repair-2026-11-01).
+
+Before BAL-1S the online build started each raid with a basic **Makeshift Confidence Shield** layered on top of the normal health system. These general rules still hold:
 - Shields mitigate incoming damage while they still have both charge and durability.
 - Shields are not extra HP; they reduce the HP damage taken from a hit while spending shield charge.
 - Shield durability wears down as shield charge is spent.
 - When a shield soaks part of a hit, the active-thread feed shows both the shield loss and the remaining HP damage so the mitigation is visible beside the fight or hazard that caused it.
-- For the MVP, returning to the HUB restores the starter shield to full charge and durability.
-- **Planned change (BAL-1S, user-confirmed 2026-10-22; not yet implemented):** shield durability will persist between raids and will no longer be restored for free. The Raider repairs it autonomously in Desperanza for coins. The deterministic decision belongs in `RaiderEconomyPolicy`, using trait-weighted repair thresholds and a protected coin-reserve floor; it is not a Handler action. Repair cost rises with the amount of durability restored, and harder dangers wear shields faster. Open details are tracked in the [BAL plan](IMPLEMENTATION_PROGRESS.md#bal---danger-difficulty-weapon-relevance-and-robot-loot-plan-proposed-2026-10-22).
-- **BAL-1S accepted experimental defaults (2026-10-31; planned, not implemented):** Shields become owned Raider equipment. Each Raider receives one free Light initially; a knockout removes the equipped shield. Replacements and upgrades are bought with Raider coins from the Gear Weirdos desk; upgrading discards the old shield without trade-in. No loaner, recurring free shield, or shield loot is authorized. A missing shield remains missing. Admission refills charge to the owned shield's maximum but never repairs durability.
+- ~~For the MVP, returning to the HUB restores the starter shield to full charge and durability.~~ Superseded by BAL-1S: durability persists and repair is paid; admission refills charge only.
+- **BAL-1S direction (user-confirmed 2026-10-22; implemented 2026-11-01):** shield durability will persist between raids and will no longer be restored for free. The Raider repairs it autonomously in Desperanza for coins. The deterministic decision belongs in `RaiderEconomyPolicy`, using trait-weighted repair thresholds and a protected coin-reserve floor; it is not a Handler action. Repair cost rises with the amount of durability restored, and harder dangers wear shields faster. Open details are tracked in the [BAL plan](IMPLEMENTATION_PROGRESS.md#bal---danger-difficulty-weapon-relevance-and-robot-loot-plan-proposed-2026-10-22).
+- **BAL-1S accepted experimental defaults (2026-10-31; implemented 2026-11-01, experimental):** Shields become owned Raider equipment. Each Raider receives one free Light initially; a knockout removes the equipped shield. Replacements and upgrades are bought with Raider coins from the Gear Weirdos desk; upgrading discards the old shield without trade-in. No loaner, recurring free shield, or shield loot is authorized. A missing shield remains missing. Admission refills charge to the owned shield's maximum but never repairs durability.
 
   | Tier | Color | Maximum charge | Mitigation |
   |---|---|---:|---:|
@@ -112,20 +114,20 @@ The current online build starts each raid with a basic **Makeshift Confidence Sh
 
   Charge spent per hit is `min(charge, damage)`. Mitigation is full while charge is at least 1 and durability is above 0. Use a per-raid permille remainder carry (never per-hit floor). Rechargers are autonomous only, restore charge only (+20 / +35 / +50), and cap at maximum. Recharge when charge is at or below `floor(maxCharge × 3/8)` (15 / 26 / 37).
 
-  Durability is 100 points and persists between raids; represent it in integer centi-points. Wear per hit is `chargeSpent / maxCharge × 20 × danger`, with Low / Medium / High multipliers ×1 / ×1.5 / ×2. Paid autonomous repair runs through `RaiderEconomyPolicy`; trait thresholds are Cautious 75, Hoarder 50, Gadgeteer 50, Brawler 25, with the reserve waived only at zero durability. Allow partial repairs in blocks of at least 10 points (or the remaining amount when less). For `m` points repaired and `s = m/100`, cost is `ceil(price × (0.25s + 0.35s²))`; evaluate affordable upgrades before repairs. These values are experimental starting points, not validated balance; BAL-1 remains next and BAL-4 owns tuning. See the [BAL plan and lab evidence](IMPLEMENTATION_PROGRESS.md#bal---danger-difficulty-weapon-relevance-and-robot-loot-plan-proposed-2026-10-22).
+  Durability is 100 points and persists between raids; represent it in integer centi-points. Wear per hit is `chargeSpent / maxCharge × 20 × danger`, with Low / Medium / High multipliers ×1 / ×1.5 / ×2. Paid autonomous repair runs through `RaiderEconomyPolicy`; trait thresholds are Cautious 75, Hoarder 50, Gadgeteer 50, Brawler 25, with the reserve waived only at zero durability. Allow partial repairs in blocks of at least 10 points (or the remaining amount when less). For `m` points repaired and `s = m/100`, cost is `ceil(price × (0.25s + 0.35s²))`; evaluate affordable upgrades before repairs. These values are experimental starting points, not validated balance; BAL-4 owns tuning. Implementation notes: the Gear Weirdos shield desk is an autonomous errand stop with placeholder parody names Courtesy / Reasonable / Excessive Bubble; a missing shield buys the highest tier affordable above reserve; the shield reserve is the preparation reserve floor; KO removal and every purchase/repair are journaled once. See the [BAL plan and lab evidence](IMPLEMENTATION_PROGRESS.md#bal---danger-difficulty-weapon-relevance-and-robot-loot-plan-proposed-2026-10-22).
 
 ### Online weapon combat (BAL-1, 2026-11-01)
 
 The authoritative raid snapshots the equipped usable catalog weapon at admission. Each round rolls an inclusive base integer from its damage range, applies its multiplier, and rounds to nearest integer (ties away from zero). Seed, raid, robot, round and Raider identity key each roll independently; scheduling, admission order, polling and retries do not advance a random stream. Shared contributions record actual damage, capped to remaining robot HP in stable identity order.
 
-Experimental robot HP is Low 12 / Medium 19 / High 25, with unchanged incoming damage and three-round limit. Kettle can solo Low; Medium solo requires Aspperigo or better; High solo requires Vernerider/Temptrest or shared Raider damage. These are equipment eligibility thresholds, not guaranteed victories or validation of the planned High top-healing/lasting-shield target. The [BAL-1 ledger](IMPLEMENTATION_PROGRESS.md#bal-1---weapons-matter-2026-11-01) records measurements and limitations. No shield, reward or trader rules change; BAL-1S and BAL-2/3/4 remain unimplemented.
+Experimental robot HP is Low 12 / Medium 19 / High 25, with unchanged incoming damage and three-round limit. Kettle can solo Low; Medium solo requires Aspperigo or better; High solo requires Vernerider/Temptrest or shared Raider damage. These are equipment eligibility thresholds, not guaranteed victories or validation of the planned High top-healing/lasting-shield target. The [BAL-1 ledger](IMPLEMENTATION_PROGRESS.md#bal-1---weapons-matter-2026-11-01) records measurements and limitations. BAL-1 itself changed no shield, reward or trader rules; BAL-1S (see Shields) followed, and BAL-2/3/4 remain unimplemented.
 
 ### Weapon maintenance
 - Successful extraction costs one durability point on the equipped weapon; failed recovery loses that weapon instead. Combat-based wear is not implemented.
 - At zero durability, a weapon stays owned but cannot be equipped or used in combat until repaired in HUB at its catalog repair cost.
 - Online field weapon finds start at 5%-60% durability (confirmed 2026-10-22), rather than full condition; purchased weapons still start full. Existing trait-weighted repair thresholds and affordability checks remain unchanged, so a find does not force an immediate repair.
 - The Raider equips another usable owned weapon when needed. If none remains, the HUB restores/supplies the starter Tea Kettle for free and narrates it. Paid broken gear remains broken; this prevents an offline equipment softlock.
-- Shield rechargers cannot repair a zero-durability shield. Shields retain their existing free full HUB restoration in the current build; BAL-1S (planned, see Shields) replaces this with persistent durability and paid autonomous shield repair.
+- Shield rechargers cannot repair a zero-durability shield. Since BAL-1S (see Shields), there is no free HUB restoration: durability persists and the Raider repairs it autonomously for coins.
 
 ### Resilience
 Mood also feeds a small hidden **resilience** bonus against robot damage:
@@ -138,7 +140,7 @@ Mood also feeds a small hidden **resilience** bonus against robot damage:
 Shield rechargers are manual-use backpack consumables available from both RAIDING finds and HUB loadout prep:
 - They drop into the normal current-raid backpack, not the separate field-meds pocket.
 - The player can buy them in HUB, stage them in a prep loadout, and deploy with them already in the backpack.
-- The player must manually apply them from the backpack UI in the current build. BAL-1S changes rechargers to autonomous use only, without Handler controls.
+- Legacy offline build: the player applied them manually. Online, the Raider uses them autonomously at the tier recharge trigger, without Handler controls.
 - Rechargers restore shield charge only; they do not repair shield durability.
 - If unused, RAIDING-found rechargers extract into Home Stash like normal backpack loot; unused purchased rechargers return to supply storage and are excluded from earned-loot receipts.
 

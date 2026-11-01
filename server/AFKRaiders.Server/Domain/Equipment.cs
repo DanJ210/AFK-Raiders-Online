@@ -82,7 +82,8 @@ public sealed record StagedSupplyItem(
 /// </summary>
 public sealed record ShopCatalogView(
     IReadOnlyList<WeaponDefinition> Weapons,
-    IReadOnlyList<SupplyDefinition> Supplies
+    IReadOnlyList<SupplyDefinition> Supplies,
+    IReadOnlyList<ShieldDefinition>? Shields = null
 );
 
 /// <summary>
@@ -135,6 +136,14 @@ public static class ShopCatalog
     public static readonly IReadOnlyList<WeaponDefinition> Weapons = Definitions.Weapons;
 
     public static readonly IReadOnlyList<SupplyDefinition> Supplies = Definitions.Supplies;
+
+    /// <summary>Unlimited standing Gear Weirdos shield offers, ordered Light, Medium, Heavy. Not cycle stock.</summary>
+    public static readonly IReadOnlyList<ShieldDefinition> Shields = Definitions.Shields;
+
+    public static ShieldDefinition GetShield(ShieldTier tier) =>
+        tier == ShieldTier.None
+            ? throw new ArgumentOutOfRangeException(nameof(tier), "No catalog entry exists for an absent shield.")
+            : Shields[(int)tier - 1];
 
     private static readonly Dictionary<string, WeaponDefinition> WeaponsById =
         Weapons.ToDictionary(w => w.Id, StringComparer.OrdinalIgnoreCase);

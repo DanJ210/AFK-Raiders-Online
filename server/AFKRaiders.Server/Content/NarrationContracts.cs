@@ -168,5 +168,11 @@ internal static class NarrationContracts
         ["hub.economy-sold-out"] = 1,
         ["hub.economy-substitute"] = 3,
         ["hub.economy-found-weapon"] = 1,
+        ["hub.economy-shield-bought"] = 4,
+        ["hub.economy-shield-emergency"] = 3,
+        ["hub.economy-shield-upgraded"] = 5,
+        ["hub.economy-shield-repaired"] = 5,
+        ["hub.economy-shield-unaffordable"] = 2,
+        ["hub.shield-lost"] = 1,
     };
 }

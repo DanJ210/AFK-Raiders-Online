@@ -10,15 +10,24 @@ export type DangerStatsView = {
   crossedPaths: number; sharedSearches: number; contestsWon: number; contestsLost: number
   itemsSecured: number; valueSecured: number; itemsLost: number; valueLost: number
   weaponsFound: number; weaponsLost: number
+  shieldDurabilityLostCenti?: number; unshieldedRaids?: number; lightShieldRaids?: number
+  mediumShieldRaids?: number; heavyShieldRaids?: number; weakShieldRaids?: number
+  brokenShieldRaids?: number; shieldsLost?: number
 }
 export type EconomyStatsView = {
   weaponsBought: number; coinsOnWeapons: number; repairs: number; coinsOnRepairs: number
   loanerKettles: number; suppliesBought: number; coinsOnSupplies: number
   itemsSold: number; coinsFromSales: number
+  lightShieldsBought?: number; mediumShieldsBought?: number; heavyShieldsBought?: number
+  emergencyShieldsBought?: number; shieldUpgrades?: number; coinsOnShields?: number
+  shieldRepairs?: number; coinsOnShieldRepairs?: number; shieldPointsRepaired?: number
+  unshieldedDeployDecisions?: number
 }
+export type ShieldStreakView = { current: number; longest: number; streaks: number }
 export type RaiderStatsView = {
   scope: string; since: string | null; total: DangerStatsView
   byDanger: DangerStatsView[]; economy: EconomyStatsView
+  shieldStreaks?: ShieldStreakView | null
 }
 
 const props = defineProps<{ stats: RaiderStatsView | null | undefined }>()
@@ -48,6 +57,10 @@ const rows: { group: string; label: string; value: (s: DangerStatsView) => strin
   { group: 'Loot', label: 'Items / value secured', value: s => `${s.itemsSecured} / ${s.valueSecured}` },
   { group: 'Loot', label: 'Items / value lost', value: s => `${s.itemsLost} / ${s.valueLost}` },
   { group: 'Loot', label: 'Weapons found / lost', value: s => `${s.weaponsFound} / ${s.weaponsLost}` },
+  { group: 'Shields', label: 'Deployed none / light / medium / heavy', value: s => `${s.unshieldedRaids ?? 0} / ${s.lightShieldRaids ?? 0} / ${s.mediumShieldRaids ?? 0} / ${s.heavyShieldRaids ?? 0}` },
+  { group: 'Shields', label: 'Deployed weak (25 or less) / broken', value: s => `${s.weakShieldRaids ?? 0} / ${s.brokenShieldRaids ?? 0}` },
+  { group: 'Shields', label: 'Durability lost (per raid)', value: s => `${((s.shieldDurabilityLostCenti ?? 0) / 100).toFixed(1)} (${perRaid((s.shieldDurabilityLostCenti ?? 0) / 100, s.raids)})` },
+  { group: 'Shields', label: 'Shields lost to knockouts', value: s => s.shieldsLost ?? 0 },
 ]
 
 const economyRows = computed(() => {
@@ -59,6 +72,10 @@ const economyRows = computed(() => {
     { label: 'Supplies bought', value: `${e.suppliesBought} for ${e.coinsOnSupplies} coins` },
     { label: 'Items sold', value: `${e.itemsSold} for ${e.coinsFromSales} coins` },
     { label: 'Loaner Tea Kettles', value: `${e.loanerKettles}` },
+    { label: 'Shields bought (light / medium / heavy)', value: `${e.lightShieldsBought ?? 0} / ${e.mediumShieldsBought ?? 0} / ${e.heavyShieldsBought ?? 0} for ${e.coinsOnShields ?? 0} coins` },
+    { label: 'Emergency shields / upgrades', value: `${e.emergencyShieldsBought ?? 0} / ${e.shieldUpgrades ?? 0}` },
+    { label: 'Shield repairs', value: `${e.shieldRepairs ?? 0} (${e.shieldPointsRepaired ?? 0} points) for ${e.coinsOnShieldRepairs ?? 0} coins` },
+    { label: 'Unshielded deployments (streak / longest)', value: `${e.unshieldedDeployDecisions ?? 0} (${props.stats?.shieldStreaks?.current ?? 0} / ${props.stats?.shieldStreaks?.longest ?? 0})` },
   ]
 })
 

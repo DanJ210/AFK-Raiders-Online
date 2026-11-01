@@ -951,6 +951,30 @@
     {
       "id": "hub.economy-found-weapon",
       "text": "Recovered {0} from the field. It is now owned equipment, not stash salvage."
+    },
+    {
+      "id": "hub.economy-shield-bought",
+      "text": "Bought the {0} ({1}) at the Gear Weirdos shield desk for {2} coins. Balance: {3}."
+    },
+    {
+      "id": "hub.economy-shield-emergency",
+      "text": "Bought the {0} as an emergency shield at the Gear Weirdos shield desk for {1} coins, dipping into the reserve rather than deploying bare. Balance: {2}."
+    },
+    {
+      "id": "hub.economy-shield-upgraded",
+      "text": "Upgraded to the {0} ({1}) at the Gear Weirdos shield desk for {2} coins and left the old {3} on the counter. The Gear Weirdos called it 'mostly theoretical, emotionally proven.' Balance: {4}."
+    },
+    {
+      "id": "hub.economy-shield-repaired",
+      "text": "Patched {1} points into the {0} at the Gear Weirdos shield desk for {2} coins ({3}/100 integrity). Balance: {4}."
+    },
+    {
+      "id": "hub.economy-shield-unaffordable",
+      "text": "A replacement {1} was {0} coins out of reach. The Raider deployed unshielded and called it aerodynamic."
+    },
+    {
+      "id": "hub.shield-lost",
+      "text": "Lost the equipped {0} on raid defeat. Admission will not issue another."
     }
   ],
   "enrichmentEventKinds": [

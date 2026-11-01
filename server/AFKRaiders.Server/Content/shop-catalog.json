@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "weapons": [
     { "id": "tea_kettle", "name": "Tea Kettle", "damage": 5, "damageMultiplier": 1.0, "damageMin": 3, "damageMax": 6, "value": 0, "rarity": 1, "durabilityMax": 8, "repairCost": 0, "flavor": "Standard issue in Desperanza: whistles under pressure and occasionally during combat." },
     { "id": "aspperigo", "name": "Aspperigo", "damage": 6, "damageMultiplier": 1.08, "damageMin": 4, "damageMax": 7, "value": 65, "rarity": 2, "durabilityMax": 10, "repairCost": 18, "flavor": "Eddie's favorite and we don't know why." },
@@ -15,5 +15,10 @@
     { "id": "fizz_cell", "name": "Fizz Cell", "category": "ShieldRecharger", "value": 12, "healAmount": 0, "reviveAmount": 0, "chargeAmount": 20, "rarity": 1, "flavor": "A pocket battery making brave little snapping noises." },
     { "id": "duct_taped_capacitor", "name": "Duct-Taped Capacitor", "category": "ShieldRecharger", "value": 28, "healAmount": 0, "reviveAmount": 0, "chargeAmount": 35, "rarity": 2, "flavor": "Technically a recharge kit. Spiritually a cry for help." },
     { "id": "panic_capacitor", "name": "Panic Capacitor", "category": "ShieldRecharger", "value": 70, "healAmount": 0, "reviveAmount": 0, "chargeAmount": 50, "rarity": 4, "flavor": "Emergency confidence in a handheld brick." }
+  ],
+  "shields": [
+    { "id": "courtesy_bubble", "tier": "Light", "name": "Courtesy Bubble", "color": "Green", "maxCharge": 40, "mitigationPermille": 421, "value": 30, "flavor": "A polite field that asks incoming fire to please slow down. Most of it reconsiders." },
+    { "id": "reasonable_bubble", "tier": "Medium", "name": "Reasonable Bubble", "color": "Blue", "maxCharge": 70, "mitigationPermille": 462, "value": 90, "flavor": "Mid-range protection for Raiders who have read one safety pamphlet all the way through." },
+    { "id": "excessive_bubble", "tier": "Heavy", "name": "Excessive Bubble", "color": "Pink", "maxCharge": 100, "mitigationPermille": 496, "value": 300, "flavor": "The Gear Weirdos call it mostly theoretical and emotionally proven. The pink is load-bearing." }
   ]
 }
