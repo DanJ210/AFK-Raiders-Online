@@ -349,7 +349,8 @@ public sealed class RaidCoordinator
         }
 
         world.Simulation.AddAutonomousRaider(handler.PlayerId, handler.Slot, at, staged, handler.Personality,
-            handler.VoiceState, handler.PrimaryTrait, weapon);
+            handler.VoiceState, handler.PrimaryTrait, weapon, handler.Shield);
+        handler.DeployedShield = handler.Shield;
         handler.CurrentRaidId = world.Simulation.RaidId;
         handler.IsHome = false;
         handler.HomeAvailableAt = null;
@@ -430,6 +431,26 @@ public sealed class RaidCoordinator
                     }
                 }
 
+                var deployedShield = handler.DeployedShield;
+                var shieldAfterRaid = world.Simulation.ShieldState(handler.PlayerId);
+                var shieldWearCenti = deployedShield.HasShield
+                    ? Math.Max(0, deployedShield.DurabilityCenti - shieldAfterRaid.DurabilityCenti)
+                    : 0;
+                var shieldLost = isKnockedOut && deployedShield.HasShield;
+                if (shieldLost)
+                {
+                    handler.Shield = ShieldLoadout.Unshielded;
+                    var shieldName = Domain.ShopCatalog.GetShield(deployedShield.Tier).Name;
+                    var shieldLossMessage = Content.NarrationContent.Default.Format("hub.shield-lost", shieldName);
+                    handler.Events.Add(new HandlerEventView(handler.Events.Count + 1, extractedAt, "ShieldLost", shieldLossMessage));
+                    AddJournalEntry(handler, world.Simulation.RaidId, extractedAt, "ShieldLost", "Hub",
+                        shieldLossMessage, $"hub:shield-lost:{world.Simulation.RaidId}:{handler.Slot}");
+                }
+                else if (deployedShield.HasShield)
+                {
+                    handler.Shield = deployedShield with { DurabilityCenti = shieldAfterRaid.DurabilityCenti };
+                }
+
                 // Return unused staged supplies if extracted safely
                 if (!isKnockedOut && projection.MyFieldSupplies is not null)
                 {
@@ -448,7 +469,8 @@ public sealed class RaidCoordinator
                     handler.LastExtractedLoot, handler.OwnedWeapons, catalog);
                 handler.OwnedWeapons.AddRange(settledItems.WeaponsToKeep);
                 handler.Stats.RecordRaid(RaidStatsSample.FromProjection(
-                    projection, handler.PlayerId, isKnockedOut, settledItems.WeaponsToKeep.Count, lostWeapon is not null));
+                    projection, handler.PlayerId, isKnockedOut, settledItems.WeaponsToKeep.Count, lostWeapon is not null,
+                    deployedShield, shieldWearCenti, shieldLost));
                 var transfer = handler.Stash.TransferHaul(settledItems.StashItems);
                 handler.Coins += transfer.OverflowCoinsGained;
 
@@ -703,7 +725,87 @@ public sealed class RaidCoordinator
             Domain.ShopCatalog.Weapons,
             Domain.ShopCatalog.Supplies,
             availableStock ?? TraderStockAt(at).AvailableQuantities,
-            reserveFloorOverride);
+            reserveFloorOverride,
+            handler.Shield);
+    }
+
+    private static void CommitShieldDecision(HandlerState handler, DateTimeOffset at, ShieldPreparationPlan decision)
+    {
+        if (decision.Action == ShieldPlanAction.None || handler.ShieldDecisionVisit == handler.HomeVisit)
+            return;
+        handler.ShieldDecisionVisit = handler.HomeVisit;
+        var current = handler.Shield;
+        if (decision.Action == ShieldPlanAction.DeployUnshielded)
+        {
+            if (current.HasShield)
+                throw new InvalidOperationException("A shielded Raider cannot be planned to deploy unshielded.");
+            var light = Domain.ShopCatalog.GetShield(ShieldTier.Light);
+            if (RecordPreparationDecision(handler, at, "PreparationShieldUnaffordable", "shield:unshielded",
+                    Content.NarrationContent.Default.Format("hub.economy-shield-unaffordable",
+                        light.Value - handler.Coins, light.Name)))
+                handler.Stats.RecordEconomy(e => e with { UnshieldedDeployDecisions = e.UnshieldedDeployDecisions + 1 });
+            return;
+        }
+
+        if (decision.Cost < 0 || handler.Coins < decision.Cost)
+            throw new InvalidOperationException(
+                $"Shield {decision.Action} failed coordinator validation: coins {handler.Coins}, cost {decision.Cost}.");
+        var definition = Domain.ShopCatalog.GetShield(decision.Tier);
+        switch (decision.Action)
+        {
+            case ShieldPlanAction.Buy or ShieldPlanAction.EmergencyBuy or ShieldPlanAction.Upgrade:
+            {
+                if (decision.Tier <= current.Tier || decision.Cost != definition.Value)
+                    throw new InvalidOperationException(
+                        $"Shield {decision.Action} to {decision.Tier} is not valid from {current.Tier}.");
+                var action = $"shield:buy:{decision.Tier}";
+                handler.Coins -= decision.Cost;
+                handler.Shield = new ShieldLoadout(decision.Tier, ShieldRules.MaxDurabilityCenti);
+                var text = decision.Action switch
+                {
+                    ShieldPlanAction.Upgrade => Content.NarrationContent.Default.Format("hub.economy-shield-upgraded",
+                        definition.Name, definition.Color, decision.Cost, Domain.ShopCatalog.GetShield(current.Tier).Name, handler.Coins),
+                    ShieldPlanAction.EmergencyBuy => Content.NarrationContent.Default.Format("hub.economy-shield-emergency",
+                        definition.Name, decision.Cost, handler.Coins),
+                    _ => Content.NarrationContent.Default.Format("hub.economy-shield-bought",
+                        definition.Name, definition.Color, decision.Cost, handler.Coins)
+                };
+                RecordPreparationDecision(handler, at, "PreparationShieldPurchase", action, text);
+                handler.Stats.RecordEconomy(e => e with
+                {
+                    LightShieldsBought = e.LightShieldsBought + (decision.Tier == ShieldTier.Light ? 1 : 0),
+                    MediumShieldsBought = e.MediumShieldsBought + (decision.Tier == ShieldTier.Medium ? 1 : 0),
+                    HeavyShieldsBought = e.HeavyShieldsBought + (decision.Tier == ShieldTier.Heavy ? 1 : 0),
+                    EmergencyShieldsBought = e.EmergencyShieldsBought + (decision.Action == ShieldPlanAction.EmergencyBuy ? 1 : 0),
+                    ShieldUpgrades = e.ShieldUpgrades + (decision.Action == ShieldPlanAction.Upgrade ? 1 : 0),
+                    CoinsOnShields = e.CoinsOnShields + decision.Cost
+                });
+                break;
+            }
+            case ShieldPlanAction.Repair:
+            {
+                if (decision.Tier != current.Tier || decision.RepairPoints <= 0
+                    || decision.Cost != ShieldRules.RepairCost(definition.Value, decision.RepairPoints)
+                    || decision.DurabilityCentiAfter != ShieldRules.ApplyRepair(current.DurabilityCenti, decision.RepairPoints))
+                    throw new InvalidOperationException("Shield repair failed coordinator validation.");
+                handler.Coins -= decision.Cost;
+                handler.Shield = current with { DurabilityCenti = decision.DurabilityCentiAfter };
+                RecordPreparationDecision(handler, at, "PreparationShieldRepair", "shield:repair",
+                    Content.NarrationContent.Default.Format("hub.economy-shield-repaired",
+                        definition.Name, decision.RepairPoints, decision.Cost,
+                        (decision.DurabilityCentiAfter / 100.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                        handler.Coins));
+                handler.Stats.RecordEconomy(e => e with
+                {
+                    ShieldRepairs = e.ShieldRepairs + 1,
+                    CoinsOnShieldRepairs = e.CoinsOnShieldRepairs + decision.Cost,
+                    ShieldPointsRepaired = e.ShieldPointsRepaired + decision.RepairPoints
+                });
+                break;
+            }
+            default:
+                throw new InvalidOperationException($"Unsupported shield action {decision.Action}.");
+        }
     }
 
     private TraderCycleStock TraderStockAt(DateTimeOffset at)
@@ -921,6 +1023,16 @@ public sealed class RaidCoordinator
             }));
         }
 
+        if (plan.Shield is { Action: not ShieldPlanAction.None })
+        {
+            stops.Add(("At the Gear Weirdos shield desk", at =>
+            {
+                // Standing offers are unlimited, so re-deciding against current coins is deterministic and never touches cycle stock.
+                var decision = RaiderEconomyPolicy.DecideShield(plan.PrimaryTrait, handler.Coins, plan.ReserveFloor, handler.Shield);
+                CommitShieldDecision(handler, at, decision);
+            }));
+        }
+
         foreach (var (purchase, purchaseIndex) in plan.SupplyPurchases.Select((purchase, index) => (purchase, index)))
         {
             if (!Domain.ShopCatalog.TryGetSupply(purchase.CatalogId, out var definition) || definition is null
@@ -1130,7 +1242,7 @@ public sealed class RaidCoordinator
     private static uint StableHash(string value) =>
         BitConverter.ToUInt32(SHA256.HashData(Encoding.UTF8.GetBytes(value)), 0);
 
-    private static void RecordPreparationDecision(
+    private static bool RecordPreparationDecision(
         HandlerState handler,
         DateTimeOffset at,
         string kind,
@@ -1139,10 +1251,11 @@ public sealed class RaidCoordinator
     {
         var sourceEventId = $"hub:preparation:{handler.HomeVisit}:{action}";
         if (!handler.PreparationEventIds.Add(sourceEventId))
-            return;
+            return false;
         handler.Events.Add(new HandlerEventView(handler.Events.Count + 1, at, kind, text));
         handler.LatestPreparationDecisions.Add(new PreparationDecisionView(at, kind, text));
         AddJournalEntry(handler, null, at, kind, "Hub", text, sourceEventId, location: "Desperanza");
+        return true;
     }
 
     private void BeginHomeStay(HandlerState handler, DateTimeOffset at, bool initial = false)
@@ -1246,7 +1359,8 @@ public sealed class RaidCoordinator
 
         var shopCatalogView = new ShopCatalogView(
             Weapons: Domain.ShopCatalog.Weapons,
-            Supplies: Domain.ShopCatalog.Supplies
+            Supplies: Domain.ShopCatalog.Supplies,
+            Shields: Domain.ShopCatalog.Shields
         );
         var traderStockView = TraderStockAt(at).Project();
 
@@ -1265,7 +1379,8 @@ public sealed class RaidCoordinator
             handler.PrimaryTrait.ToString(), handler.LatestPreparationDecisions.ToArray(),
             handler.IsHome ? handler.HubErrandLabel : null,
             traderStockView,
-            handler.Stats.Project());
+            handler.Stats.Project(),
+            ShieldRules.Project(handler.Shield));
     }
 
     internal void DamageWeaponForTesting(string accessToken, string instanceId, int damage)
@@ -1280,6 +1395,12 @@ public sealed class RaidCoordinator
                 state.OwnedWeapons[index] = current with { CurrentDurability = Math.Max(0, current.CurrentDurability - damage) };
             }
         }
+    }
+
+    internal void SetShieldForTesting(string accessToken, ShieldLoadout shield)
+    {
+        lock (gate)
+            GetAuthorizedHandler(accessToken).Shield = shield;
     }
 
     internal void ResetPreparationForTesting(
@@ -1815,6 +1936,12 @@ public sealed class RaidCoordinator
 
         public List<OwnedWeapon> OwnedWeapons { get; } = [Domain.ShopCatalog.CreateWeaponInstance(Domain.ShopCatalog.GetStarterWeapon())];
         public string? EquippedWeaponInstanceId { get; set; }
+        /// <summary>Raider-owned shield and durability, persisted across raids. KO clears it; admission never repairs it.</summary>
+        public ShieldLoadout Shield { get; set; } = ShieldRules.InitialLoadout;
+        /// <summary>The shield state committed at the most recent admission; the settlement baseline for wear.</summary>
+        public ShieldLoadout DeployedShield { get; set; } = ShieldRules.InitialLoadout;
+        /// <summary>Home visit whose single shield-desk decision has committed; guards against repeat commits.</summary>
+        public int ShieldDecisionVisit { get; set; } = -1;
         public Dictionary<string, int> SupplyStock { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, int> StagedSupplies { get; } = new(StringComparer.OrdinalIgnoreCase);
         public int SignalCurrent { get; set; } = 3;
@@ -1867,7 +1994,8 @@ public sealed record HandlerProjection(
     IReadOnlyList<PreparationDecisionView>? LatestPreparationDecisions = null,
     string? HubErrand = null,
     TraderStockView? TraderStock = null,
-    RaiderStatsView? Stats = null);
+    RaiderStatsView? Stats = null,
+    OwnedShieldView? Shield = null);
 public sealed record TraderStockView(long CycleIndex, IReadOnlyList<TraderStockItemView> Items);
 public sealed record TraderStockItemView(string CatalogId, string Name, string Category, int? Quantity, int UnitPrice);
 public sealed record HubResidentView(string Slot, string DisplayName, string Status, DateTimeOffset? HomeAvailableAt);

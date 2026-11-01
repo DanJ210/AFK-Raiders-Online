@@ -9,7 +9,7 @@ Use source material only for the broad function: hub vendors give the player rec
 | Trader archetype | Canon identity | Content hooks |
 |---|---|---|
 | Pawn Desk | A valuation counter where cracked mugs become investment vehicles if described with enough confidence. | Stash overflow, sell jokes, extraction greed, future market UI. |
-| Gear Weirdos | Loadout sellers who believe every refurbished battery, shield plate, or cable has a destiny. | Finite shared cycle stock, weapon offers, repairs, truthful sold-out/substitution Comms, and deployment pep talks. |
+| Gear Weirdos | Loadout sellers who believe every refurbished battery, shield plate, or cable has a destiny. | Finite shared cycle stock, weapon offers, repairs, truthful sold-out/substitution Comms, and deployment pep talks. BAL-1S adds unlimited standing shield offers (Courtesy, Reasonable and Excessive Bubble; placeholder names, non-canon, pending approval) and paid shield repair. These offers are not part of cycle stock. |
 | Coupon Barons | Discount mathematicians who treat barter rates like diplomacy. | Hub gossip, bargain events, coin jokes, mood penalties. |
 | Nearly Fresh Counter | Food vendors with a flexible legal relationship to freshness. | Mood events, snacks, healing-adjacent flavor, ration jokes. |
 | Bravado Battery Kiosk | A power stall where every cell is marketed as courageous. | Shield rechargers, battery loot, humming equipment jokes. |
@@ -33,7 +33,7 @@ Use source material only for the broad function: hub vendors give the player rec
 | Trader archetype | First event hooks |
 |---|---|
 | Pawn Desk | `hub_pawn_desk_cracked_mug_index`, `hub_pawn_clerk_squints`, `hub_pawn_desk_overflow_prophecy`, `extract_pawn_desk_valuation_intrusive` |
-| Gear Weirdos | `hub_gear_weirdo_battery_pitch`, `hub_gear_weirdo_shield_pitch`, `deploy_gear_weirdo_recharger_demo` |
+| Gear Weirdos | `hub_gear_weirdo_battery_pitch`, `hub_gear_weirdo_shield_pitch`, `deploy_gear_weirdo_recharger_demo`. The online BAL-1S `hub.economy-shield-upgraded` line reuses the shield pitch's "mostly theoretical, emotionally proven" from legacy `src/content/hub_events.json` at revision `4deaef9fb3dc678a38bdc9637bf44bbb78f3ea10` (DanJ210/afk-raiders, verified 2026-11-01); only the quoted phrase is reused, not its weight, conditions or effects. |
 | Coupon Barons | `hub_coupon_barons_math`, `hub_coupon_barons_receipt_duel` |
 | Nearly Fresh Counter | `hub_nearly_fresh_sample_table`, `hub_nearly_fresh_counter_sample_oath` |
 | Bravado Battery Kiosk | `hub_bravado_battery_kiosk_tiny_spark` |

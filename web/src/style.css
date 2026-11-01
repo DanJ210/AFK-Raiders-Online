@@ -250,6 +250,10 @@ th { color: var(--muted); }
 .weapon-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .equipped-tag { font: 700 9px Consolas, monospace; background: #163e52; color: #56d2ff; padding: 1px 6px; border-radius: 2px; }
 .rarity-badge { font: 700 9px Consolas, monospace; padding: 1px 6px; border-radius: 2px; color: var(--rarity-color); background: color-mix(in srgb, var(--rarity-color) 15%, #101222); }
+.shield-card { --rarity-color: var(--muted); border-left: 4px solid var(--rarity-color); }
+.shield-card[data-shield-color="green"] { --rarity-color: #5fd38d; }
+.shield-card[data-shield-color="blue"] { --rarity-color: #5aa9ff; }
+.shield-card[data-shield-color="pink"] { --rarity-color: #ff7ac8; }
 .weapon-flavor { color: #8e94a8; font-size: 11px; font-style: italic; line-height: 1.4; }
 .weapon-stats-row { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: #bcc1db; }
 .repair-cost-tag { color: #ffda79; font: 10px Consolas, monospace; }

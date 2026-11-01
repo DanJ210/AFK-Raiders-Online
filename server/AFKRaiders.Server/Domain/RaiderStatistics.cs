@@ -25,7 +25,11 @@ public sealed record RaidStatsSample(
     int ItemsLost,
     int ValueLost,
     int WeaponsFound,
-    bool WeaponLost)
+    bool WeaponLost,
+    string? DeployShieldTier = null,
+    int DeployShieldDurabilityCenti = 0,
+    int ShieldDurabilityLostCenti = 0,
+    bool ShieldLost = false)
 {
     public const string UnratedDanger = "Unrated";
 
@@ -34,7 +38,10 @@ public sealed record RaidStatsSample(
         string playerId,
         bool knockedOut,
         int weaponsFound,
-        bool weaponLost)
+        bool weaponLost,
+        ShieldLoadout? deployShield = null,
+        int shieldDurabilityLostCenti = 0,
+        bool shieldLost = false)
     {
         var hpRobot = 0;
         var hpHazard = 0;
@@ -100,7 +107,11 @@ public sealed record RaidStatsSample(
             ItemsLost: projection.MyLostHaulCount,
             ValueLost: projection.MyLostHaulValue,
             WeaponsFound: weaponsFound,
-            WeaponLost: weaponLost);
+            WeaponLost: weaponLost,
+            DeployShieldTier: deployShield?.Tier.ToString(),
+            DeployShieldDurabilityCenti: deployShield?.DurabilityCenti ?? 0,
+            ShieldDurabilityLostCenti: shieldDurabilityLostCenti,
+            ShieldLost: shieldLost);
     }
 }
 
@@ -130,7 +141,15 @@ public sealed record DangerStatsView(
     int ItemsLost,
     int ValueLost,
     int WeaponsFound,
-    int WeaponsLost)
+    int WeaponsLost,
+    int ShieldDurabilityLostCenti = 0,
+    int UnshieldedRaids = 0,
+    int LightShieldRaids = 0,
+    int MediumShieldRaids = 0,
+    int HeavyShieldRaids = 0,
+    int WeakShieldRaids = 0,
+    int BrokenShieldRaids = 0,
+    int ShieldsLost = 0)
 {
     public static DangerStatsView Empty(string danger) =>
         new(danger, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -161,8 +180,19 @@ public sealed record DangerStatsView(
         ItemsLost = ItemsLost + s.ItemsLost,
         ValueLost = ValueLost + s.ValueLost,
         WeaponsFound = WeaponsFound + s.WeaponsFound,
-        WeaponsLost = WeaponsLost + (s.WeaponLost ? 1 : 0)
+        WeaponsLost = WeaponsLost + (s.WeaponLost ? 1 : 0),
+        ShieldDurabilityLostCenti = ShieldDurabilityLostCenti + s.ShieldDurabilityLostCenti,
+        UnshieldedRaids = UnshieldedRaids + (s.DeployShieldTier == nameof(ShieldTier.None) ? 1 : 0),
+        LightShieldRaids = LightShieldRaids + (s.DeployShieldTier == nameof(ShieldTier.Light) ? 1 : 0),
+        MediumShieldRaids = MediumShieldRaids + (s.DeployShieldTier == nameof(ShieldTier.Medium) ? 1 : 0),
+        HeavyShieldRaids = HeavyShieldRaids + (s.DeployShieldTier == nameof(ShieldTier.Heavy) ? 1 : 0),
+        WeakShieldRaids = WeakShieldRaids + (IsShielded(s) && s.DeployShieldDurabilityCenti is > 0 and <= ShieldRules.WeakDurabilityCenti ? 1 : 0),
+        BrokenShieldRaids = BrokenShieldRaids + (IsShielded(s) && s.DeployShieldDurabilityCenti <= 0 ? 1 : 0),
+        ShieldsLost = ShieldsLost + (s.ShieldLost ? 1 : 0)
     };
+
+    private static bool IsShielded(RaidStatsSample s) =>
+        s.DeployShieldTier is not null && s.DeployShieldTier != nameof(ShieldTier.None);
 
     public DangerStatsView Merge(DangerStatsView o) => this with
     {
@@ -190,7 +220,15 @@ public sealed record DangerStatsView(
         ItemsLost = ItemsLost + o.ItemsLost,
         ValueLost = ValueLost + o.ValueLost,
         WeaponsFound = WeaponsFound + o.WeaponsFound,
-        WeaponsLost = WeaponsLost + o.WeaponsLost
+        WeaponsLost = WeaponsLost + o.WeaponsLost,
+        ShieldDurabilityLostCenti = ShieldDurabilityLostCenti + o.ShieldDurabilityLostCenti,
+        UnshieldedRaids = UnshieldedRaids + o.UnshieldedRaids,
+        LightShieldRaids = LightShieldRaids + o.LightShieldRaids,
+        MediumShieldRaids = MediumShieldRaids + o.MediumShieldRaids,
+        HeavyShieldRaids = HeavyShieldRaids + o.HeavyShieldRaids,
+        WeakShieldRaids = WeakShieldRaids + o.WeakShieldRaids,
+        BrokenShieldRaids = BrokenShieldRaids + o.BrokenShieldRaids,
+        ShieldsLost = ShieldsLost + o.ShieldsLost
     };
 }
 
@@ -203,9 +241,29 @@ public sealed record EconomyStatsView(
     int SuppliesBought,
     int CoinsOnSupplies,
     int ItemsSold,
-    int CoinsFromSales)
+    int CoinsFromSales,
+    int LightShieldsBought = 0,
+    int MediumShieldsBought = 0,
+    int HeavyShieldsBought = 0,
+    int EmergencyShieldsBought = 0,
+    int ShieldUpgrades = 0,
+    int CoinsOnShields = 0,
+    int ShieldRepairs = 0,
+    int CoinsOnShieldRepairs = 0,
+    int ShieldPointsRepaired = 0,
+    int UnshieldedDeployDecisions = 0)
 {
     public static readonly EconomyStatsView Empty = new(0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+    public EconomyStatsView Merge(EconomyStatsView o) => new(
+        WeaponsBought + o.WeaponsBought, CoinsOnWeapons + o.CoinsOnWeapons, Repairs + o.Repairs,
+        CoinsOnRepairs + o.CoinsOnRepairs, LoanerKettles + o.LoanerKettles, SuppliesBought + o.SuppliesBought,
+        CoinsOnSupplies + o.CoinsOnSupplies, ItemsSold + o.ItemsSold, CoinsFromSales + o.CoinsFromSales,
+        LightShieldsBought + o.LightShieldsBought, MediumShieldsBought + o.MediumShieldsBought,
+        HeavyShieldsBought + o.HeavyShieldsBought, EmergencyShieldsBought + o.EmergencyShieldsBought,
+        ShieldUpgrades + o.ShieldUpgrades, CoinsOnShields + o.CoinsOnShields, ShieldRepairs + o.ShieldRepairs,
+        CoinsOnShieldRepairs + o.CoinsOnShieldRepairs, ShieldPointsRepaired + o.ShieldPointsRepaired,
+        UnshieldedDeployDecisions + o.UnshieldedDeployDecisions);
 }
 
 /// <summary>
@@ -217,7 +275,11 @@ public sealed record RaiderStatsView(
     DateTimeOffset? Since,
     DangerStatsView Total,
     IReadOnlyList<DangerStatsView> ByDanger,
-    EconomyStatsView Economy);
+    EconomyStatsView Economy,
+    ShieldStreakView? ShieldStreaks = null);
+
+/// <summary>Consecutive settled raids deployed without any shield.</summary>
+public sealed record ShieldStreakView(int Current, int Longest, int Streaks);
 
 public sealed class RaiderStatistics
 {
@@ -230,8 +292,17 @@ public sealed class RaiderStatistics
 
     public void Start(DateTimeOffset at) => Since ??= at;
 
-    public void RecordRaid(RaidStatsSample sample) =>
+    public ShieldStreakView ShieldStreaks { get; private set; } = new(0, 0, 0);
+
+    public void RecordRaid(RaidStatsSample sample)
+    {
         byDanger[sample.Danger] = byDanger.GetValueOrDefault(sample.Danger, DangerStatsView.Empty(sample.Danger)).Add(sample);
+        if (sample.DeployShieldTier is null) return;
+        ShieldStreaks = sample.DeployShieldTier == nameof(ShieldTier.None)
+            ? new(ShieldStreaks.Current + 1, Math.Max(ShieldStreaks.Longest, ShieldStreaks.Current + 1),
+                ShieldStreaks.Streaks + (ShieldStreaks.Current == 0 ? 1 : 0))
+            : ShieldStreaks with { Current = 0 };
+    }
 
     public void RecordEconomy(Func<EconomyStatsView, EconomyStatsView> change) => Economy = change(Economy);
 
@@ -242,6 +313,6 @@ public sealed class RaiderStatistics
             .ThenBy(d => d.Danger, StringComparer.Ordinal)
             .ToArray();
         var total = ordered.Aggregate(DangerStatsView.Empty("All"), (sum, d) => sum.Merge(d));
-        return new RaiderStatsView(SessionScope, Since, total, ordered, Economy);
+        return new RaiderStatsView(SessionScope, Since, total, ordered, Economy, ShieldStreaks);
     }
 }

@@ -205,7 +205,8 @@ public sealed class WeaponCombatTests(ITestOutputHelper output)
         reference.AddAutonomousRaider(admitted.PlayerId, admitted.Slot, Start.AddSeconds(600),
             raid.MyFieldSupplies!.Select(s => new StagedSupplyItem(s.CatalogId, s.Name, s.Category, s.Quantity)),
             new(raid.MyGreed, raid.MyMood), primaryTrait: Enum.Parse<RaiderPrimaryTrait>(admitted.PrimaryTrait),
-            equippedWeapon: Weapon(equipped.CatalogId));
+            equippedWeapon: Weapon(equipped.CatalogId),
+            shield: new ShieldLoadout(Enum.Parse<ShieldTier>(admitted.Shield!.Tier), (int)Math.Round(admitted.Shield.Durability * 100)));
 
         var observedRound = false;
         var settled = false;

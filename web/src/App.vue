@@ -107,6 +107,8 @@ type Projection = {
   myShieldCharge?: number
   myShieldMaxCharge?: number
   myShieldDurability?: number
+  myShieldTier?: string | null
+  myShieldMitigationPermille?: number
   myHiddenPocketInstanceId?: string | null
   myFieldSupplies?: StagedSupplyItem[] | null
   myCauseOfDefeat?: string | null
@@ -156,6 +158,11 @@ type HandlerProjection = {
   hubErrand?: string | null
   traderStock?: TraderStockView | null
   stats?: RaiderStatsView | null
+  shield?: OwnedShieldView | null
+}
+type OwnedShieldView = {
+  tier: string; catalogId: string | null; name: string | null; color: string | null
+  durability: number; maxDurability: number; maxCharge: number; mitigationPercent: number
 }
 type HandlerSupportActionResponse = {
   commandId: string
@@ -172,7 +179,7 @@ type DesignateHiddenPocketResponse = {
 }
 type EnrollResponse = { accessToken: string; projection: HandlerProjection }
 
-const expectedRulesVersion = 'desperanza-bal-1-v1'
+const expectedRulesVersion = 'desperanza-bal-1s-v1'
 const requestedIdentity = new URLSearchParams(window.location.search).get('handler')
 const slot = ref<'raider-one' | 'raider-two'>(requestedIdentity === 'two' ? 'raider-two' : 'raider-one')
 const session = shallowRef<HandlerAccess | null>(null)
@@ -233,9 +240,17 @@ const myHealth = computed(() => projection.value?.myHealth ?? 40)
 const myMaxHealth = computed(() => projection.value?.myMaxHealth ?? 40)
 const hpPercent = computed(() => Math.max(0, Math.min(100, Math.round((myHealth.value / myMaxHealth.value) * 100))))
 const shieldCharge = computed(() => projection.value?.myShieldCharge ?? 0)
-const shieldMaxCharge = computed(() => projection.value?.myShieldMaxCharge ?? 40)
-const shieldPercent = computed(() => Math.max(0, Math.min(100, Math.round((shieldCharge.value / shieldMaxCharge.value) * 100))))
-const shieldDurability = computed(() => projection.value?.myShieldDurability ?? 100.0)
+const shieldMaxCharge = computed(() => projection.value?.myShieldMaxCharge ?? 0)
+const shieldPercent = computed(() => shieldMaxCharge.value <= 0 ? 0 : Math.max(0, Math.min(100, Math.round((shieldCharge.value / shieldMaxCharge.value) * 100))))
+const shieldDurability = computed(() => projection.value?.myShieldDurability ?? 0)
+const raidShieldTier = computed(() => projection.value?.myShieldTier ?? 'None')
+const raidShieldMitigation = computed(() => ((projection.value?.myShieldMitigationPermille ?? 0) / 10).toFixed(1))
+const ownedShield = computed(() => handlerProjection.value?.shield ?? null)
+const ownedShieldSummary = computed(() => {
+  const shield = ownedShield.value
+  if (!shield || shield.tier === 'None' || !shield.name) return 'Unshielded'
+  return `${shield.name} (${shield.durability}/${shield.maxDurability})`
+})
 const myHiddenPocketInstanceId = computed(() => projection.value?.myHiddenPocketInstanceId ?? handlerProjection.value?.secretHiddenPocketInstanceId ?? null)
 const pocketedItem = computed(() => loot.value.find(item => item.instanceId === myHiddenPocketInstanceId.value) ?? null)
 const activeFieldSupplies = computed(() => projection.value?.myFieldSupplies ?? [])
@@ -872,6 +887,7 @@ onBeforeUnmount(() => {
         <div><span class="label">SIGNAL BUDGET</span><strong class="highlight-signal">{{ signalCurrent }} / {{ signalMax }} ⚡</strong></div>
         <div><span class="label">SPENDABLE COINS</span><strong class="highlight-coins">{{ coins }} ¢</strong></div>
         <div><span class="label">ARMED WEAPON</span><strong>{{ equippedWeapon ? `${equippedWeapon.name} (${equippedWeapon.currentDurability}/${equippedWeapon.maxDurability})` : 'Unarmed' }}</strong></div>
+        <div><span class="label">SHIELD</span><strong>{{ ownedShieldSummary }}</strong></div>
         <div><span class="label">FIELD STAGED</span><strong>{{ stagedSupplies.reduce((acc, s) => acc + s.quantity, 0) }} items</strong></div>
         <div><span class="label">HOME STASH</span><strong>{{ stashCount }} / {{ stashCapacity }} ({{ stashCapacityPercent }}%)</strong></div>
         <div><span class="label">CAPACITY / PULSE</span><strong>2 actual Raiders / 30s</strong></div>
@@ -947,6 +963,25 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <p v-else class="empty">No committed weapon is currently projected.</p>
+            </div>
+
+            <div>
+              <p class="eyebrow">EQUIPPED SHIELD</p>
+              <div v-if="ownedShield && ownedShield.tier !== 'None' && ownedShield.name" class="weapon-card equipped-weapon-card shield-card" :data-shield-color="ownedShield.color?.toLowerCase()">
+                <div class="weapon-main-info">
+                  <div class="weapon-title-row">
+                    <span class="equipped-tag">ACTIVE</span>
+                    <strong>{{ ownedShield.name }}</strong>
+                    <span class="rarity-badge">{{ ownedShield.tier }} / {{ ownedShield.color }}</span>
+                  </div>
+                  <div class="weapon-stats-row">
+                    <span>Charge: {{ ownedShield.maxCharge }}</span>
+                    <span>Mitigation: {{ ownedShield.mitigationPercent.toFixed(1) }}%</span>
+                    <span>Durability: {{ ownedShield.durability }} / {{ ownedShield.maxDurability }}</span>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="empty">Unshielded. The Raider buys a replacement on its own when it can afford one.</p>
             </div>
 
             <div>
@@ -1235,7 +1270,7 @@ onBeforeUnmount(() => {
 
             <div class="meter-card shield-meter">
               <div class="meter-info">
-                <span class="meter-label">SHIELD CHARGE (40% MITIGATION)</span>
+                <span class="meter-label">{{ raidShieldTier === 'None' ? 'NO SHIELD EQUIPPED' : `${raidShieldTier.toUpperCase()} SHIELD CHARGE (${raidShieldMitigation}% MITIGATION)` }}</span>
                 <strong class="meter-value" :class="{ 'shield-depleted': shieldCharge <= 0 }">{{ shieldCharge }} / {{ shieldMaxCharge }} pts</strong>
               </div>
               <div class="progress-bar-bg">
@@ -1243,7 +1278,8 @@ onBeforeUnmount(() => {
               </div>
               <div class="shield-meta-row">
                 <small class="shield-durability-note">Durability: {{ shieldDurability }}% integrity</small>
-                <small v-if="shieldCharge <= 0" class="shield-down-warn">⚠️ SHIELD DOWN — Breakthrough damage unmitigated</small>
+                <small v-if="raidShieldTier !== 'None' && shieldCharge <= 0" class="shield-down-warn">⚠️ SHIELD DOWN — Breakthrough damage unmitigated</small>
+                <small v-else-if="raidShieldTier !== 'None' && shieldDurability <= 0" class="shield-down-warn">⚠️ SHIELD BROKEN — No mitigation until repaired</small>
               </div>
             </div>
           </div>

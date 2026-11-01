@@ -86,6 +86,11 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
             Assert.True(stats.Total.MedicalCarried >= stats.Total.MedicalUsed + stats.Total.RevivesUsed);
             Assert.True(stats.Total.ContestsWon + stats.Total.ContestsLost <= stats.Total.CrossedPaths);
             Assert.All(stats.ByDanger, d => Assert.Contains(d.Danger, new[] { "Low", "Medium", "High" }));
+            Assert.Equal(stats.Total.Raids, stats.Total.UnshieldedRaids + stats.Total.LightShieldRaids
+                + stats.Total.MediumShieldRaids + stats.Total.HeavyShieldRaids);
+            Assert.InRange(stats.Total.ShieldsLost, 0, stats.Total.KnockOuts);
+            Assert.InRange(stats.Total.BrokenShieldRaids, 0, stats.Total.Raids - stats.Total.UnshieldedRaids);
+            Assert.Equal(stats.Economy.UnshieldedDeployDecisions, stats.Total.UnshieldedRaids);
         }
     }
 
@@ -93,7 +98,8 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
     public void AbsentHandlersAccumulateTheSameStatsAsPolledHandlers()
     {
         var polled = RunRecurringCohort(seed: 11, hours: 2, pollSeconds: 5);
-        var absent = RunRecurringCohort(seed: 11, hours: 2, pollSeconds: int.MaxValue);
+        var absent = RunRecurringCohort(seed: 11, hours: 2, pollSeconds: int.MaxValue);        Assert.Contains(polled.Stats, s => s.Total.ShieldDurabilityLostCenti > 0);
+
         Assert.Equal(
             System.Text.Json.JsonSerializer.Serialize(polled.Stats),
             System.Text.Json.JsonSerializer.Serialize(absent.Stats));
@@ -171,10 +177,8 @@ public static class BalanceReport
             .ToList();
         var total = dangers.Aggregate(DangerStatsView.Empty("All"), (sum, d) => sum.Merge(d));
         dangers.Add(total);
-        var economy = raiders.Select(r => r.Economy).Aggregate(EconomyStatsView.Empty, (a, b) => new EconomyStatsView(
-            a.WeaponsBought + b.WeaponsBought, a.CoinsOnWeapons + b.CoinsOnWeapons, a.Repairs + b.Repairs,
-            a.CoinsOnRepairs + b.CoinsOnRepairs, a.LoanerKettles + b.LoanerKettles, a.SuppliesBought + b.SuppliesBought,
-            a.CoinsOnSupplies + b.CoinsOnSupplies, a.ItemsSold + b.ItemsSold, a.CoinsFromSales + b.CoinsFromSales));
+        var economy = raiders.Select(r => r.Economy).Aggregate(EconomyStatsView.Empty, (a, b) => a.Merge(b));
+
 
         static string Pct(int n, int d) => d == 0 ? "-" : (100.0 * n / d).ToString("F1", CultureInfo.InvariantCulture) + "%";
         static string Per(int n, int d) => d == 0 ? "-" : ((double)n / d).ToString("F2", CultureInfo.InvariantCulture);
@@ -218,6 +222,20 @@ public static class BalanceReport
         sb.AppendLine($"| {economy.WeaponsBought} | {economy.CoinsOnWeapons} | {economy.Repairs} | {economy.CoinsOnRepairs} | {economy.LoanerKettles} | {economy.SuppliesBought} | {economy.CoinsOnSupplies} | {economy.ItemsSold} | {economy.CoinsFromSales} |");
         sb.AppendLine();
         sb.AppendLine($"Weapon inflow (found + bought + loaner) vs outflow (lost on KO): {total.WeaponsFound + economy.WeaponsBought + economy.LoanerKettles} in / {total.WeaponsLost} out.");
+        sb.AppendLine();
+        sb.AppendLine("## Shields (BAL-1S, experimental)");
+        sb.AppendLine();
+        sb.AppendLine("| Danger | Raids | Deployed none | Light | Medium | Heavy | Started weak (<=25) | Started broken | Durability lost/raid | Shields lost on KO |");
+        sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        foreach (var d in dangers)
+            sb.AppendLine($"| {d.Danger} | {d.Raids} | {Pct(d.UnshieldedRaids, d.Raids)} | {Pct(d.LightShieldRaids, d.Raids)} | {Pct(d.MediumShieldRaids, d.Raids)} | {Pct(d.HeavyShieldRaids, d.Raids)} | {Pct(d.WeakShieldRaids, d.Raids)} | {Pct(d.BrokenShieldRaids, d.Raids)} | {(d.Raids == 0 ? "-" : (d.ShieldDurabilityLostCenti / 100.0 / d.Raids).ToString("F2", CultureInfo.InvariantCulture))} | {d.ShieldsLost} |");
+        sb.AppendLine();
+        var shieldSpend = economy.CoinsOnShields + economy.CoinsOnShieldRepairs;
+        var streaks = raiders.Select(r => r.ShieldStreaks ?? new ShieldStreakView(0, 0, 0)).ToArray();
+        var streakCount = streaks.Sum(s => s.Streaks);
+        sb.AppendLine("| Light / Medium / Heavy bought | Emergency Lights | Upgrades | Coins on shields | Shield repairs (points) | Coins on shield repairs | Shield spend/settled raid | Unshielded deploy decisions | Unshielded streaks (mean / max) |");
+        sb.AppendLine("|---|---:|---:|---:|---|---:|---:|---:|---|");
+        sb.AppendLine($"| {economy.LightShieldsBought} / {economy.MediumShieldsBought} / {economy.HeavyShieldsBought} | {economy.EmergencyShieldsBought} | {economy.ShieldUpgrades} | {economy.CoinsOnShields} | {economy.ShieldRepairs} ({economy.ShieldPointsRepaired}) | {economy.CoinsOnShieldRepairs} | {Per(shieldSpend, total.Raids)} | {economy.UnshieldedDeployDecisions} | {streakCount} streaks, {(streakCount == 0 ? "-" : ((double)total.UnshieldedRaids / streakCount).ToString("F2", CultureInfo.InvariantCulture))} / {(streaks.Length == 0 ? 0 : streaks.Max(s => s.Longest))} |");
         return sb.ToString();
     }
 }

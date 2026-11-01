@@ -7,7 +7,7 @@ namespace AFKRaiders.Server.Domain;
 
 public sealed class RaidSimulation
 {
-    public const string RulesVersion = "desperanza-bal-1-v1";
+    public const string RulesVersion = "desperanza-bal-1s-v1";
     public static readonly TimeSpan AdmissionWindow = TimeSpan.FromSeconds(20);
     public const int MaxRaiders = 2;
     private const int PodDeploymentSeconds = 60;
@@ -118,6 +118,12 @@ public sealed class RaidSimulation
         var raider = raiders.Single(r => r.PlayerId == playerId);
         return new(new Dictionary<string, long>(raider.VoiceCounts), raider.LastVoice);
     }
+    /// <summary>The Raider's equipped shield with its current (worn) durability.</summary>
+    internal ShieldLoadout ShieldState(string playerId)
+    {
+        var raider = raiders.Single(r => r.PlayerId == playerId);
+        return new(raider.ShieldTier, raider.ShieldDurabilityCenti);
+    }
     internal void RestoreVoiceState(string playerId, RaiderVoiceState? state)
     {
         if (state is null) return;
@@ -162,7 +168,7 @@ public sealed class RaidSimulation
     public string Status => Completed ? "Completed" : !departed ? "Preparing" : "Raiding";
 
     public void AddRaider(string playerId, string slot, DateTimeOffset now, IEnumerable<StagedSupplyItem>? stagedSupplies = null,
-        WeaponDefinition? equippedWeapon = null)
+        WeaponDefinition? equippedWeapon = null, ShieldLoadout? shield = null)
     {
         if (slot is not ("raider-one" or "raider-two"))
         {
@@ -182,7 +188,7 @@ public sealed class RaidSimulation
             throw new RaidAccessException("PlayerAlreadyJoined");
         }
 
-        raiders.Add(CreateRaider(playerId, slot, StartsAt + AdmissionWindow, stagedSupplies, equippedWeapon: equippedWeapon));
+        raiders.Add(CreateRaider(playerId, slot, StartsAt + AdmissionWindow, stagedSupplies, equippedWeapon: equippedWeapon, shield: shield));
         Revision++;
         var added = raiders.Single(raider => raider.PlayerId == playerId);
         Emit(now, "Deployment", [playerId], NarrationContent.Default.Format("narrator.checks-in-the-handler-is", added.Name));
@@ -190,7 +196,7 @@ public sealed class RaidSimulation
 
     public void AddAutonomousRaider(string playerId, string slot, DateTimeOffset at, IEnumerable<StagedSupplyItem>? stagedSupplies = null,
         RaiderPersonality? personality = null, RaiderVoiceState? voiceState = null,
-        RaiderPrimaryTrait? primaryTrait = null, WeaponDefinition? equippedWeapon = null)
+        RaiderPrimaryTrait? primaryTrait = null, WeaponDefinition? equippedWeapon = null, ShieldLoadout? shield = null)
     {
         if (slot is not ("raider-one" or "raider-two"))
         {
@@ -215,7 +221,7 @@ public sealed class RaidSimulation
         }
 
         departed = true;
-        raiders.Add(CreateRaider(playerId, slot, at, stagedSupplies, personality, primaryTrait, equippedWeapon));
+        raiders.Add(CreateRaider(playerId, slot, at, stagedSupplies, personality, primaryTrait, equippedWeapon, shield));
         RestoreVoiceState(playerId, voiceState);
         Revision++;
         var added = raiders.Single(raider => raider.PlayerId == playerId);
@@ -266,7 +272,8 @@ public sealed class RaidSimulation
     }
 
     private SimRaider CreateRaider(string playerId, string slot, DateTimeOffset readyAt, IEnumerable<StagedSupplyItem>? stagedSupplies = null,
-        RaiderPersonality? personality = null, RaiderPrimaryTrait? primaryTrait = null, WeaponDefinition? equippedWeapon = null)
+        RaiderPersonality? personality = null, RaiderPrimaryTrait? primaryTrait = null, WeaponDefinition? equippedWeapon = null,
+        ShieldLoadout? shield = null)
     {
         var trait = primaryTrait ?? RaiderEconomyPolicy.TraitFromSeed(Factor(slot, "primary-trait"));
         var hoarder = trait == RaiderPrimaryTrait.Hoarder;
@@ -284,6 +291,7 @@ public sealed class RaidSimulation
             AdmittedAt = readyAt,
             Weapon = equippedWeapon ?? ShopCatalog.GetStarterWeapon()
         };
+        raider.EquipShield(shield ?? ShieldRules.InitialLoadout);
 
         if (stagedSupplies is not null)
         {
@@ -509,7 +517,7 @@ public sealed class RaidSimulation
             recentThreads,
             me.ShieldCharge,
             me.ShieldMaxCharge,
-            me.ShieldDurability,
+            me.ShieldDurabilityCenti / 100.0,
             me.HiddenPocketInstanceId,
             me.FieldSupplies.Where(s => s.Quantity > 0).Select(s => s.ToView()).ToArray(),
             me.CauseOfDefeat,
@@ -520,7 +528,9 @@ public sealed class RaidSimulation
             me.Greed, me.Mood, RaidConditions.Resilience(me.Mood),
             CurrentExtractChance(me, serverTime), RaidConditions.Appetite(me.Greed, me.Mood),
             riskReward ? RaidConditions.Exposure(StartsAt, serverTime) : 0,
-            hazardWarnings.ToArray());
+            hazardWarnings.ToArray(),
+            me.ShieldTier.ToString(),
+            me.ShieldMitigationPermille);
     }
 
     private static string OpportunityStatus(Opportunity opportunity) =>
@@ -1604,14 +1614,15 @@ public sealed class RaidSimulation
             ChangePersonality(raider, 0, -1, at, source);
         }
         int hpDamage;
-        if (raider.ShieldCharge > 0 && raider.ShieldDurability > 0)
+        if (raider.ShieldActive && raider.ShieldCharge >= 1)
         {
             var chargeLost = Math.Min(raider.ShieldCharge, rawDamage);
-            hpDamage = rawDamage - (int)Math.Floor(chargeLost * 0.4);
+            var mitigated = ShieldRules.Mitigate(rawDamage, raider.ShieldMitigationPermille, ref raider.ShieldMitigationCarry);
+            hpDamage = rawDamage - mitigated;
             raider.ShieldCharge -= chargeLost;
 
-            var durabilityLost = Math.Min(raider.ShieldDurability, Math.Round(((double)chargeLost / raider.ShieldMaxCharge) * 10.0, 2));
-            raider.ShieldDurability = Math.Max(0, raider.ShieldDurability - durabilityLost);
+            var wear = ShieldRules.WearCenti(chargeLost, raider.ShieldMaxCharge, Condition.Danger);
+            raider.ShieldDurabilityCenti = Math.Max(0, raider.ShieldDurabilityCenti - wear);
 
             Emit(at, "ShieldAbsorbed", [raider.PlayerId],
                 NarrationContent.Default.Format("simulation.shield-lost-charge-hp-got", chargeLost, hpDamage),
@@ -1688,7 +1699,7 @@ public sealed class RaidSimulation
             }
         }
 
-        if (raider.ShieldCharge <= 15)
+        if (raider.ShieldActive && raider.ShieldCharge <= ShieldRules.RechargeTrigger(raider.ShieldMaxCharge))
         {
             var shieldSupply = raider.FieldSupplies
                 .Where(s => s.ChargeAmount > 0 && s.Quantity > 0)
@@ -1827,9 +1838,33 @@ public sealed class RaidSimulation
         public DateTimeOffset ActivityStartedAt { get; set; }
         public int MaxHealth { get; } = 40;
         public int Health { get; set; } = 40;
-        public int ShieldMaxCharge { get; } = 40;
-        public int ShieldCharge { get; set; } = 40;
-        public double ShieldDurability { get; set; } = 100.0;
+        public int ShieldMaxCharge { get; private set; }
+        public int ShieldCharge { get; set; }
+        public ShieldTier ShieldTier { get; private set; }
+        public int ShieldMitigationPermille { get; private set; }
+        public int ShieldDurabilityCenti { get; set; }
+        public int ShieldMitigationCarry;
+        public bool ShieldActive => ShieldTier != ShieldTier.None && ShieldDurabilityCenti > 0;
+
+        /// <summary>Admission equips the persisted shield and refills charge only; durability and tier come from the Raider record.</summary>
+        public void EquipShield(ShieldLoadout shield)
+        {
+            if (!shield.HasShield)
+            {
+                ShieldTier = ShieldTier.None;
+                ShieldMaxCharge = 0;
+                ShieldCharge = 0;
+                ShieldMitigationPermille = 0;
+                ShieldDurabilityCenti = 0;
+                return;
+            }
+            var definition = ShopCatalog.GetShield(shield.Tier);
+            ShieldTier = shield.Tier;
+            ShieldMaxCharge = definition.MaxCharge;
+            ShieldCharge = definition.MaxCharge;
+            ShieldMitigationPermille = definition.MitigationPermille;
+            ShieldDurabilityCenti = Math.Clamp(shield.DurabilityCenti, 0, ShieldRules.MaxDurabilityCenti);
+        }
         public string? HiddenPocketInstanceId { get; set; }
         public List<FieldSupplyItem> FieldSupplies { get; } = [];
         public string? CauseOfDefeat { get; set; }
@@ -1867,7 +1902,9 @@ public sealed record RaidProjection(string RaidId, int Revision, string RulesVer
     double MyExtractChance = 0,
     double MyAppetite = 0,
     double Exposure = 0,
-    IReadOnlyList<HazardWarningView>? HazardWarnings = null);
+    IReadOnlyList<HazardWarningView>? HazardWarnings = null,
+    string? MyShieldTier = null,
+    int MyShieldMitigationPermille = 0);
 public sealed record OpportunityView(string OpportunityId, string Location, string Activity, string Title,
     string Status, DateTimeOffset? ClosesAt, int RemainingItems, IReadOnlyList<string> ParticipantIds);
 public sealed record PlayerView(string PlayerId, string DisplayName, string PrimaryTrait, string Location,

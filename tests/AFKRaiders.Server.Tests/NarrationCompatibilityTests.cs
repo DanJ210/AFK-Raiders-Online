@@ -62,7 +62,8 @@ public sealed class NarrationCompatibilityTests(ITestOutputHelper output)
             }
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
         output.WriteLine($"Current narration and simulation fingerprint: {hash}");
-        // BAL-1 deliberately changes weapon damage, robot HP and the advertised rules version, not authored content.
-        Assert.Equal("7F1BBE6E566E3C17C0F3B8AE263F8979D5F4C3AABF660ED627BC59D3B80FBEBA", hash);
+        // BAL-1 deliberately changed weapon damage and robot HP; BAL-1S deliberately changes shield mitigation, wear,
+        // projected shield tier/durability and the advertised rules version, not existing authored content.
+        Assert.Equal("540CCFA67C81A1309930306C631271080CF31E956A6ECAEF6E8F1B35239571AB", hash);
     }
 }

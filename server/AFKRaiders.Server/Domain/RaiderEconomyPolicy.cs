@@ -26,7 +26,29 @@ public sealed record RaiderPreparationPlan(
     IReadOnlyList<StagedSupplyItem> StagedSupplies,
     bool UpdateStagedSupplies,
     int ReserveFloor,
-    int RepairReserveFloor);
+    int RepairReserveFloor,
+    ShieldPreparationPlan? Shield = null);
+
+public enum ShieldPlanAction
+{
+    None,
+    Buy,
+    EmergencyBuy,
+    Upgrade,
+    Repair,
+    DeployUnshielded
+}
+
+/// <summary>
+/// The Raider's autonomous shield decision for one hub visit. Offers are unlimited standing Gear Weirdos stock,
+/// so nothing here touches finite cycle stock.
+/// </summary>
+public sealed record ShieldPreparationPlan(
+    ShieldPlanAction Action,
+    ShieldTier Tier,
+    int Cost,
+    int RepairPoints,
+    int DurabilityCentiAfter);
 
 public static class RaiderEconomyPolicy
 {
@@ -72,7 +94,8 @@ public static class RaiderEconomyPolicy
         IReadOnlyList<WeaponDefinition> weaponCatalog,
         IReadOnlyList<SupplyDefinition> supplyCatalog,
         IReadOnlyDictionary<string, int>? traderStock = null,
-        int? reserveFloorOverride = null)
+        int? reserveFloorOverride = null,
+        ShieldLoadout? shield = null)
     {
         var trait = TraitFromSeed(traitSeed);
         var weights = Weights(trait);
@@ -209,6 +232,11 @@ public static class RaiderEconomyPolicy
         var equippedRepairCost = equipped.Weapon.RepairCost;
         var supplyReserve = Math.Max(percentageReserve, equippedRepairCost);
         var remainingCoins = weaponCoins;
+        // Priority: weapon, shield, supplies, staging. Supplies plan from what the shield leaves.
+        var shieldPlan = shield is { } ownedShield
+            ? DecideShield(trait, weaponCoins, supplyReserve, ownedShield)
+            : null;
+        remainingCoins -= shieldPlan?.Cost ?? 0;
         var supplyPurchases = new List<SupplyPurchasePlan>();
         var staged = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var rankedSupplies = supplyCatalog
@@ -303,7 +331,74 @@ public static class RaiderEconomyPolicy
             Math.Max(percentageReserve, equippedRepairCost),
             Math.Max(percentageReserve, weaponToRepair is null
                 ? 0
-                : ownedWeapons.First(weapon => weapon.InstanceId == weaponToRepair).RepairCost));
+                : ownedWeapons.First(weapon => weapon.InstanceId == weaponToRepair).RepairCost),
+            shieldPlan);
+    }
+
+    public static int ShieldRepairThresholdPercent(RaiderPrimaryTrait trait) => Weights(trait).RepairThresholdPercent;
+
+    /// <summary>
+    /// Pure shield decision: affordable upgrades first (full durability, old shield discarded, no trade-in), then
+    /// repair at the trait threshold. Reserve is preserved except when an absent shield is replaced by an emergency
+    /// Light or a zero-durability shield is repaired. An unaffordable replacement deploys unshielded.
+    /// </summary>
+    public static ShieldPreparationPlan DecideShield(
+        RaiderPrimaryTrait trait,
+        int coins,
+        int reserveFloor,
+        ShieldLoadout shield,
+        IReadOnlyList<ShieldDefinition>? catalog = null)
+    {
+        catalog ??= ShopCatalog.Shields;
+        coins = Math.Max(0, coins);
+        reserveFloor = Math.Max(0, reserveFloor);
+        var bestAboveReserve = catalog
+            .Select((definition, index) => (Definition: definition, Tier: (ShieldTier)(index + 1)))
+            .Where(entry => entry.Tier > shield.Tier && coins - entry.Definition.Value >= reserveFloor)
+            .OrderByDescending(entry => entry.Tier)
+            .Select(entry => ((ShieldDefinition Definition, ShieldTier Tier)?)entry)
+            .FirstOrDefault();
+
+        if (!shield.HasShield)
+        {
+            if (bestAboveReserve is { } buy)
+                return new(ShieldPlanAction.Buy, buy.Tier, buy.Definition.Value, 0, ShieldRules.MaxDurabilityCenti);
+            var light = catalog[0];
+            return coins >= light.Value
+                ? new(ShieldPlanAction.EmergencyBuy, ShieldTier.Light, light.Value, 0, ShieldRules.MaxDurabilityCenti)
+                : new(ShieldPlanAction.DeployUnshielded, ShieldTier.None, 0, 0, 0);
+        }
+
+        if (bestAboveReserve is { } upgrade)
+            return new(ShieldPlanAction.Upgrade, upgrade.Tier, upgrade.Definition.Value, 0, ShieldRules.MaxDurabilityCenti);
+
+        var durability = Math.Clamp(shield.DurabilityCenti, 0, ShieldRules.MaxDurabilityCenti);
+        var none = new ShieldPreparationPlan(ShieldPlanAction.None, shield.Tier, 0, 0, durability);
+        if (durability >= ShieldRules.MaxDurabilityCenti
+            || durability > ShieldRepairThresholdPercent(trait) * 100)
+            return none;
+
+        var price = catalog[(int)shield.Tier - 1].Value;
+        var spendable = coins - (durability == 0 ? 0 : reserveFloor);
+        var missing = ShieldRules.MissingPoints(durability);
+        var points = 0;
+        if (missing < ShieldRules.MinimumRepairBlockPoints)
+        {
+            if (ShieldRules.RepairCost(price, missing) <= spendable) points = missing;
+        }
+        else
+        {
+            for (var candidate = missing; candidate >= ShieldRules.MinimumRepairBlockPoints; candidate--)
+            {
+                if (ShieldRules.RepairCost(price, candidate) > spendable) continue;
+                points = candidate;
+                break;
+            }
+        }
+        return points <= 0
+            ? none
+            : new(ShieldPlanAction.Repair, shield.Tier, ShieldRules.RepairCost(price, points), points,
+                ShieldRules.ApplyRepair(durability, points));
     }
 
     private static TraitWeights Weights(RaiderPrimaryTrait trait) => trait switch
