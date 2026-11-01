@@ -100,7 +100,19 @@ The Raider now starts each raid with a basic **Makeshift Confidence Shield** lay
 - When a shield soaks part of a hit, the active-thread feed shows both the shield loss and the remaining HP damage so the mitigation is visible beside the fight or hazard that caused it.
 - For the MVP, returning to the HUB restores the starter shield to full charge and durability.
 - **Planned change (BAL-1S, user-confirmed 2026-10-22; not yet implemented):** shield durability will persist between raids and will no longer be restored for free. The Raider repairs it autonomously in Desperanza for coins. The deterministic decision belongs in `RaiderEconomyPolicy`, using trait-weighted repair thresholds and a protected coin-reserve floor; it is not a Handler action. Repair cost rises with the amount of durability restored, and harder dangers wear shields faster. Open details are tracked in the [BAL plan](IMPLEMENTATION_PROGRESS.md#bal---danger-difficulty-weapon-relevance-and-robot-loot-plan-proposed-2026-10-22).
-- In future phases, a loadout and store loop can decide which shield is equipped and how it persists.
+- **Proposed tiers (2026-10-23; BAL-1S, not implemented):**
+
+  | Tier | Display color | Damage mitigation while functional | Maximum charge |
+  |---|---|---|---|
+  | Light | Green | About 42.1% | 40 |
+  | Medium | Blue | About 46.2% | 70 |
+  | Heavy | Pink | 49.6% | 100 |
+
+  **User decisions (2026-10-23; planned, not implemented):** Knockout loses the equipped shield entirely. Every Raider receives one free Light shield initially; later replacements must be bought with Raider funds from a trader. Medium and Heavy are also trader purchases at higher prices. No recurring free replacement/loaner is authorized. Rechargers are used autonomously.
+
+  Higher-rarity rechargers would restore larger amounts of charge, capped at the equipped shield's maximum; they do not repair durability. The user's admission statement is interpreted as automatic charge refill at admission, not free shield replacement or durability repair. Persistent durability and paid autonomous Desperanza repairs remain the planned rules above. Durability burn uses a deterministic formula; a base percentage and later skill/level modifiers were suggested, but parameters remain open and skill/level systems are deferred.
+
+  Prices/stock, unaffordable replacement/admission behavior, partial repairs, repair priorities, durability capacity/formula parameters, recharge amounts/trigger, charge expenditure and per-hit rounding remain undecided. The current online shield still uses a 40% mitigation coefficient with integer rounding and 40 maximum charge; the planned Light value is about 42.1%. See the [BAL-1S tier proposal](IMPLEMENTATION_PROGRESS.md#bal-1s-shield-tier-proposal-2026-10-23) for reference rechargers and measurement requirements. This proposal does not add Handler equip, recharge or repair controls.
 
 ### Weapon maintenance
 - Successful extraction costs one durability point on the equipped weapon; failed recovery loses that weapon instead. Combat-based wear is not implemented.
