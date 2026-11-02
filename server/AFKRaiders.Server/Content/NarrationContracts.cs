@@ -115,6 +115,8 @@ internal static class NarrationContracts
         ["simulation.joins-the-fight-against-the"] = 4,
         ["simulation.has-no-remaining-fighters-no"] = 1,
         ["simulation.is-disabled-the-service-depot"] = 1,
+        ["simulation.is-disabled-defeat-cargo-claimed"] = 1,
+        ["simulation.is-disabled-no-eligible-claimant"] = 1,
         ["simulation.has-health-it-deals-raw"] = 4,
         ["simulation.overran-all-fighters-the-service"] = 1,
         ["simulation.escapes-after-rounds-the-service"] = 2,

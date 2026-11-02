@@ -74,6 +74,7 @@ public sealed class RaidCoordinator
             state.EquippedWeaponInstanceId = state.OwnedWeapons[0].InstanceId;
             state.LastSignalRegenAt = time.GetUtcNow();
             state.Stats.Start(time.GetUtcNow());
+            state.Stats.RecordInitialAssets(CurrentAssetValue(state), state.OwnedWeapons.Count);
             BeginHomeStay(state, time.GetUtcNow(), initial: true);
             handlers.Add(slot, state);
             handlerCredentials.Add(Hash(accessToken), slot);
@@ -94,6 +95,56 @@ public sealed class RaidCoordinator
             return ProjectHandler(state, time.GetUtcNow());
         }
     }
+
+    /// <summary>
+    /// Measurement-only per-settlement telemetry (true terminal timestamps and post-settlement snapshots).
+    /// Reading never mutates committed outcomes.
+    /// </summary>
+    public RaiderRunTelemetry GetSettlementTelemetry(string accessToken)
+    {
+        lock (gate)
+        {
+            var state = GetAuthorizedHandler(accessToken);
+            return new RaiderRunTelemetry(
+                state.Stats.SettledRaids.ToArray(),
+                state.Stats.InitialAssetValue,
+                state.Stats.InitialWeaponCount,
+                CurrentAssetValue(state),
+                state.OwnedWeapons.Count,
+                state.Coins,
+                state.Shield.Tier.ToString());
+        }
+    }
+
+    /// <summary>
+    /// Owned asset value at shop/catalog marking: coins, ordinary stash, owned weapons and shield at
+    /// catalog price and owned supplies at unit cost. Durability is reported separately by callers;
+    /// catalog marking is not a damaged-sale estimate.
+    /// </summary>
+    private static int CurrentAssetValue(HandlerState handler)
+        => handler.Coins + handler.Stash.TotalValue + CurrentWeaponCatalogValue(handler)
+            + CurrentSupplyValue(handler) + CurrentShieldValue(handler);
+
+    private static int CurrentWeaponCatalogValue(HandlerState handler) =>
+        handler.OwnedWeapons.Sum(weapon =>
+            ShopCatalog.TryGetWeapon(weapon.CatalogId, out var definition) && definition is not null
+                ? definition.Value
+                : throw new InvalidOperationException($"Owned weapon '{weapon.CatalogId}' has no catalog definition."));
+
+    private static int CurrentSupplyValue(HandlerState handler) =>
+        handler.SupplyStock.Sum(stock =>
+            ShopCatalog.TryGetSupply(stock.Key, out var definition) && definition is not null
+                ? definition.Value * stock.Value
+                : throw new InvalidOperationException($"Owned supply '{stock.Key}' has no catalog definition."));
+
+    private static int CurrentShieldValue(HandlerState handler) =>
+        handler.Shield.HasShield ? ShopCatalog.GetShield(handler.Shield.Tier).Value : 0;
+
+    private static int CurrentWeaponDurabilityCenti(HandlerState handler) =>
+        handler.OwnedWeapons.Sum(weapon => weapon.CurrentDurability * 100 / Math.Max(1, weapon.MaxDurability));
+
+    private static int CurrentShieldDurabilityCenti(HandlerState handler) =>
+        handler.Shield.HasShield ? handler.Shield.DurabilityCenti : 0;
 
     public HandlerProjection SetDuty(string accessToken, bool enabled)
     {
@@ -351,6 +402,7 @@ public sealed class RaidCoordinator
         world.Simulation.AddAutonomousRaider(handler.PlayerId, handler.Slot, at, staged, handler.Personality,
             handler.VoiceState, handler.PrimaryTrait, weapon, handler.Shield);
         handler.DeployedShield = handler.Shield;
+        handler.DeployedWeaponCatalogId = equipped.CatalogId;
         handler.CurrentRaidId = world.Simulation.RaidId;
         handler.IsHome = false;
         handler.HomeAvailableAt = null;
@@ -468,11 +520,34 @@ public sealed class RaidCoordinator
                 var settledItems = FoundWeaponSettlement.Separate(
                     handler.LastExtractedLoot, handler.OwnedWeapons, catalog);
                 handler.OwnedWeapons.AddRange(settledItems.WeaponsToKeep);
-                handler.Stats.RecordRaid(RaidStatsSample.FromProjection(
-                    projection, handler.PlayerId, isKnockedOut, settledItems.WeaponsToKeep.Count, lostWeapon is not null,
-                    deployedShield, shieldWearCenti, shieldLost));
                 var transfer = handler.Stash.TransferHaul(settledItems.StashItems);
                 handler.Coins += transfer.OverflowCoinsGained;
+                var sample = RaidStatsSample.FromProjection(
+                    projection, world.Simulation.StartsAt, handler.PlayerId, isKnockedOut,
+                    settledItems.WeaponsToKeep.Count, lostWeapon is not null,
+                    deployedShield, shieldWearCenti, shieldLost);
+                handler.Stats.RecordRaid(sample);
+                handler.Stats.RecordSettlementTelemetry(new SettledRaidRecord(
+                    RaidId: world.Simulation.RaidId,
+                    SettledAt: extractedAt,
+                    Sample: sample,
+                    CoinsAfter: handler.Coins,
+                    AssetValueAfter: CurrentAssetValue(handler),
+                    StashValueAfter: handler.Stash.TotalValue,
+                    SuppliesValueAfter: CurrentSupplyValue(handler),
+                    OwnedWeaponCatalogValue: CurrentWeaponCatalogValue(handler),
+                    OwnedWeaponDurabilityCenti: CurrentWeaponDurabilityCenti(handler),
+                    OwnedShieldDurabilityCenti: CurrentShieldDurabilityCenti(handler),
+                    UsableWeaponsOwned: handler.OwnedWeapons.Count(weapon => !weapon.IsBroken),
+                    BrokenWeaponsOwned: handler.OwnedWeapons.Count(weapon => weapon.IsBroken),
+                    OwnedWeaponsAfter: handler.OwnedWeapons.Count,
+                    OwnedShieldTierAfter: handler.Shield.Tier.ToString(),
+                    DeployedWeaponCatalogId: handler.DeployedWeaponCatalogId
+                        ?? throw new InvalidOperationException("Settled raid has no recorded deployed weapon."),
+                    WeaponsBoughtCumulative: handler.Stats.Economy.WeaponsBought,
+                    LoanerKettlesCumulative: handler.Stats.Economy.LoanerKettles,
+                    WeaponsLostCumulative: handler.Stats.Project().Total.WeaponsLost,
+                    EconomyAfter: handler.Stats.Economy));
 
                 var payoff = new HaulPayoffView(
                     SettlementId: $"settlement:{world.Simulation.RaidId}:{handler.PlayerId}",
@@ -1936,6 +2011,7 @@ public sealed class RaidCoordinator
 
         public List<OwnedWeapon> OwnedWeapons { get; } = [Domain.ShopCatalog.CreateWeaponInstance(Domain.ShopCatalog.GetStarterWeapon())];
         public string? EquippedWeaponInstanceId { get; set; }
+        public string? DeployedWeaponCatalogId { get; set; }
         /// <summary>Raider-owned shield and durability, persisted across raids. KO clears it; admission never repairs it.</summary>
         public ShieldLoadout Shield { get; set; } = ShieldRules.InitialLoadout;
         /// <summary>The shield state committed at the most recent admission; the settlement baseline for wear.</summary>

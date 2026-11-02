@@ -12,7 +12,18 @@ AFK Raiders robots are A.R.C. units: `Aggressively Roaming Chassis`. They are no
 | 4 | `nasty` | Lethal-capable machines unlocked by greedier, deeper raids. |
 | 5 | `deadly` | Major threats that can down wounded raiders and anchor scary comms moments. |
 
-Only `nasty` and `deadly` robots can kill the raider outright, and high-tier encounter events should require built-up greed. Lower tiers can make the situation worse, but they should respect the nonlethal floor in the engine.
+Legacy descriptions treat only `nasty` and `deadly` robots as directly lethal, and associate high-tier events with built-up greed. This is writing guidance, not an engine guarantee; see the online implementation clarification below.
+
+### Online implementation clarification (2026-11-01)
+
+The tier descriptions above are legacy lore and writing guidance, not an
+authoritative online health rule. The approved BAL-2 online slice preserves its
+existing Downed/KO semantics at every danger and adds no lower-tier nonlethal
+floor. Raider KO remains separate from robot defeat; robot defeat rewards do not
+prevent or reverse a Raider KO. Do not use the lore floor as a hidden gameplay
+gate or change BAL-1/BAL-1S values to force it. See the [BAL-2 proposal](../../balance/BAL-2-proposal.md)
+and [implementation checkpoint](../../IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint)
+for the approved contract and its experimental status.
 
 ## Current Roster
 

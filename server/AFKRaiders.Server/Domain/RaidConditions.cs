@@ -6,7 +6,7 @@ namespace AFKRaiders.Server.Domain;
 
 public sealed record ZoneConditionView(string Id, string Name, string Description, string Danger);
 public sealed record DangerProfile(int MinimumExtractSeconds, double HazardChance, int HazardDamage,
-    int RobotHealth, int RobotDamage, string RobotId, string RobotName, string RobotFlavor);
+    int RobotHealth, int RobotDamage, int RobotRounds, string RobotId, string RobotName, string RobotFlavor);
 public sealed record RaiderPersonality(int Greed, int Mood);
 public sealed record RaiderVoiceState(IReadOnlyDictionary<string, long> Counts, string? LastLine);
 public sealed record HazardWarningView(string Location, DateTimeOffset ResolvesAt, int RawDamage);
@@ -24,13 +24,15 @@ public static class RaidConditions
     public static readonly IReadOnlyList<string> Zones =
         ["Damp Battlegrounds", "Chassis Graveyard", "The Staycation Celebration"];
 
+    // BAL-2 experimental robot profiles (approved 2026-11-01): Low 12 HP / 8 raw / 3 rounds,
+    // Medium 22 / 12 / 3, High 45 / 18 / 4. Rounds every 5s; hazards unchanged from BAL-1.
     public static DangerProfile Profile(string danger) => danger switch
     {
-        "Low" => new(900, 0.025, 10, 12, 8, "anxietick", "Anxietick",
+        "Low" => new(900, 0.025, 10, 12, 8, 3, "anxietick", "Anxietick",
             "It approaches, reconsiders, then files a worried metronome report."),
-        "Medium" => new(960, 0.16, 22, 19, 10, "passive_aggressor", "Passive-Aggressor Drone",
+        "Medium" => new(960, 0.16, 22, 22, 12, 3, "passive_aggressor", "Passive-Aggressor Drone",
             "It emits a disappointed sigh at industrial efficiency."),
-        "High" => new(1020, 0.20, 30, 25, 10, "roomba_prime", "Roomba Prime",
+        "High" => new(1020, 0.20, 30, 45, 18, 4, "roomba_prime", "Roomba Prime",
             "Its cleaning mandate has escalated into a workplace grievance."),
         _ => throw new ArgumentException("Unknown danger profile.", nameof(danger))
     };

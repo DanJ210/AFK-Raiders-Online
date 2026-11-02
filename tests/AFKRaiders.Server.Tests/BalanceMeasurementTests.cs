@@ -22,7 +22,8 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
 
     private sealed record CohortResult(
         IReadOnlyList<RaiderStatsView> Stats,
-        IReadOnlyDictionary<string, (int Extracted, int KnockedOut)> ObservedSettlements);
+        IReadOnlyDictionary<string, (int Extracted, int KnockedOut)> ObservedSettlements,
+        IReadOnlyList<RaiderTelemetry> Telemetry);
 
     private static CohortResult RunRecurringCohort(int seed, int hours, int pollSeconds)
     {
@@ -59,7 +60,12 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
         var second = enrolled.Select(h => coordinator.GetHandlerProjection(h.AccessToken).Stats!).ToArray();
         for (var i = 0; i < first.Length; i++)
             Assert.Equal(System.Text.Json.JsonSerializer.Serialize(first[i]), System.Text.Json.JsonSerializer.Serialize(second[i]));
-        return new CohortResult(second, observed);
+        var telemetry = enrolled.Select((handler, index) =>
+        {
+            var run = coordinator.GetSettlementTelemetry(handler.AccessToken);
+            return new RaiderTelemetry(seed, Slots[index], run);
+        }).ToArray();
+        return new CohortResult(second, observed, telemetry);
     }
 
     [Fact]
@@ -98,11 +104,16 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
     public void AbsentHandlersAccumulateTheSameStatsAsPolledHandlers()
     {
         var polled = RunRecurringCohort(seed: 11, hours: 2, pollSeconds: 5);
-        var absent = RunRecurringCohort(seed: 11, hours: 2, pollSeconds: int.MaxValue);        Assert.Contains(polled.Stats, s => s.Total.ShieldDurabilityLostCenti > 0);
+        var absent = RunRecurringCohort(seed: 11, hours: 2, pollSeconds: int.MaxValue);
+        Assert.Contains(polled.Stats, s => s.Total.ShieldDurabilityLostCenti > 0);
 
         Assert.Equal(
             System.Text.Json.JsonSerializer.Serialize(polled.Stats),
             System.Text.Json.JsonSerializer.Serialize(absent.Stats));
+        // Per-raid telemetry (timestamps, snapshots and robot cargo) must also be identical.
+        Assert.Equal(
+            System.Text.Json.JsonSerializer.Serialize(polled.Telemetry),
+            System.Text.Json.JsonSerializer.Serialize(absent.Telemetry));
     }
 
     [Fact]
@@ -123,7 +134,8 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
             for (var t = 5; t <= 1500 && !sim.Completed; t += 5) sim.Advance(Start.AddSeconds(t));
             var final = sim.Project("one", Start.AddSeconds(1500));
             var knockedOut = final.Events.Any(e => e.Kind == "KnockedOut");
-            var sample = RaidStatsSample.FromProjection(final, "one", knockedOut, weaponsFound: 0, weaponLost: knockedOut);
+            var sample = RaidStatsSample.FromProjection(final, Start, "one", knockedOut, weaponsFound: 0,
+                weaponLost: knockedOut);
 
             var totalHpLost = final.Events
                 .Where(e => e.Kind is "ShieldAbsorbed" or "UnmitigatedDamage" && e.HealthDelta < 0)
@@ -142,7 +154,8 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
 
     /// <summary>
     /// Writes reviewable current-rule measurements using the BAL-0 harness when AFK_BALANCE_REPORT_PATH is set.
-    /// Optional: AFK_BALANCE_SEEDS (default 24), AFK_BALANCE_HOURS (default 8).
+    /// Optional: AFK_BALANCE_SEEDS (default 24), AFK_BALANCE_HOURS (default 8),
+    /// AFK_BALANCE_RAW_PATH (writes raw per-raid settlement telemetry as JSON).
     /// </summary>
     [Fact]
     public void WriteBalanceReportWhenRequested()
@@ -155,16 +168,63 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
         }
         var seeds = int.Parse(Environment.GetEnvironmentVariable("AFK_BALANCE_SEEDS") ?? "24", CultureInfo.InvariantCulture);
         var hours = int.Parse(Environment.GetEnvironmentVariable("AFK_BALANCE_HOURS") ?? "8", CultureInfo.InvariantCulture);
-        var all = Enumerable.Range(1, seeds)
+        var cohorts = Enumerable.Range(1, seeds)
             .AsParallel().AsOrdered()
-            .SelectMany(seed => RunRecurringCohort(seed, hours, pollSeconds: int.MaxValue).Stats)
+            .Select(seed => RunRecurringCohort(seed, hours, pollSeconds: int.MaxValue))
             .ToArray();
-        var report = BalanceReport.Render(all, seeds, hours, RaidSimulation.RulesVersion);
+        var all = cohorts.SelectMany(cohort => cohort.Stats).ToArray();
+        var telemetry = cohorts.SelectMany(cohort => cohort.Telemetry).ToArray();
+        var starter = RunStarterLowCohort(seeds);
+        var report = BalanceReport.Render(all, seeds, hours, RaidSimulation.RulesVersion)
+            + BalanceReport.RenderWindows(telemetry, Start, hours)
+            + starter;
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         File.WriteAllText(path, report);
+        var rawPath = Environment.GetEnvironmentVariable("AFK_BALANCE_RAW_PATH");
+        if (!string.IsNullOrWhiteSpace(rawPath))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(rawPath))!);
+            File.WriteAllText(rawPath, System.Text.Json.JsonSerializer.Serialize(new
+            {
+                RaidSimulation.RulesVersion,
+                Seeds = seeds,
+                Hours = hours,
+                Start,
+                Telemetry = telemetry
+            }));
+        }
         output.WriteLine(report);
     }
+
+    /// <summary>
+    /// Fresh solo Low starter cohort: Tea Kettle plus a fresh initial Light shield, no Handler Signals.
+    /// Mature Low raids are not starter evidence; this isolates the first-raid experience.
+    /// </summary>
+    private static string RunStarterLowCohort(int seeds)
+    {
+        var knockouts = 0;
+        var robotDefeats = 0;
+        var fights = 0;
+        for (var seed = 1; seed <= seeds; seed++)
+        {
+            var sim = new RaidSimulation($"starter{seed}", Start, seed, danger: "Low");
+            sim.AddAutonomousRaider("one", "raider-one", Start,
+                equippedWeapon: ShopCatalog.GetStarterWeapon(),
+                shield: new ShieldLoadout(ShieldTier.Light, ShieldRules.MaxDurabilityPoints * 100));
+            for (var t = 5; t <= 1500 && !sim.Completed; t += 5) sim.Advance(Start.AddSeconds(t));
+            var final = sim.Project("one", Start.AddSeconds(1500));
+            if (final.Events.Any(e => e.Kind == "KnockedOut")) knockouts++;
+            if (final.RobotEncounter is not null) fights++;
+            if (final.RobotEncounter?.Resolution == "Defeated") robotDefeats++;
+        }
+        return "\n## Fresh solo Low starter cohort (Kettle + initial Light, no Signals)\n\n"
+            + $"| Seeds | KO rate | Robot fights | Robot defeats |\n|---:|---:|---:|---:|\n"
+            + $"| {seeds} | {(100.0 * knockouts / seeds).ToString("F1", CultureInfo.InvariantCulture)}% | {fights} | {robotDefeats} |\n";
+    }
 }
+
+/// <summary>Per-raider measurement telemetry for one cohort run.</summary>
+public sealed record RaiderTelemetry(int Seed, string Slot, RaiderRunTelemetry Run);
 
 public static class BalanceReport
 {
@@ -236,6 +296,230 @@ public static class BalanceReport
         sb.AppendLine("| Light / Medium / Heavy bought | Emergency Lights | Upgrades | Coins on shields | Shield repairs (points) | Coins on shield repairs | Shield spend/settled raid | Unshielded deploy decisions | Unshielded streaks (mean / max) |");
         sb.AppendLine("|---|---:|---:|---:|---|---:|---:|---:|---|");
         sb.AppendLine($"| {economy.LightShieldsBought} / {economy.MediumShieldsBought} / {economy.HeavyShieldsBought} | {economy.EmergencyShieldsBought} | {economy.ShieldUpgrades} | {economy.CoinsOnShields} | {economy.ShieldRepairs} ({economy.ShieldPointsRepaired}) | {economy.CoinsOnShieldRepairs} | {Per(shieldSpend, total.Raids)} | {economy.UnshieldedDeployDecisions} | {streakCount} streaks, {(streakCount == 0 ? "-" : ((double)total.UnshieldedRaids / streakCount).ToString("F2", CultureInfo.InvariantCulture))} / {(streaks.Length == 0 ? 0 : streaks.Max(s => s.Longest))} |");
+        return sb.ToString();
+    }
+
+    private static readonly (double FromHours, double ToHours)[] SettlementWindows =
+        [(0, 8), (8, 24), (24, 48), (48, 96)];
+
+    /// <summary>
+    /// BAL-2 windowed telemetry over half-open settlement-time windows [0,8), [8,24), [24,48), [48,96) hours.
+    /// Uses true terminal-event timestamps. Net asset change per raid diffs consecutive post-settlement
+    /// snapshots, attributing inter-raid preparation to the following raid; events at exactly 96h are excluded.
+    /// </summary>
+    public static string RenderWindows(IReadOnlyList<RaiderTelemetry> raiders, DateTimeOffset start, int hours)
+    {
+        static string F(double v) => v.ToString("F2", CultureInfo.InvariantCulture);
+        static string PctF(int n, int d) => d == 0 ? "-" : (100.0 * n / d).ToString("F1", CultureInfo.InvariantCulture) + "%";
+        static double Percentile(IReadOnlyList<double> sorted, double p)
+        {
+            if (sorted.Count == 0) return 0;
+            var rank = (sorted.Count - 1) * p;
+            var low = (int)Math.Floor(rank);
+            var high = (int)Math.Ceiling(rank);
+            return sorted[low] + (sorted[high] - sorted[low]) * (rank - low);
+        }
+
+        static EconomyStatsView Difference(EconomyStatsView current, EconomyStatsView previous) => new(
+            current.WeaponsBought - previous.WeaponsBought,
+            current.CoinsOnWeapons - previous.CoinsOnWeapons,
+            current.Repairs - previous.Repairs,
+            current.CoinsOnRepairs - previous.CoinsOnRepairs,
+            current.LoanerKettles - previous.LoanerKettles,
+            current.SuppliesBought - previous.SuppliesBought,
+            current.CoinsOnSupplies - previous.CoinsOnSupplies,
+            current.ItemsSold - previous.ItemsSold,
+            current.CoinsFromSales - previous.CoinsFromSales,
+            current.LightShieldsBought - previous.LightShieldsBought,
+            current.MediumShieldsBought - previous.MediumShieldsBought,
+            current.HeavyShieldsBought - previous.HeavyShieldsBought,
+            current.EmergencyShieldsBought - previous.EmergencyShieldsBought,
+            current.ShieldUpgrades - previous.ShieldUpgrades,
+            current.CoinsOnShields - previous.CoinsOnShields,
+            current.ShieldRepairs - previous.ShieldRepairs,
+            current.CoinsOnShieldRepairs - previous.CoinsOnShieldRepairs,
+            current.ShieldPointsRepaired - previous.ShieldPointsRepaired,
+            current.UnshieldedDeployDecisions - previous.UnshieldedDeployDecisions);
+
+        var rows = new List<(int Window, int Seed, string Slot, string Danger, RaidStatsSample Sample,
+            SettledRaidRecord Record, int Net, int WeaponsBought, int LoanerKettles, int WeaponLosses,
+            EconomyStatsView EconomyDelta)>();
+        foreach (var raider in raiders)
+        {
+            var previousAssets = raider.Run.InitialAssetValue;
+            var previousWeapons = raider.Run.InitialWeaponCount;
+            var previousBought = 0;
+            var previousLoaners = 0;
+            var previousLosses = 0;
+            var previousEconomy = EconomyStatsView.Empty;
+            foreach (var record in raider.Run.Records)
+            {
+                var atHours = (record.SettledAt - start).TotalHours;
+                var window = Array.FindIndex(SettlementWindows, w => atHours >= w.FromHours && atHours < w.ToHours);
+                var net = record.AssetValueAfter - previousAssets;
+                var bought = record.WeaponsBoughtCumulative - previousBought;
+                var loaners = record.LoanerKettlesCumulative - previousLoaners;
+                var losses = record.WeaponsLostCumulative - previousLosses;
+                var actualStockChange = record.OwnedWeaponsAfter - previousWeapons;
+                var expectedStockChange = record.Sample.WeaponsFound + bought + loaners - losses;
+                if (actualStockChange != expectedStockChange)
+                {
+                    throw new InvalidOperationException(
+                        $"Weapon stock did not conserve for seed {raider.Seed}, {raider.Slot}, raid {record.RaidId}: "
+                        + $"actual {actualStockChange}, expected {expectedStockChange} "
+                        + $"(secured {record.Sample.WeaponsFound}, bought {bought}, loaner {loaners}, lost {losses}).");
+                }
+                var economyDelta = Difference(record.EconomyAfter, previousEconomy);
+                previousAssets = record.AssetValueAfter;
+                previousWeapons = record.OwnedWeaponsAfter;
+                previousBought = record.WeaponsBoughtCumulative;
+                previousLoaners = record.LoanerKettlesCumulative;
+                previousLosses = record.WeaponsLostCumulative;
+                previousEconomy = record.EconomyAfter;
+                if (window < 0) continue;
+                rows.Add((window, raider.Seed, raider.Slot, record.Sample.Danger, record.Sample,
+                    record, net, bought, loaners, losses, economyDelta));
+            }
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine();
+        sb.AppendLine("## Settlement-time windows (BAL-2 telemetry)");
+        sb.AppendLine();
+        sb.AppendLine("Half-open windows by true terminal-event timestamp. Robot counts are per settled participant,");
+        sb.AppendLine("not distinct worlds; world counts are separately deduplicated by RaidId. Net asset change is");
+        sb.AppendLine("coins + stash + owned weapons/shield at catalog value + supplies at unit cost, diffed against");
+        sb.AppendLine("the previous settlement (first raid diffs against enrollment), so inter-raid preparation is");
+        sb.AppendLine("attributed to the following raid. Catalog marking ignores durability; the endpoint table isolates");
+        sb.AppendLine("unsettled end-of-run changes. Weapon stock conservation is checked for each owner/settlement.");
+        sb.AppendLine();
+        foreach (var (windowIndex, window) in SettlementWindows.Index())
+        {
+            if (window.FromHours >= hours) continue;
+            var inWindow = rows.Where(row => row.Window == windowIndex).ToArray();
+            sb.AppendLine($"### Window [{window.FromHours},{window.ToHours})h");
+            sb.AppendLine();
+            if (inWindow.Length == 0)
+            {
+                sb.AppendLine("No settlements in this window.");
+                sb.AppendLine();
+                continue;
+            }
+            sb.AppendLine("| Danger | Settlements | KO rate | KO cause count(s) | Mean time-to-KO | Robot worlds | Participant fights | Defeated / escaped / unresolved | Mean rounds/fight | Shared fights | Medical used/raid | Carried/raid | HP restored/wasted | Secured value/raid | Robot items secured/allocated | Robot value secured/raid | Robot guns secured/allocated/lost | Weapons found/lost | Bought / loaner / retired | Shield spend | Net asset change/raid (mean / p50 / p90 / p99) |");
+            sb.AppendLine("|---|---:|---:|---|---:|---:|---:|---|---:|---:|---:|---:|---|---:|---|---:|---|---|---|---:|---|");
+            foreach (var danger in new[] { "Low", "Medium", "High", "All" })
+            {
+                var subset = danger == "All" ? inWindow : inWindow.Where(row => row.Danger == danger).ToArray();
+                if (subset.Length == 0) continue;
+                var nets = subset.Select(row => (double)row.Net).OrderBy(v => v).ToArray();
+                var fights = subset.Where(r => r.Sample.RobotFought).ToArray();
+                var ko = subset.Where(r => r.Sample.KnockedOut).ToArray();
+                var causes = string.Join(", ", ko.GroupBy(r => r.Sample.KnockOutCause ?? "Unknown")
+                    .OrderByDescending(group => group.Count())
+                    .ThenBy(group => group.Key, StringComparer.Ordinal)
+                    .Select(group => $"{group.Key}:{group.Count()}"));
+                var distinctWorlds = fights.Select(row => row.Record.RaidId).Distinct(StringComparer.Ordinal).Count();
+                var shieldSpend = subset.Sum(row => row.EconomyDelta.CoinsOnShields + row.EconomyDelta.CoinsOnShieldRepairs);
+                var bought = subset.Sum(row => row.WeaponsBought);
+                var loaners = subset.Sum(row => row.LoanerKettles);
+                var lost = subset.Sum(row => row.WeaponLosses);
+                sb.AppendLine($"| {danger} | {subset.Length} | {PctF(ko.Length, subset.Length)} | {causes} "
+                    + $"| {(ko.Length == 0 ? "-" : F(ko.Average(row => row.Sample.TimeToTerminalSeconds ?? 0)))} "
+                    + $"| {distinctWorlds} | {fights.Length} | "
+                    + $"{fights.Count(r => r.Sample.RobotResolution == "Defeated")} / "
+                    + $"{fights.Count(r => r.Sample.RobotResolution == "Escaped")} / "
+                    + $"{fights.Count(r => r.Sample.RobotResolution == "Unresolved")} "
+                    + $"| {(fights.Length == 0 ? "-" : F(fights.Average(row => (double)row.Sample.RobotRoundsResolved)))} "
+                    + $"| {fights.Count(r => r.Sample.SharedRobotFight)} "
+                    + $"| {F(subset.Average(r => (double)r.Sample.MedicalUsed))} "
+                    + $"| {F(subset.Average(r => (double)r.Sample.MedicalCarried))} "
+                    + $"| {subset.Sum(r => r.Sample.MedicalHpRestored)}/{subset.Sum(r => r.Sample.MedicalHpWasted)} "
+                    + $"| {F(subset.Average(r => (double)r.Sample.ValueSecured))} "
+                    + $"| {subset.Sum(r => r.Sample.RobotCargoSecured)}/{subset.Sum(r => r.Sample.RobotCargoAllocated)} "
+                    + $"| {F(subset.Average(r => (double)r.Sample.RobotCargoValueSecured))} "
+                    + $"| {subset.Sum(r => r.Sample.RobotWeaponsSecured)}/{subset.Sum(r => r.Sample.RobotWeaponsAllocated)}/{subset.Sum(r => r.Sample.RobotWeaponsLost)} "
+                    + $"| {subset.Sum(r => r.Sample.WeaponsFound)}/{lost} "
+                    + $"| {bought}/{loaners}/0 "
+                    + $"| {shieldSpend} "
+                    + $"| {F(nets.Average())} / {F(Percentile(nets, 0.50))} / {F(Percentile(nets, 0.90))} / {F(Percentile(nets, 0.99))} |");
+            }
+            sb.AppendLine();
+            sb.AppendLine("Robot outcomes by deployed weapon/shield (participant-fight counts):");
+            sb.AppendLine();
+            sb.AppendLine("| Weapon | Shield | Fights | Defeated | Escaped | Mean rounds |");
+            sb.AppendLine("|---|---|---:|---:|---:|---:|");
+            foreach (var group in inWindow.Where(row => row.Sample.RobotFought)
+                .GroupBy(row => (row.Record.DeployedWeaponCatalogId, row.Sample.DeployShieldTier))
+                .OrderBy(group => group.Key.DeployedWeaponCatalogId, StringComparer.Ordinal)
+                .ThenBy(group => group.Key.DeployShieldTier, StringComparer.Ordinal))
+            {
+                sb.AppendLine($"| {group.Key.DeployedWeaponCatalogId} | {group.Key.DeployShieldTier} | {group.Count()} "
+                    + $"| {group.Count(row => row.Sample.RobotResolution == "Defeated")} "
+                    + $"| {group.Count(row => row.Sample.RobotResolution == "Escaped")} "
+                    + $"| {F(group.Average(row => (double)row.Sample.RobotRoundsResolved))} |");
+            }
+            // High jackpot sensitivity: exclude raids that secured a 900-value prime-archive shard.
+            var high = inWindow.Where(row => row.Danger == "High").ToArray();
+            var highNoJackpot = high.Where(row => !row.Sample.RobotJackpotSecured).ToArray();
+            if (high.Length > 0 && highNoJackpot.Length != high.Length)
+                sb.AppendLine($"\nHigh excluding secured 900-value jackpots: n {highNoJackpot.Length}, "
+                    + $"net mean {F(highNoJackpot.Average(row => (double)row.Net))} "
+                    + $"(all High: {F(high.Average(row => (double)row.Net))}).");
+            // End-of-window owned stock from each raider's last settlement in or before this window.
+            var closing = raiders.Select(raider => raider.Run.Records.LastOrDefault(record =>
+                    (record.SettledAt - start).TotalHours < window.ToHours))
+                .Where(record => record is not null)
+                .Select(record => record!)
+                .ToArray();
+            if (closing.Length > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"Closing stock at {window.ToHours}h (per raider with any settlement): "
+                    + $"coins {F(closing.Average(r => (double)r.CoinsAfter))}, stash value {F(closing.Average(r => (double)r.StashValueAfter))}, "
+                    + $"supply value {F(closing.Average(r => (double)r.SuppliesValueAfter))}, "
+                    + $"usable weapons {F(closing.Average(r => (double)r.UsableWeaponsOwned))}, "
+                    + $"broken weapons {F(closing.Average(r => (double)r.BrokenWeaponsOwned))}, shield none/L/M/H "
+                    + $"{closing.Count(r => r.OwnedShieldTierAfter == "None")}/{closing.Count(r => r.OwnedShieldTierAfter == "Light")}/"
+                    + $"{closing.Count(r => r.OwnedShieldTierAfter == "Medium")}/{closing.Count(r => r.OwnedShieldTierAfter == "Heavy")}.");
+            }
+            sb.AppendLine();
+        }
+        sb.AppendLine("### End-of-run unsettled endpoint");
+        sb.AppendLine();
+        sb.AppendLine("This separates costs/assets after the last settled raid, rather than silently dropping an unfinished raid or preparation.");
+        sb.AppendLine();
+        sb.AppendLine("| Raiders | Mean final-minus-last-settlement assets | Mean final assets | Mean final coins | Mean final weapons | Mean final shield |");
+        sb.AppendLine("|---:|---:|---:|---:|---:|---|");
+        var endpoint = raiders.Select(raider =>
+        {
+            var last = raider.Run.Records.LastOrDefault();
+            return (raider.Run.FinalAssetValue - (last?.AssetValueAfter ?? raider.Run.InitialAssetValue),
+                raider.Run.FinalAssetValue, raider.Run.FinalCoins, raider.Run.FinalWeaponCount, raider.Run.FinalShieldTier);
+        }).ToArray();
+        sb.AppendLine($"| {endpoint.Length} | {F(endpoint.Average(row => (double)row.Item1))} "
+            + $"| {F(endpoint.Average(row => (double)row.FinalAssetValue))} "
+            + $"| {F(endpoint.Average(row => (double)row.FinalCoins))} "
+            + $"| {F(endpoint.Average(row => (double)row.FinalWeaponCount))} "
+            + $"| {string.Join(", ", endpoint.GroupBy(row => row.FinalShieldTier).OrderBy(group => group.Key, StringComparer.Ordinal).Select(group => $"{group.Key}:{group.Count()}"))} |");
+        sb.AppendLine();
+        // Shield progression: first settlement at which a Medium/Heavy shield is owned.
+        var mediumTimes = new List<double>();
+        var heavyTimes = new List<double>();
+        foreach (var raider in raiders)
+        {
+            var firstMedium = raider.Run.Records.FirstOrDefault(r => r.OwnedShieldTierAfter is "Medium" or "Heavy");
+            if (firstMedium is not null) mediumTimes.Add((firstMedium.SettledAt - start).TotalHours);
+            var firstHeavy = raider.Run.Records.FirstOrDefault(r => r.OwnedShieldTierAfter is "Heavy");
+            if (firstHeavy is not null) heavyTimes.Add((firstHeavy.SettledAt - start).TotalHours);
+        }
+        mediumTimes.Sort();
+        heavyTimes.Sort();
+        sb.AppendLine("### Shield progression");
+        sb.AppendLine();
+        sb.AppendLine($"Raiders reaching Medium-or-better: {mediumTimes.Count}/{raiders.Count}"
+            + (mediumTimes.Count > 0 ? $", median {F(Percentile(mediumTimes, 0.5))}h" : "")
+            + $". Reaching Heavy: {heavyTimes.Count}/{raiders.Count}"
+            + (heavyTimes.Count > 0 ? $", median {F(Percentile(heavyTimes, 0.5))}h" : "") + ".");
         return sb.ToString();
     }
 }

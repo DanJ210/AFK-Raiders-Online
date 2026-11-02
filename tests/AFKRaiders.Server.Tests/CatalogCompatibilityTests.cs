@@ -17,8 +17,13 @@ public sealed class CatalogCompatibilityTests
     internal static LootCatalog C3Baseline()
     {
         var catalog = LootCatalog.Default;
+        var rewardItemIds = RobotDefeatRewards.CargoByDanger.Values
+            .Concat(RobotDefeatRewards.WeaponsByDanger.Values)
+            .SelectMany(entries => entries)
+            .Select(entry => entry.CatalogId);
+        var itemIds = C3ItemIds.Concat(rewardItemIds).Distinct(StringComparer.Ordinal);
         return new LootCatalog("desperanza-shared-loot-v3",
-            C3ItemIds.Select(catalog.GetItem), catalog.Opportunities,
+            itemIds.Select(catalog.GetItem), catalog.Opportunities,
             C3ItemIds.Select(id => catalog.Pool.Single(entry => entry.CatalogId == id)));
     }
 

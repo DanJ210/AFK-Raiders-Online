@@ -7,7 +7,7 @@ namespace AFKRaiders.Server.Domain;
 
 public sealed class RaidSimulation
 {
-    public const string RulesVersion = "desperanza-bal-1s-v1";
+    public const string RulesVersion = "desperanza-bal-2-v1";
     public static readonly TimeSpan AdmissionWindow = TimeSpan.FromSeconds(20);
     public const int MaxRaiders = 2;
     private const int PodDeploymentSeconds = 60;
@@ -15,8 +15,12 @@ public sealed class RaidSimulation
     private const int ExtractionBoardingWindowSeconds = 30;
     private const int DecisionIntervalSeconds = 30;
     private static readonly TimeSpan RobotRoundInterval = TimeSpan.FromSeconds(5);
+    // Legacy fast-pacing fixture limit; risk/reward worlds use the BAL-2 danger profile's round count.
     private const int RobotRoundLimit = 3;
     private const int RobotDamageToRaider = 10;
+    private int EffectiveRobotRoundLimit => riskReward && !fastPacing
+        ? dangerProfile.RobotRounds
+        : RobotRoundLimit;
     private readonly int seed;
     private readonly IRaidNarrator narrator;
     private readonly ILootCatalog catalog;
@@ -73,6 +77,27 @@ public sealed class RaidSimulation
                 (conditionMomentum >= 30 ? 3 : 2))];
         Zone = RaidConditions.Zones[(int)(RaidConditions.Roll(seed, "zone") * RaidConditions.Zones.Count)];
         dangerProfile = RaidConditions.Profile(Condition.Danger);
+        if (this.riskReward && fastPacing)
+        {
+            // Preserve the pre-BAL-2 profile for fast-pacing fixtures; BAL-2 profiles apply to normal worlds.
+            dangerProfile = dangerProfile with
+            {
+                RobotHealth = Condition.Danger switch
+                {
+                    "Low" => 12,
+                    "Medium" => 19,
+                    "High" => 25,
+                    _ => throw new ArgumentException("Unknown danger profile.", nameof(danger))
+                },
+                RobotDamage = Condition.Danger switch
+                {
+                    "Low" => 8,
+                    "Medium" or "High" => 10,
+                    _ => throw new ArgumentException("Unknown danger profile.", nameof(danger))
+                },
+                RobotRounds = RobotRoundLimit
+            };
+        }
         nextDecisionAt = startsAt.AddSeconds(DecisionIntervalSeconds);
         nextForecastAt = startsAt.AddSeconds(50);
         if (this.riskReward)
@@ -641,9 +666,29 @@ public sealed class RaidSimulation
 
         if (robot.Health == 0)
         {
-            FinishRobotEncounter(at, "Defeated", participants,
-                NarrationContent.Default.Format("simulation.is-disabled-the-service-depot", robot.Name));
-            foreach (var participant in participants) BeginSearch(participant, at);
+            if (riskReward)
+            {
+                // BAL-2: eligibility snapshot at committed defeat, before fighters reset to Ready.
+                // Participants here are still FightingRobot at the robot location at this deadline.
+                var eligible = participants.Where(participant => !participant.EmergencyExtract
+                    && robot.DamageByPlayer[participant.PlayerId].Dealt > 0).ToArray();
+                var ranked = RobotDefeatRewards.RankContributors(
+                    eligible.Select(participant => (participant,
+                        robot.DamageByPlayer[participant.PlayerId].Dealt,
+                        robot.DamageByPlayer[participant.PlayerId].JoinedAt,
+                        participant.Slot,
+                        participant.PlayerId)));
+                FinishRobotEncounter(at, "Defeated", participants, ranked.Length > 0
+                    ? NarrationContent.Default.Format("simulation.is-disabled-defeat-cargo-claimed", robot.Name)
+                    : NarrationContent.Default.Format("simulation.is-disabled-no-eligible-claimant", robot.Name));
+                ResolveRobotDefeatRewards(ranked, at);
+            }
+            else
+            {
+                FinishRobotEncounter(at, "Defeated", participants,
+                    NarrationContent.Default.Format("simulation.is-disabled-the-service-depot", robot.Name));
+                foreach (var participant in participants) BeginSearch(participant, at);
+            }
             return;
         }
 
@@ -684,7 +729,7 @@ public sealed class RaidSimulation
             return;
         }
 
-        if (robot.RoundsResolved >= RobotRoundLimit)
+        if (robot.RoundsResolved >= EffectiveRobotRoundLimit)
         {
             robot.Status = "Escaped";
             robot.NextRoundAt = null;
@@ -732,6 +777,72 @@ public sealed class RaidSimulation
     private string[] OrderedRobotParticipantIds() =>
         OrderedRaiders().Where(raider => robot.ParticipantIds.Contains(raider.PlayerId))
             .Select(raider => raider.PlayerId).ToArray();
+
+    /// <summary>
+    /// BAL-2: at committed defeat, atomically create and allocate the two world defeat cargo slots,
+    /// resolve the Service Depot opportunity (replacing its generic draws) and start the 2s Packing
+    /// transition. No later reward search, no personality completion bonus, nothing on empty eligibility.
+    /// Guarded by the robot's terminal "Defeated" status: repeated advances cannot re-enter.
+    /// </summary>
+    private void ResolveRobotDefeatRewards(SimRaider[] ranked, DateTimeOffset at)
+    {
+        var depot = opportunities.Single(opportunity => opportunity.Location == "Service Depot");
+        depot.Resolved = true;
+        items.RemoveAll(item => item.Opportunity == depot.Id && item.OwnerId is null);
+        if (ranked.Length == 0)
+        {
+            Emit(at, "RobotDefeatCargoResolved", robotEncounter?.ParticipantIds.ToArray() ?? [],
+                "The Service Depot opportunity is resolved without cargo: no positive-damage contributor remained eligible.",
+                location: depot.Location,
+                opportunityId: depot.Id,
+                threadId: $"robot:{robot.Id}");
+            return;
+        }
+
+        var generated = RobotDefeatRewards.CreateDefeatItems(catalog, RaidId, seed, robot.Id, Condition.Danger);
+        var ordered = generated
+            .OrderByDescending(item => item.Value)
+            .ThenBy(item => item.InstanceId, StringComparer.Ordinal)
+            .ToArray();
+        var threadId = $"robot:{robot.Id}";
+        var awards = new List<ItemAwardView>();
+        for (var index = 0; index < ordered.Length; index++)
+        {
+            var recipient = ranked[index % ranked.Length];
+            var worldItem = new WorldItem(depot.Id, ordered[index]) { OwnerId = recipient.PlayerId };
+            items.Add(worldItem);
+            recipient.Backpack.Add(worldItem.Item);
+            awards.Add(new ItemAwardView(worldItem.Item.InstanceId, worldItem.Item.Name, recipient.PlayerId, recipient.Name));
+        }
+        Emit(at, "RobotDefeatCargoResolved", robotEncounter?.ParticipantIds.ToArray() ?? [],
+            $"Two defeat cargo slots were allocated among {ranked.Length} eligible contributor(s); the Service Depot opportunity is resolved.",
+            location: depot.Location,
+            opportunityId: depot.Id,
+            threadId: threadId);
+        foreach (var award in awards)
+        {
+            var recipient = ranked.First(raider => raider.PlayerId == award.RecipientId);
+            var awardedItem = recipient.Backpack.First(item => item.InstanceId == award.InstanceId);
+            Emit(at, "ItemAllocated", [award.RecipientId],
+                NarrationContent.Default.Format("narrator.recovered-value-securing-cargo-with", award.RecipientName, award.ItemName, awardedItem.Value),
+                location: depot.Location,
+                itemName: award.ItemName,
+                itemValue: awardedItem.Value,
+                itemInstanceId: award.InstanceId,
+                opportunityId: depot.Id,
+                threadId: threadId,
+                channel: "Diary");
+        }
+        foreach (var raider in ranked)
+        {
+            SetActivity(raider, "Packing", null, at.AddSeconds(2), at);
+            Emit(at, "PackingStarted", [raider.PlayerId],
+                NarrationContent.Default.Format("narrator.begins-packing-salvage-into-backpack", raider.Name, raider.Backpack.LastOrDefault()?.Value ?? 0),
+                location: raider.Location,
+                durationSeconds: 2,
+                threadId: $"packing:{raider.Location}");
+        }
+    }
 
     private void ResolveSearch(Opportunity opportunity, DateTimeOffset at)
     {

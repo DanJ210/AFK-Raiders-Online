@@ -360,8 +360,9 @@ public sealed class ShieldTests
     }
 
     [Fact]
-    public void RulesVersionAdvertisesBal1S()
+    public void RulesVersionAdvertisesCurrentBalanceSlice()
     {
-        Assert.Equal("desperanza-bal-1s-v1", RaidSimulation.RulesVersion);
+        // BAL-1S shield rules are unchanged; the advertised version moved forward with BAL-2.
+        Assert.Equal("desperanza-bal-2-v1", RaidSimulation.RulesVersion);
     }
 }

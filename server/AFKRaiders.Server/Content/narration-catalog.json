@@ -741,6 +741,14 @@
       "text": "{0} is disabled. The Service Depot field site is accessible."
     },
     {
+      "id": "simulation.is-disabled-defeat-cargo-claimed",
+      "text": "{0} is disabled. Its salvage cargo is claimed on the spot; the Service Depot locker has nothing further to offer."
+    },
+    {
+      "id": "simulation.is-disabled-no-eligible-claimant",
+      "text": "{0} is disabled, but no standing contributor remains to claim its cargo. The Service Depot locker stays empty."
+    },
+    {
       "id": "simulation.has-health-it-deals-raw",
       "text": "{0} has {1}/{2} health. It deals {3} raw damage to each fighter before resilience/shields."
     },

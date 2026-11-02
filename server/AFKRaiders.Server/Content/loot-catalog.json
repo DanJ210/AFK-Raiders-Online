@@ -1,6 +1,6 @@
 {
   "schemaVersion": 4,
-  "contentVersion": "desperanza-shared-loot-v6",
+  "contentVersion": "desperanza-shared-loot-v7",
   "items": [
     { "id": "scrap_metal_basic", "name": "Basic Scrap Metal", "value": 8, "rarity": 1, "category": "scrap_components", "flavor": "Sharp, rusty, and eager to give you tetanus.", "eligibilityCategories": ["Salvage", "Residential"] },
     { "id": "scrap_metal_bent", "name": "Bent Scrap Metal", "value": 10, "rarity": 1, "category": "scrap_components", "flavor": "Bent at a perfect 37\u00b0 angle. Useless but stylish.", "eligibilityCategories": ["Salvage", "Residential"] },
@@ -28,7 +28,10 @@
     { "id": "arc_encrypted_drive_broken", "name": "Chassis Encrypted Drive (Broken)", "value": 18, "rarity": 2, "category": "arc_tech", "flavor": "Contains exactly one intact file: 'notes.txt'. It's empty.", "eligibilityCategories": ["Robot", "Technology"] },
     { "id": "collector_plate_shattered", "name": "Shattered Collector Plate", "value": 8, "rarity": 1, "category": "valuables", "flavor": "Still collectible. Technically.", "eligibilityCategories": ["Residential", "Salvage"] },
     { "id": "aspperigo", "name": "Aspperigo", "value": 65, "rarity": 3, "category": "weapons", "flavor": "Eddie's favorite and we don't know why.", "eligibilityCategories": ["Weapons"] },
-    { "id": "vernerider", "name": "Vernerider", "value": 140, "rarity": 4, "category": "weapons", "flavor": "No one can pronounce it right.", "eligibilityCategories": ["Weapons"] }
+    { "id": "vernerider", "name": "Vernerider", "value": 140, "rarity": 4, "category": "weapons", "flavor": "No one can pronounce it right.", "eligibilityCategories": ["Weapons"] },
+    { "id": "arc_data_shard", "name": "Chassis Data Shard", "value": 60, "rarity": 3, "category": "arc_tech", "flavor": "Encrypted. Probably important. Definitely unreadable.", "eligibilityCategories": ["Robot", "Technology"] },
+    { "id": "energy_core_overcharged", "name": "Overcharged Energy Core", "value": 150, "rarity": 4, "category": "arc_tech", "flavor": "Hums loudly. Too loudly.", "eligibilityCategories": ["Robot", "Technology"] },
+    { "id": "arc_data_shard_legendary", "name": "Chassis Data Shard (Prime Archive)", "value": 900, "rarity": 5, "category": "arc_tech", "flavor": "You feel smarter just holding it. Briefly.", "eligibilityCategories": ["Robot", "Technology"] }
   ],
   "pool": [
     { "catalogId": "scrap_metal_basic", "dropWeight": 35 },

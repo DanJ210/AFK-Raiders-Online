@@ -13,6 +13,13 @@ public sealed class ReviewedLootIntakeTests
     ];
     private static readonly string[] RobotIds =
         ["energy_core_spent", "prototype_chip_faulty", "broken_servo", "arc_encrypted_drive_broken"];
+    // BAL-2: the Service Depot reward is the robot defeat bundle. FastPacing worlds roll Low/Medium
+    // dangers only, so the observable cargo union spans those two fixed tables.
+    private static readonly string[] Bal2DepotCargoIds =
+    [
+        "energy_core_spent", "robot_toe", "robot_knuckle_joint",
+        "circuit_bundle_messy", "arc_data_shard_corrupted", "arc_data_shard"
+    ];
 
     [Theory]
     [InlineData("lost_diary_page", "Lost Diary Page", 10, 2, "personal_junk", 20,
@@ -75,8 +82,10 @@ public sealed class ReviewedLootIntakeTests
                 "arc_encrypted_drive_broken", "collector_plate_shattered"])
             .Concat(["aspperigo", "vernerider"])
             .ToArray();
-        Assert.Equal("desperanza-shared-loot-v6", catalog.ContentVersion);
-        Assert.Equal(expectedIds, catalog.Items.Select(item => item.Id));
+        // BAL-2 defeat-bundle-only tech definitions: catalog items, never generic pool entries.
+        string[] defeatOnlyIds = ["arc_data_shard", "energy_core_overcharged", "arc_data_shard_legendary"];
+        Assert.Equal("desperanza-shared-loot-v7", catalog.ContentVersion);
+        Assert.Equal(expectedIds.Concat(defeatOnlyIds), catalog.Items.Select(item => item.Id));
         Assert.Equal(expectedIds, catalog.Pool.Select(entry => entry.CatalogId));
         Assert.Equal(new[] { 35, 30, 25, 20, 18, 15, 22, 18, 25, 18, 20 },
             catalog.Pool.Take(11).Select(entry => entry.DropWeight));
@@ -92,8 +101,12 @@ public sealed class ReviewedLootIntakeTests
             Assert.True(catalog.Pool.Count(entry => catalog.GetItem(entry.CatalogId).EligibilityCategories
                 .Any(opportunity.EligibleCategories.Contains)) >= 5));
         Assert.All(catalog.Opportunities, opportunity => Assert.Equal(2, opportunity.DrawCount));
-        Assert.All(catalog.Items.Where(item => item.Category != "weapons"),
+        string[] bal2DefeatOnlyIds = ["arc_data_shard", "energy_core_overcharged", "arc_data_shard_legendary"];
+        Assert.All(catalog.Items.Where(item => item.Category != "weapons" && !bal2DefeatOnlyIds.Contains(item.Id)),
             item => Assert.InRange(item.Value, 5, 35));
+        // Approved BAL-2 selective tech intake values/rarities.
+        Assert.Equal([60, 150, 900], bal2DefeatOnlyIds.Select(id => catalog.GetItem(id).Value));
+        Assert.Equal([3, 4, 5], bal2DefeatOnlyIds.Select(id => catalog.GetItem(id).Rarity));
         Assert.Equal(new[] { 65, 140 },
             catalog.Items.Where(item => item.Category == "weapons").Select(item => item.Value));
     }
@@ -136,7 +149,7 @@ public sealed class ReviewedLootIntakeTests
     [InlineData("depot-locker")]
     public void NewLootIsActuallyAllocatedByAutonomousSharedSearchesWithoutHandlersAndNeverTwice(string opportunityId)
     {
-        var expectedIds = opportunityId == "market-locker" ? ResidentialIds : RobotIds;
+        var expectedIds = opportunityId == "market-locker" ? ResidentialIds : Bal2DepotCargoIds;
         var observed = new HashSet<string>(StringComparer.Ordinal);
         var start = DateTimeOffset.Parse("2026-10-14T12:00:00Z");
         for (var seed = 0; seed < 512 && observed.Count < expectedIds.Length; seed++)
@@ -150,15 +163,19 @@ public sealed class ReviewedLootIntakeTests
             var one = simulation.Project("one", end);
             var two = simulation.Project("two", end);
             Assert.True(simulation.Completed);
-            var search = one.Events.FirstOrDefault(evt =>
-                evt.Kind == "SearchCompleted" && evt.OpportunityId == opportunityId);
+            var search = one.Events.FirstOrDefault(evt => opportunityId == "depot-locker"
+                ? evt.Kind == "RobotDefeatCargoResolved" && evt.OpportunityId == opportunityId
+                : evt.Kind == "SearchCompleted" && evt.OpportunityId == opportunityId);
             if (search is null) continue;
             if (opportunityId == "depot-locker")
             {
                 if (one.RobotEncounter?.ParticipantIds.Count != 2) continue;
                 Assert.Equal("Defeated", one.Robot.Status);
                 Assert.Equal(new[] { "one", "two" }, one.RobotEncounter!.ParticipantIds);
-                Assert.True(Assert.Single(one.Events, evt => evt.Kind == "RobotDefeated").At < search.At);
+                // BAL-2: defeat cargo is created atomically at the committed defeat, not a later search.
+                Assert.Equal(Assert.Single(one.Events, evt => evt.Kind == "RobotDefeated").At, search.At);
+                Assert.DoesNotContain(one.Events, evt => evt.Kind == "SearchCompleted"
+                    && evt.OpportunityId == opportunityId);
             }
             var awards = one.Events.Concat(two.Events).Where(evt => evt.Kind == "ItemAllocated").ToArray();
             Assert.Equal(awards.Length, awards.Select(evt => evt.ItemInstanceId).Distinct().Count());

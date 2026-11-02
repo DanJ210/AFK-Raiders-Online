@@ -304,7 +304,7 @@ public sealed class RaidSimulationTests
             var first = candidate.Project("one", Start.AddMinutes(3));
             var second = candidate.Project("two", Start.AddMinutes(3));
             if (first.RobotEncounter?.Resolution == "Defeated"
-                && first.Events.Any(raidEvent => raidEvent.Kind == "SearchCompleted"
+                && first.Events.Any(raidEvent => raidEvent.Kind == "RobotDefeatCargoResolved"
                     && raidEvent.OpportunityId == "depot-locker"))
             {
                 simulation = candidate;
@@ -321,9 +321,11 @@ public sealed class RaidSimulationTests
         Assert.Equal(["one", "two"], one.RobotEncounter!.ParticipantIds);
         var allEvents = one.Events.Concat(two.Events).ToArray();
         var robotDefeated = Assert.Single(one.Events, raidEvent => raidEvent.Kind == "RobotDefeated");
-        var depotSearch = Assert.Single(one.Events, raidEvent => raidEvent.Kind == "SearchCompleted"
+        var rewardResolved = Assert.Single(one.Events, raidEvent => raidEvent.Kind == "RobotDefeatCargoResolved"
             && raidEvent.OpportunityId == "depot-locker");
-        Assert.True(robotDefeated.At < depotSearch.At);
+        Assert.Equal(robotDefeated.At, rewardResolved.At);
+        Assert.DoesNotContain(one.Events, raidEvent => raidEvent.Kind == "SearchCompleted"
+            && raidEvent.OpportunityId == "depot-locker");
         var depotAwards = allEvents.Where(raidEvent => raidEvent.Kind == "ItemAllocated"
             && raidEvent.OpportunityId == "depot-locker").ToArray();
         Assert.Equal(2, depotAwards.Length);
@@ -337,7 +339,8 @@ public sealed class RaidSimulationTests
         {
             var catalogItem = Assert.Single(simulation.Catalog.Items, item => item.Name == award.ItemName);
             Assert.Contains(catalogItem.EligibilityCategories,
-                category => category is LootEligibilityCategory.Robot or LootEligibilityCategory.Technology);
+                category => category is LootEligibilityCategory.Robot or LootEligibilityCategory.Technology
+                    or LootEligibilityCategory.Weapons);
         }
 
         simulation.Advance(Start.AddDays(1));

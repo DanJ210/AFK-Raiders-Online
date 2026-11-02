@@ -34,6 +34,27 @@ This workspace contains the M1 networking proof, independent server-owned journe
 
 The original [game design document](GAME_DESIGN.md) is the main-game baseline for this rebuild, including the Handler experience and the loot/survival/home loop as well as §8 Social Encounters and PvP. The server engine enables these systems to operate in a shared world instead of isolated browser simulations. Any retained invite-based development endpoints are a test harness, not the intended product loop.
 
+### BAL-2 approved bounded scope (2026-11-01)
+
+The [danger robot and defeat-reward proposal](balance/BAL-2-proposal.md) has
+been implemented and technically verified, not balance-certified or expanded
+into another milestone. See the [paired experimental measurements](balance/BAL-2-measurements.md)
+and [implementation checkpoint](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint).
+Experimental profiles are Low/Medium/High 12/8/3, 22/12/3, and 45/18/4
+(HP/raw damage/rounds). Exactly two shared rewards replace the selected Depot
+opportunity's generic draws; contribution-ranked allocation occurs at committed
+defeat and retains existing extraction, pocket, and KO semantics. The Depot
+search delay and its personality gain are removed.
+
+BAL-1/BAL-1S values, trader-only Temptrest, once-per-raid weapon wear, and
+once-only ownership/settlement remain frozen. Preserve weapon inventory and
+defer caps/liquidation to BAL-4. Best healing for solo High is an aspiration;
+lesser-loadout wins remain legal, with no equipment gate or nonlethal floor.
+BAL-3 activities, BAL-4 tuning, PvP/theft, Handler equipment controls,
+persistence/authentication, and live backend restart are outside this approval.
+The [ledger](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint) records the
+verified technical status; all new balance remains experimental.
+
 ## 2. Product definition
 
 Build an autonomous zero-player RPG with live, recurring social PvPvE extraction gameplay organized around Desperanza as the shared home hub.
@@ -48,7 +69,7 @@ This is confirmed product direction, not an experimental proposal. Exact traits,
 - **Deterministic, server-owned decisions.** The C# domain decides with a utility (scoring) policy: every legal option (sell, buy, equip, repair, stash, depart) gets a score, for example power gain × trait weight − price − cash-reserve risk. Inputs are only what the Raider should know: inventory, coins, durability, current trader stock, recent outcomes, and its traits. The coordinator validates and commits each choice as a journaled event. Same seed, state, and time give the same decisions, so replay, retries, tests, and recovery stay deterministic.
 - **Shield economy (BAL-1S, accepted experimental defaults 2026-10-31; implemented 2026-11-01, experimental):** One initial free Light shield; knockout loses the equipped shield; replacements and upgrades are paid with Raider coins, with no trade-in, loaner, recurring free shield, or shield loot. Durability persists and is repaired autonomously; charge refills at admission. Light / Medium / Heavy have 40 / 70 / 100 charge and 42.1% / 46.2% / 49.6% mitigation, at 30 / 90 / 300 Desperanza. They are unlimited standing offers and need a separate purchase path from finite cycle stock. If a replacement is unaffordable, deploy unshielded rather than wait; the emergency Light may waive the reserve. Repair, charge, and danger-wear parameters are experimental starting values recorded in the [implementation ledger](IMPLEMENTATION_PROGRESS.md#bal---danger-difficulty-weapon-relevance-and-robot-loot-plan-proposed-2026-10-22), not validated balance. Post-BAL-1 measurements are recorded in the [BAL-1S ledger](IMPLEMENTATION_PROGRESS.md#bal-1s---shield-tiers-wear-and-paid-autonomous-repair-2026-11-01); tuning belongs to BAL-4.
 - **Death stakes (confirmed 2026-10-22):** Terminal defeat loses the equipped weapon, unprotected backpack loot and remaining carried supplies. Keep the designated one-item Secret Hidden Pocket exception. Home weapons, supply stock, stash and coins are not forfeited; normal autonomous arrival preparation and the free Tea Kettle fallback still apply. Difficulty changes, additional shared damaging activities/robots and broader statistics remain separate proposed follow-ups, not approval to expand ECON-3.
-- **Shield economy (BAL-1S, user decisions 2026-10-23; implemented 2026-11-01):** Knockout will also lose the equipped shield entirely. Each Raider gets one initial free Light shield (about 42.1% mitigation); replacements must be bought from traders with Raider funds, with Medium and Heavy available at higher prices. Surviving shields retain durability between raids and require paid autonomous repair decisions in `RaiderEconomyPolicy`; rechargers are used autonomously and restore charge only. The user's admission statement is interpreted as automatic charge refill, not replacement or durability repair. Durability burn will use a deterministic formula with parameters still open; possible future skill/level modifiers do not authorize those systems now. Remaining balance, stock and recovery decisions are tracked in the [BAL-1S plan](IMPLEMENTATION_PROGRESS.md#bal-1s-shield-tier-proposal-2026-10-23).
+- **Historical shield decision record (2026-10-23):** The original ownership, KO-loss and admission direction is implemented. The accepted experimental defaults and remaining open items are recorded in the verified [BAL-1S ledger entry](IMPLEMENTATION_PROGRESS.md#bal-1s---shield-tiers-wear-and-paid-autonomous-repair-2026-11-01) and the checkpoint above; this older note is not a separate list of unresolved rules.
 - **Personality through traits.** Each Raider has seeded traits (examples: Greedy, Cautious, Hoarder, Brawler, Gadgeteer) that weight its choices and drift slowly with committed experience, such as becoming more cautious after a failed extraction. Different Raiders choose differently from the same stock.
 - **Signals as nudges, not commands.** Signal actions shift scoring weights temporarily (for example "Spend!", "Play it safe", "Hoard"), like the existing Calm/Pressure greed nudges. They never name a specific purchase or bypass validation, and an absent Handler forfeits nothing owed.
 - **Desperanza traders.** Trader stock is generated from a seed for each cycle and is shared and finite. When Raiders want the same scarce item, a deterministic order decides, never request arrival or reflexes. Each purchase or sale commits exactly once: retries and repeated scheduling cannot double-charge, double-pay, or duplicate items.

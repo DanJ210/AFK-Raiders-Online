@@ -29,12 +29,26 @@ public sealed record RaidStatsSample(
     string? DeployShieldTier = null,
     int DeployShieldDurabilityCenti = 0,
     int ShieldDurabilityLostCenti = 0,
-    bool ShieldLost = false)
+    bool ShieldLost = false,
+    int RobotCargoSecured = 0,
+    int RobotCargoValueSecured = 0,
+    int RobotCargoAllocated = 0,
+    int RobotCargoValueAllocated = 0,
+    int RobotWeaponsAllocated = 0,
+    int RobotWeaponsSecured = 0,
+    int RobotWeaponsLost = 0,
+    int RobotRoundsResolved = 0,
+    string? KnockOutCause = null,
+    double? TimeToTerminalSeconds = null,
+    int MedicalHpRestored = 0,
+    int MedicalHpWasted = 0,
+    bool RobotJackpotSecured = false)
 {
     public const string UnratedDanger = "Unrated";
 
     public static RaidStatsSample FromProjection(
         RaidProjection projection,
+        DateTimeOffset raidStartedAt,
         string playerId,
         bool knockedOut,
         int weaponsFound,
@@ -48,6 +62,8 @@ public sealed record RaidStatsSample(
         var medical = 0;
         var revives = 0;
         var rechargers = 0;
+        var medicalHpRestored = 0;
+        var medicalHpWasted = 0;
         var robotFought = false;
         var crossedPaths = 0;
         foreach (var raidEvent in projection.Events)
@@ -65,7 +81,13 @@ public sealed record RaidStatsSample(
                         ?? throw new InvalidOperationException($"Consumed supply '{raidEvent.ItemName}' is not in the catalog.");
                     if (supply.ReviveAmount > 0) revives++;
                     else if (supply.Category == "ShieldRecharger") rechargers++;
-                    else medical++;
+                    else
+                    {
+                        medical++;
+                        var actualHeal = raidEvent.HealthDelta ?? 0;
+                        medicalHpRestored += actualHeal;
+                        medicalHpWasted += Math.Max(0, supply.HealAmount - actualHeal);
+                    }
                     break;
                 case "RobotCombatStarted" or "RobotParticipantJoined" when raidEvent.ParticipantIds.Contains(playerId):
                     robotFought = true;
@@ -85,6 +107,20 @@ public sealed record RaidStatsSample(
         var contests = projection.Encounters.Where(e => e.Resolution == "Contest").ToArray();
         var contestsWon = contests.Count(e => e.Awards.Any(a => a.RecipientId == playerId));
 
+        var robotCargo = projection.MyExtractedLoot
+            .Where(item => item.InstanceId.Contains(":defeat:", StringComparison.Ordinal))
+            .ToArray();
+        var robotCargoAwards = projection.Events
+            .Where(raidEvent => raidEvent.Kind == "ItemAllocated"
+                && raidEvent.ItemInstanceId?.Contains(":defeat:", StringComparison.Ordinal) == true
+                && raidEvent.ParticipantIds.Contains(playerId))
+            .ToArray();
+        var robotWeaponsAllocated = robotCargoAwards.Count(raidEvent =>
+            ShopCatalog.Weapons.Any(weapon => weapon.Name.Equals(raidEvent.ItemName, StringComparison.Ordinal)));
+        var robotWeaponsSecured = robotCargo.Count(item =>
+            ShopCatalog.TryGetWeapon(item.CatalogId, out _));
+        var terminal = projection.Events.LastOrDefault(raidEvent => raidEvent.Kind is "Extracted" or "KnockedOut")
+            ?? throw new InvalidOperationException($"Settled raid '{projection.RaidId}' has no terminal event.");
         return new RaidStatsSample(
             Danger: projection.Condition?.Danger ?? UnratedDanger,
             KnockedOut: knockedOut,
@@ -111,7 +147,20 @@ public sealed record RaidStatsSample(
             DeployShieldTier: deployShield?.Tier.ToString(),
             DeployShieldDurabilityCenti: deployShield?.DurabilityCenti ?? 0,
             ShieldDurabilityLostCenti: shieldDurabilityLostCenti,
-            ShieldLost: shieldLost);
+            ShieldLost: shieldLost,
+            RobotCargoSecured: robotCargo.Length,
+            RobotCargoValueSecured: robotCargo.Sum(item => item.Value),
+            RobotCargoAllocated: robotCargoAwards.Length,
+            RobotCargoValueAllocated: robotCargoAwards.Sum(raidEvent => raidEvent.ItemValue ?? 0),
+            RobotWeaponsAllocated: robotWeaponsAllocated,
+            RobotWeaponsSecured: robotWeaponsSecured,
+            RobotWeaponsLost: robotWeaponsAllocated - robotWeaponsSecured,
+            RobotRoundsResolved: projection.Robot.RoundsResolved,
+            KnockOutCause: knockedOut ? terminal.Reason : null,
+            TimeToTerminalSeconds: (terminal.At - raidStartedAt).TotalSeconds,
+            MedicalHpRestored: medicalHpRestored,
+            MedicalHpWasted: medicalHpWasted,
+            RobotJackpotSecured: robotCargo.Any(item => item.Value == 900));
     }
 }
 
@@ -281,11 +330,62 @@ public sealed record RaiderStatsView(
 /// <summary>Consecutive settled raids deployed without any shield.</summary>
 public sealed record ShieldStreakView(int Current, int Longest, int Streaks);
 
+/// <summary>
+/// BAL-2 measurement telemetry: one committed settlement with its true terminal-event timestamp and
+/// post-settlement owner snapshots. Recorded once per settled raid alongside the aggregate statistics;
+/// consecutive <see cref="AssetValueAfter"/> values attribute inter-raid preparation to the following raid.
+/// </summary>
+public sealed record SettledRaidRecord(
+    string RaidId,
+    DateTimeOffset SettledAt,
+    RaidStatsSample Sample,
+    int CoinsAfter,
+    int AssetValueAfter,
+    int StashValueAfter,
+    int SuppliesValueAfter,
+    int OwnedWeaponCatalogValue,
+    int OwnedWeaponDurabilityCenti,
+    int OwnedShieldDurabilityCenti,
+    int UsableWeaponsOwned,
+    int BrokenWeaponsOwned,
+    int OwnedWeaponsAfter,
+    string OwnedShieldTierAfter,
+    string DeployedWeaponCatalogId,
+    int WeaponsBoughtCumulative,
+    int LoanerKettlesCumulative,
+    int WeaponsLostCumulative,
+    EconomyStatsView EconomyAfter);
+
+public sealed record RaiderRunTelemetry(
+    IReadOnlyList<SettledRaidRecord> Records,
+    int InitialAssetValue,
+    int InitialWeaponCount,
+    int FinalAssetValue,
+    int FinalWeaponCount,
+    int FinalCoins,
+    string FinalShieldTier);
+
 public sealed class RaiderStatistics
 {
     public const string SessionScope = "ServerSession";
     private static readonly string[] DangerOrder = ["Low", "Medium", "High"];
     private readonly Dictionary<string, DangerStatsView> byDanger = new(StringComparer.Ordinal);
+    private readonly List<SettledRaidRecord> settledRaids = [];
+
+    /// <summary>Measurement-only per-raid telemetry in settlement order; not part of the projected view.</summary>
+    public IReadOnlyList<SettledRaidRecord> SettledRaids => settledRaids;
+
+    /// <summary>Asset value snapshot at enrollment, before any raid's admission preparation.</summary>
+    public int InitialAssetValue { get; private set; }
+
+    /// <summary>Owned weapon stock at enrollment, before any raid's admission preparation.</summary>
+    public int InitialWeaponCount { get; private set; }
+
+    public void RecordInitialAssets(int assetValue, int weaponCount)
+    {
+        InitialAssetValue = assetValue;
+        InitialWeaponCount = weaponCount;
+    }
 
     public DateTimeOffset? Since { get; private set; }
     public EconomyStatsView Economy { get; private set; } = EconomyStatsView.Empty;
@@ -303,6 +403,9 @@ public sealed class RaiderStatistics
                 ShieldStreaks.Streaks + (ShieldStreaks.Current == 0 ? 1 : 0))
             : ShieldStreaks with { Current = 0 };
     }
+
+    /// <summary>Appends measurement telemetry for the settlement just recorded via <see cref="RecordRaid"/>.</summary>
+    public void RecordSettlementTelemetry(SettledRaidRecord record) => settledRaids.Add(record);
 
     public void RecordEconomy(Func<EconomyStatsView, EconomyStatsView> change) => Economy = change(Economy);
 

@@ -34,6 +34,28 @@ G6 now implements server-owned shared conditions/danger, evolving greed/mood/res
 
 Online ordinary extraction eligibility is 900/960/1020 seconds by danger, with early distress/support exits and a 1320-second world deadline. One condition belongs to the world, not each Handler. No SLM creates mechanical weather, actors, loot or rewards. See the [G6 ledger](IMPLEMENTATION_PROGRESS.md#g6-autonomous-riskreward-conditions-and-broader-parody-content) for frozen audits and exact experimental rules. Low unattended viability and support thresholds passed; High starter unattended survival is only 1.67% in the frozen solo cohort, and staged High unattended mean net is negative. This is not final balance or human comedy/pacing approval. The legacy tick counts, generation examples and progression below are not online implementation claims.
 
+### BAL-2 danger robots and defeat rewards (approved 2026-11-01)
+
+The bounded [BAL-2 proposal](balance/BAL-2-proposal.md) has been implemented
+and technically verified; the [ledger checkpoint](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint)
+is authoritative for step status, and the [paired measurement report](balance/BAL-2-measurements.md)
+records experimental outcomes and limitations. It sets experimental Low/Medium/High
+robot profiles to 12/8/3, 22/12/3, and 45/18/4 (HP/raw damage/rounds), and
+replaces—not supplements—the Service Depot's two generic draws with two
+world-scoped defeat rewards. On committed defeat, actual positive capped-damage
+contributors are ranked and receive cargo round-robin with deterministic ties.
+This removes the Depot's 10-second search and its completion personality gain.
+Cargo follows existing extraction, KO, and designated pocket semantics.
+
+Preserve BAL-1 weapon rules and BAL-1S shield values, trader-only Temptrest, and
+once-only wear/settlement. Retain all secured unique weapons and defer caps and
+liquidation to BAL-4. The older solo-High best-healing wording is a balance
+aspiration: favorable lesser-loadout wins remain legal, with no equipment gate
+or nonlethal floor. BAL-2 does not authorize Handler equipment controls,
+PvP/theft, BAL-3 activities, or BAL-4 tuning. The matched measurements show
+departures from experimental KO/economy expectations; they are not balance
+certification or authority to retune frozen rules.
+
 ### Autonomous Raider economy (confirmed 2026-10-17)
 
 This supersedes every Handler-driven preparation description below (§1 pitch "you prepare their equipment", §2 prep phase, Preparation Economy, purchase/equip/repair confirmations). In the online game, as in Godville, the **Raider** sells, buys, equips, repairs, and decides when to depart, using a deterministic, trait-weighted, server-owned utility policy. Weapons come mainly from raid loot and sometimes from Desperanza traders. The Handler influences the Raider only through Signal actions, including temporary nudges to its spending and risk appetite. AI models voice these decisions but never make them. The [rebuild brief](MULTIPLAYER_REBUILD_BRIEF.md#autonomous-raider-economy-confirmed-2026-10-17) holds the full contract. Legacy prices, stock, and preparation audits remain historical references, not approved online balance.
@@ -120,7 +142,17 @@ Before BAL-1S the online build started each raid with a basic **Makeshift Confid
 
 The authoritative raid snapshots the equipped usable catalog weapon at admission. Each round rolls an inclusive base integer from its damage range, applies its multiplier, and rounds to nearest integer (ties away from zero). Seed, raid, robot, round and Raider identity key each roll independently; scheduling, admission order, polling and retries do not advance a random stream. Shared contributions record actual damage, capped to remaining robot HP in stable identity order.
 
-Experimental robot HP is Low 12 / Medium 19 / High 25, with unchanged incoming damage and three-round limit. Kettle can solo Low; Medium solo requires Aspperigo or better; High solo requires Vernerider/Temptrest or shared Raider damage. These are equipment eligibility thresholds, not guaranteed victories or validation of the planned High top-healing/lasting-shield target. The [BAL-1 ledger](IMPLEMENTATION_PROGRESS.md#bal-1---weapons-matter-2026-11-01) records measurements and limitations. BAL-1 itself changed no shield, reward or trader rules; BAL-1S (see Shields) followed, and BAL-2/3/4 remain unimplemented.
+Historical BAL-1 snapshot (before BAL-2): experimental robot HP was Low 12 /
+Medium 19 / High 25, with unchanged incoming damage and a three-round limit.
+Weapon-specific solo win rates varied in that historical profile; these were
+distribution observations, not equipment gates, and do not describe the
+current profiles. The approved BAL-2 reading is that best-healing-loadout solo
+High is a balance aspiration, while lesser-loadout wins remain legal. The
+approved BAL-2 section above supersedes the earlier danger profiles and
+rewards. The [BAL-1 ledger](IMPLEMENTATION_PROGRESS.md#bal-1---weapons-matter-2026-11-01)
+records those historical measurements. BAL-1 itself changed no shield, reward
+or trader rules; BAL-1S followed, and BAL-2 now supersedes the earlier robot
+profile. BAL-3/4 remain proposed and unimplemented.
 
 ### Weapon maintenance
 - Successful extraction costs one durability point on the equipped weapon; failed recovery loses that weapon instead. Combat-based wear is not implemented.
@@ -233,7 +265,7 @@ Progression should reinforce the survival-and-loot loop: a player should be able
    - **Signal Handling** improves only when the Handler successfully spends Signal on Ready Up, Calm, Pressure, or CALL EXTRACT.
    Skill progression is intentionally slow because the game can run unattended: repeated real outcomes should build identity over many raids, not max a track in one evening. The normal skill XP curve is selected by the `standard` profile in `src/content/progression_config.json`; the `prototype` profile keeps smaller thresholds for faster internal testing. Skill effects stay intentionally small: tiny extraction-odds help, tiny loot/bonus-find help, tiny robot-damage mitigation, and Signal Handling as visible Handler competence/progression without a direct survival modifier for MVP. Level-ups are narrated in the comms feed because the joke is that everyone is slowly becoming good at the wrong things.
 - **Raider Level:** a long-term level spine from 1–75. The label stays plain for clarity, while title bands such as **Questionable Competence** provide the in-world joke. Pacing is deliberately slow because the game runs itself: routine loot and failure grant tiny XP, every successful extraction grants a small base XP award, extracted loot adds a little more, and later levels require a much larger cumulative total. Raider XP is earned autonomously from meaningful outcomes: successful extractions, extracted loot, robot outcomes, High-danger survival, hidden-pocket saves, death recovery, stash-overflow pawn-shop lessons, and skill level-ups. Rat Rating does not drive Raider Level directly; it remains its own shame/pride metric. Level benefits are intentionally light-power: title bands, level-up comms, a small title-band extraction stipend that starts at Level 10, and a tiny title-band resilience trim that piggybacks on the existing failed-robot resilience system. Higher levels should feel like long-term identity and future unlock territory, not a combat stat that solves raids.
-- **Balance contract:** Danger Level and robot deadliness are the main survival levers. A starter Raider with no meaningful skill progress should survive Low often enough to keep the comedy loop moving, but should die frequently in Medium and especially High when left alone. Medium and High add small per-tick ambient downed pressure during RAIDING so dangerous conditions matter; greed can unlock scarier robot events and bias future major conditions, but it does not directly add death chance. Nasty and deadly robots should be able to down wounded starter Raiders; weaker tiers can hurt badly but should not bypass their nonlethal floor. High danger is tuned as a Handler-intervention space: manual bandages, shield rechargers, and CALL EXTRACT are the intended survival path, not passive Raider Level scaling. Raider Level must not add HP, raw damage, shield strength, broad passive damage resistance, or major extraction safety. Keep resistance simple: positive mood provides the main soft pre-shield resilience trim, Raider Level adds only a tiny visible title-band trim in that same failed-robot path, Hiding in Lockers stays a tiny explicit pre-shield skill bonus, and real survival comes from shields, consumables, and Handler intervention. Skill modifiers stay small enough that max skills still leave High danger harsher than Medium.
+- **Balance contract:** Danger Level and robot deadliness are the main survival levers. A starter Raider with no meaningful skill progress should survive Low often enough to keep the comedy loop moving, but should die frequently in Medium and especially High when left alone. Medium and High add small per-tick ambient downed pressure during RAIDING so dangerous conditions matter; greed can unlock scarier robot events and bias future major conditions, but it does not directly add death chance. Nasty and deadly robots should be able to down wounded starter Raiders. A lower-tier nonlethal floor remains a possible future design constraint, but BAL-2 explicitly preserves current online Downed/KO semantics and does not add that floor; any later change needs separate approval. High danger is a Handler-intervention aspiration in the broader design, not an implemented BAL-2 rule: BAL-2 treats solo best-healing as a balance aspiration, with lesser-loadout wins legal and no equipment gate. Manual bandages, shield rechargers, and CALL EXTRACT remain proposed survival paths, not new mechanics in this slice. Raider Level must not add HP, raw damage, shield strength, broad passive damage resistance, or major extraction safety. Keep resistance simple: positive mood provides the main soft pre-shield resilience trim, Raider Level adds only a tiny visible title-band trim in that same failed-robot path, Hiding in Lockers stays a tiny explicit pre-shield skill bonus, and real survival comes from shields, consumables, and Handler intervention. Skill modifiers stay small enough that max skills still leave High danger harsher than Medium.
 - **Gear with cursed flavor text** (e.g., "Helmet of Mild Confidence: +2 defense, -1 awareness of exits").
 - **Rat Rating** — a stat tracking how cowardly/looty the Raider plays. Both a badge of shame and pride.
 - **Achievements:** "Died to an Anxietick — Twice", "Extracted with 50 water bottles", "Befriended a vending machine."
@@ -246,7 +278,7 @@ Progression should reinforce the survival-and-loot loop: a player should be able
 - **Home Stash** — persistent extracted loot; stacks duplicates (×N), capped at 120 items with overflow auto-sold into coins
 - **Coins** — accumulated value from stash overflow auto-sales
 - **Lifetime Stats** — extracts/deaths totals and context breakdowns, robot defeats, healing usage
-- **Shield Layer** — current raid shield state (starter shield for now)
+- **Shield Layer** — owned shield tier and current-raid charge/durability state
 - **EventLog** — the diary/comms feed entries
 - **ActivityLog** — active-thread entries for multi-tick tasks, damage, fighting, extraction, and DOWNED progress
 - **ActiveRaidActivity** — current-raid task state for searches, robot encounters, and other multi-tick actions; see [ACTIVE_RAID_ACTIVITY_PLAN.md](ACTIVE_RAID_ACTIVITY_PLAN.md)
@@ -452,7 +484,7 @@ Remove-Item Env:SURVIVAL_ECONOMY_REPORT
 
 ### Finite-supply economy rerun — 2026-10-10
 
-Implemented the agreed equipment/supply contracts before changing balance: broken weapons stay owned at zero durability and require repair; only usable weapons can equip or contribute combat damage. A working fallback is selected, with a narrated free starter restoration/supply only if no usable weapon remains. Successful raids still cost one weapon durability; failure still loses the equipped weapon. Shield mitigation, recharge, healing, and free MVP shield restoration at HUB remain unchanged.
+Historical snapshot: this 2026-10-10 rerun implemented the agreed equipment/supply contracts before changing balance. Broken weapons stayed owned at zero durability and required repair; only usable weapons could equip or contribute combat damage. A working fallback was selected, with a narrated free starter restoration/supply only if no usable weapon remained. Successful raids cost one weapon durability; failure lost the equipped weapon. Shield mitigation, recharge and healing were unchanged in that rerun; its free MVP shield restoration at HUB was later superseded by BAL-1S.
 
 Purchased loadouts now **transfer out of storage once at deployment** and clear their selections. Used supplies are permanently consumed; unused purchased meds/rechargers return to supply storage on successful extraction. Failure loses deployed supplies, not unselected stock. Found meds remain field-only, and found rechargers still extract as loot. Mixed stacks track purchased quantities separately; returned supplies do not inflate receipts, XP, stash value, or gross rewards.
 
