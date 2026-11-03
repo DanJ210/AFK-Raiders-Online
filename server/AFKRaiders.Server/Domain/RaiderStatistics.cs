@@ -300,7 +300,9 @@ public sealed record EconomyStatsView(
     int ShieldRepairs = 0,
     int CoinsOnShieldRepairs = 0,
     int ShieldPointsRepaired = 0,
-    int UnshieldedDeployDecisions = 0)
+    int UnshieldedDeployDecisions = 0,
+    int WeaponInstancesLiquidated = 0,
+    int CoinsFromWeaponLiquidations = 0)
 {
     public static readonly EconomyStatsView Empty = new(0, 0, 0, 0, 0, 0, 0, 0, 0);
 
@@ -312,7 +314,9 @@ public sealed record EconomyStatsView(
         HeavyShieldsBought + o.HeavyShieldsBought, EmergencyShieldsBought + o.EmergencyShieldsBought,
         ShieldUpgrades + o.ShieldUpgrades, CoinsOnShields + o.CoinsOnShields, ShieldRepairs + o.ShieldRepairs,
         CoinsOnShieldRepairs + o.CoinsOnShieldRepairs, ShieldPointsRepaired + o.ShieldPointsRepaired,
-        UnshieldedDeployDecisions + o.UnshieldedDeployDecisions);
+        UnshieldedDeployDecisions + o.UnshieldedDeployDecisions,
+        WeaponInstancesLiquidated + o.WeaponInstancesLiquidated,
+        CoinsFromWeaponLiquidations + o.CoinsFromWeaponLiquidations);
 }
 
 /// <summary>
@@ -338,6 +342,7 @@ public sealed record ShieldStreakView(int Current, int Longest, int Streaks);
 public sealed record SettledRaidRecord(
     string RaidId,
     DateTimeOffset SettledAt,
+    string PrimaryTrait,
     RaidStatsSample Sample,
     int CoinsAfter,
     int AssetValueAfter,

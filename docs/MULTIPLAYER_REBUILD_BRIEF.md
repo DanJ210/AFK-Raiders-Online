@@ -55,6 +55,16 @@ persistence/authentication, and live backend restart are outside this approval.
 The [ledger](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint) records the
 verified technical status; all new balance remains experimental.
 
+### BAL-4 experimental first arm (2026-11-02)
+
+The user later authorized the first bounded BAL-4 tuning arm: High robot HP
+40 (18 raw damage/four rounds), High reward cargo weights 25/25/15/35 for
+values 60/35/150/900 within the existing two shared slots, and a four-owned-
+weapon cap with deterministic 50%-catalog-value overflow liquidation. This
+does not validate the balance or retune Medium risk, shield prices/repair/wear,
+or start BAL-3/ECON-3; those remain separate decisions. See the [BAL-4
+proposal](balance/BAL-4-proposal.md) and [implementation checkpoint](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint).
+
 ## 2. Product definition
 
 Build an autonomous zero-player RPG with live, recurring social PvPvE extraction gameplay organized around Desperanza as the shared home hub.

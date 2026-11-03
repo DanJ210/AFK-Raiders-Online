@@ -277,11 +277,11 @@ public static class BalanceReport
         sb.AppendLine();
         sb.AppendLine("## Autonomous economy (all dangers)");
         sb.AppendLine();
-        sb.AppendLine("| Weapons bought | Coins on weapons | Repairs | Coins on repairs | Loaner Kettles | Supplies bought | Coins on supplies | Items sold | Coins from sales |");
-        sb.AppendLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
-        sb.AppendLine($"| {economy.WeaponsBought} | {economy.CoinsOnWeapons} | {economy.Repairs} | {economy.CoinsOnRepairs} | {economy.LoanerKettles} | {economy.SuppliesBought} | {economy.CoinsOnSupplies} | {economy.ItemsSold} | {economy.CoinsFromSales} |");
+        sb.AppendLine("| Weapons bought | Coins on weapons | Repairs | Coins on repairs | Loaner Kettles | Supplies bought | Coins on supplies | Items sold | Coins from sales | Weapons liquidated | Coins from weapon liquidation |");
+        sb.AppendLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        sb.AppendLine($"| {economy.WeaponsBought} | {economy.CoinsOnWeapons} | {economy.Repairs} | {economy.CoinsOnRepairs} | {economy.LoanerKettles} | {economy.SuppliesBought} | {economy.CoinsOnSupplies} | {economy.ItemsSold} | {economy.CoinsFromSales} | {economy.WeaponInstancesLiquidated} | {economy.CoinsFromWeaponLiquidations} |");
         sb.AppendLine();
-        sb.AppendLine($"Weapon inflow (found + bought + loaner) vs outflow (lost on KO): {total.WeaponsFound + economy.WeaponsBought + economy.LoanerKettles} in / {total.WeaponsLost} out.");
+        sb.AppendLine($"Weapon flow (found + bought + loaner) vs outflow (KO loss + cap liquidation): {total.WeaponsFound + economy.WeaponsBought + economy.LoanerKettles} in / {total.WeaponsLost} KO losses / {economy.WeaponInstancesLiquidated} cap liquidations.");
         sb.AppendLine();
         sb.AppendLine("## Shields (BAL-1S, experimental)");
         sb.AppendLine();
@@ -339,13 +339,22 @@ public static class BalanceReport
             current.ShieldRepairs - previous.ShieldRepairs,
             current.CoinsOnShieldRepairs - previous.CoinsOnShieldRepairs,
             current.ShieldPointsRepaired - previous.ShieldPointsRepaired,
-            current.UnshieldedDeployDecisions - previous.UnshieldedDeployDecisions);
+            current.UnshieldedDeployDecisions - previous.UnshieldedDeployDecisions,
+            current.WeaponInstancesLiquidated - previous.WeaponInstancesLiquidated,
+            current.CoinsFromWeaponLiquidations - previous.CoinsFromWeaponLiquidations);
 
-        var rows = new List<(int Window, int Seed, string Slot, string Danger, RaidStatsSample Sample,
+        var rows = new List<(int Window, int Seed, string Slot, string Danger, string Trait, RaidStatsSample Sample,
             SettledRaidRecord Record, int Net, int WeaponsBought, int LoanerKettles, int WeaponLosses,
             EconomyStatsView EconomyDelta)>();
         foreach (var raider in raiders)
         {
+            if (raider.Run.InitialWeaponCount > WeaponInventoryCap.MaximumOwnedWeapons
+                || raider.Run.FinalWeaponCount > WeaponInventoryCap.MaximumOwnedWeapons)
+            {
+                throw new InvalidOperationException(
+                    $"Weapon cap exceeded for seed {raider.Seed}, {raider.Slot}: "
+                    + $"initial {raider.Run.InitialWeaponCount}, final {raider.Run.FinalWeaponCount}.");
+            }
             var previousAssets = raider.Run.InitialAssetValue;
             var previousWeapons = raider.Run.InitialWeaponCount;
             var previousBought = 0;
@@ -360,16 +369,24 @@ public static class BalanceReport
                 var bought = record.WeaponsBoughtCumulative - previousBought;
                 var loaners = record.LoanerKettlesCumulative - previousLoaners;
                 var losses = record.WeaponsLostCumulative - previousLosses;
+                var economyDelta = Difference(record.EconomyAfter, previousEconomy);
+                var liquidated = economyDelta.WeaponInstancesLiquidated;
                 var actualStockChange = record.OwnedWeaponsAfter - previousWeapons;
-                var expectedStockChange = record.Sample.WeaponsFound + bought + loaners - losses;
+                var expectedStockChange = record.Sample.WeaponsFound + bought + loaners - losses - liquidated;
+                if (record.OwnedWeaponsAfter > WeaponInventoryCap.MaximumOwnedWeapons)
+                {
+                    throw new InvalidOperationException(
+                        $"Weapon cap exceeded for seed {raider.Seed}, {raider.Slot}, raid {record.RaidId}: "
+                        + $"{record.OwnedWeaponsAfter} owned.");
+                }
                 if (actualStockChange != expectedStockChange)
                 {
                     throw new InvalidOperationException(
                         $"Weapon stock did not conserve for seed {raider.Seed}, {raider.Slot}, raid {record.RaidId}: "
                         + $"actual {actualStockChange}, expected {expectedStockChange} "
-                        + $"(secured {record.Sample.WeaponsFound}, bought {bought}, loaner {loaners}, lost {losses}).");
+                        + $"(secured {record.Sample.WeaponsFound}, bought {bought}, loaner {loaners}, "
+                        + $"lost {losses}, liquidated {liquidated}).");
                 }
-                var economyDelta = Difference(record.EconomyAfter, previousEconomy);
                 previousAssets = record.AssetValueAfter;
                 previousWeapons = record.OwnedWeaponsAfter;
                 previousBought = record.WeaponsBoughtCumulative;
@@ -377,7 +394,7 @@ public static class BalanceReport
                 previousLosses = record.WeaponsLostCumulative;
                 previousEconomy = record.EconomyAfter;
                 if (window < 0) continue;
-                rows.Add((window, raider.Seed, raider.Slot, record.Sample.Danger, record.Sample,
+                rows.Add((window, raider.Seed, raider.Slot, record.Sample.Danger, record.PrimaryTrait, record.Sample,
                     record, net, bought, loaners, losses, economyDelta));
             }
         }
@@ -405,8 +422,8 @@ public static class BalanceReport
                 sb.AppendLine();
                 continue;
             }
-            sb.AppendLine("| Danger | Settlements | KO rate | KO cause count(s) | Mean time-to-KO | Robot worlds | Participant fights | Defeated / escaped / unresolved | Mean rounds/fight | Shared fights | Medical used/raid | Carried/raid | HP restored/wasted | Secured value/raid | Robot items secured/allocated | Robot value secured/raid | Robot guns secured/allocated/lost | Weapons found/lost | Bought / loaner / retired | Shield spend | Net asset change/raid (mean / p50 / p90 / p99) |");
-            sb.AppendLine("|---|---:|---:|---|---:|---:|---:|---|---:|---:|---:|---:|---|---:|---|---:|---|---|---|---:|---|");
+            sb.AppendLine("| Danger | Settlements | KO rate | KO cause count(s) | Mean time-to-KO | Robot worlds | Participant fights | Defeated / escaped / unresolved | Mean rounds/fight | Shared fights | Medical used/raid | Carried/raid | HP restored/wasted | Secured value/raid | Robot items secured/allocated | Robot value secured/raid | Robot guns secured/allocated/lost | Weapons found/lost | Bought / loaner / liquidated | Weapon liquidation coins | Shield spend | Net asset change/raid (mean / p50 / p90 / p99) |");
+            sb.AppendLine("|---|---:|---:|---|---:|---:|---:|---|---:|---:|---:|---:|---|---:|---|---:|---|---|---:|---:|---|");
             foreach (var danger in new[] { "Low", "Medium", "High", "All" })
             {
                 var subset = danger == "All" ? inWindow : inWindow.Where(row => row.Danger == danger).ToArray();
@@ -423,6 +440,8 @@ public static class BalanceReport
                 var bought = subset.Sum(row => row.WeaponsBought);
                 var loaners = subset.Sum(row => row.LoanerKettles);
                 var lost = subset.Sum(row => row.WeaponLosses);
+                var liquidated = subset.Sum(row => row.EconomyDelta.WeaponInstancesLiquidated);
+                var liquidationCoins = subset.Sum(row => row.EconomyDelta.CoinsFromWeaponLiquidations);
                 sb.AppendLine($"| {danger} | {subset.Length} | {PctF(ko.Length, subset.Length)} | {causes} "
                     + $"| {(ko.Length == 0 ? "-" : F(ko.Average(row => row.Sample.TimeToTerminalSeconds ?? 0)))} "
                     + $"| {distinctWorlds} | {fights.Length} | "
@@ -439,9 +458,26 @@ public static class BalanceReport
                     + $"| {F(subset.Average(r => (double)r.Sample.RobotCargoValueSecured))} "
                     + $"| {subset.Sum(r => r.Sample.RobotWeaponsSecured)}/{subset.Sum(r => r.Sample.RobotWeaponsAllocated)}/{subset.Sum(r => r.Sample.RobotWeaponsLost)} "
                     + $"| {subset.Sum(r => r.Sample.WeaponsFound)}/{lost} "
-                    + $"| {bought}/{loaners}/0 "
+                    + $"| {bought}/{loaners}/{liquidated} "
+                    + $"| {liquidationCoins} "
                     + $"| {shieldSpend} "
                     + $"| {F(nets.Average())} / {F(Percentile(nets, 0.50))} / {F(Percentile(nets, 0.90))} / {F(Percentile(nets, 0.99))} |");
+            }
+            sb.AppendLine();
+            sb.AppendLine("Trait-level outcomes by danger:");
+            sb.AppendLine();
+            sb.AppendLine("| Danger | Trait | Settlements | KO rate | Medical/raid | Secured value/raid | Weapons liquidated |");
+            sb.AppendLine("|---|---|---:|---:|---:|---:|---:|");
+            foreach (var group in inWindow.GroupBy(row => (row.Danger, row.Trait))
+                .OrderBy(group => group.Key.Danger, StringComparer.Ordinal)
+                .ThenBy(group => group.Key.Trait, StringComparer.Ordinal))
+            {
+                var traitKOs = group.Count(row => row.Sample.KnockedOut);
+                sb.AppendLine($"| {group.Key.Danger} | {group.Key.Trait} | {group.Count()} "
+                    + $"| {PctF(traitKOs, group.Count())} "
+                    + $"| {F(group.Average(row => (double)row.Sample.MedicalUsed))} "
+                    + $"| {F(group.Average(row => (double)row.Sample.ValueSecured))} "
+                    + $"| {group.Sum(row => row.EconomyDelta.WeaponInstancesLiquidated)} |");
             }
             sb.AppendLine();
             sb.AppendLine("Robot outcomes by deployed weapon/shield (participant-fight counts):");

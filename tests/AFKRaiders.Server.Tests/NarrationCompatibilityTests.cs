@@ -63,7 +63,7 @@ public sealed class NarrationCompatibilityTests(ITestOutputHelper output)
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
         output.WriteLine($"Current narration and simulation fingerprint: {hash}");
         // BAL-1 deliberately changed weapon damage and robot HP; BAL-1S changed shield resolution;
-        // BAL-2 changes profiles, defeat events and the advertised rules version.
-        Assert.Equal("77413350741D1E503CC43A0B3951AC7D1C1AC90519937121FDF59171CC8972EA", hash);
+        // BAL-2 changed profiles/defeat events; BAL-4 changes the High profile, rewards and rules version.
+        Assert.Equal("ABCA8643017ABF32A6D5709CAFB63E387C34A442D8F5D61E368221AA604BA6E6", hash);
     }
 }

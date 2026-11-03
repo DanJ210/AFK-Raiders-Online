@@ -520,6 +520,11 @@ public sealed class RaidCoordinator
                 var settledItems = FoundWeaponSettlement.Separate(
                     handler.LastExtractedLoot, handler.OwnedWeapons, catalog);
                 handler.OwnedWeapons.AddRange(settledItems.WeaponsToKeep);
+                NormalizeAndLiquidateOverflow(
+                    handler,
+                    extractedAt,
+                    $"settlement:{world.Simulation.RaidId}",
+                    raidId: world.Simulation.RaidId);
                 var transfer = handler.Stash.TransferHaul(settledItems.StashItems);
                 handler.Coins += transfer.OverflowCoinsGained;
                 var sample = RaidStatsSample.FromProjection(
@@ -530,6 +535,7 @@ public sealed class RaidCoordinator
                 handler.Stats.RecordSettlementTelemetry(new SettledRaidRecord(
                     RaidId: world.Simulation.RaidId,
                     SettledAt: extractedAt,
+                    PrimaryTrait: RaiderEconomyPolicy.TraitFromSeed(handler.TraitSeed).ToString(),
                     Sample: sample,
                     CoinsAfter: handler.Coins,
                     AssetValueAfter: CurrentAssetValue(handler),
@@ -765,6 +771,11 @@ public sealed class RaidCoordinator
             handler.LatestPreparationDecisions.Clear();
             handler.PendingErrands.Clear();
             handler.HubErrandLabel = null;
+            NormalizeAndLiquidateOverflow(
+                handler,
+                handler.HomeArrivedAt
+                    ?? throw new InvalidOperationException("A home visit must have an arrival time before normalization."),
+                $"preparation:{handler.HomeVisit}");
             ScheduleArrivalErrands(handler, paced && !fastPacing);
         }
 
@@ -918,7 +929,7 @@ public sealed class RaidCoordinator
         && handler.Coins >= definition.Value
         && handler.Coins - definition.Value >= reserveFloor;
 
-    private static void EnsureTeaKettleFallback(HandlerState handler, DateTimeOffset at)
+    private void EnsureTeaKettleFallback(HandlerState handler, DateTimeOffset at)
     {
         if (RaiderEconomyPolicy.BestUsableWeapon(handler.OwnedWeapons, Domain.ShopCatalog.Weapons) is not null)
             return;
@@ -930,8 +941,81 @@ public sealed class RaidCoordinator
                 Domain.ShopCatalog.GetStarterWeapon(), fallbackId));
             handler.Stats.RecordEconomy(e => e with { LoanerKettles = e.LoanerKettles + 1 });
         }
+        var usableFallbackId = handler.OwnedWeapons.Any(weapon =>
+            weapon.InstanceId == fallbackId && weapon.CurrentDurability > 0)
+            ? fallbackId
+            : null;
+        NormalizeAndLiquidateOverflow(
+            handler, at, $"fallback:{handler.HomeVisit}:{fallbackId}", usableFallbackId);
         RecordPreparationDecision(handler, at, "PreparationWeaponFallback", "fallback",
             "Issued a free Tea Kettle at the Hatch Authority loaner desk because no usable owned weapon remained.");
+    }
+
+    private void NormalizeAndLiquidateOverflow(
+        HandlerState handler,
+        DateTimeOffset at,
+        string transactionId,
+        string? neededFallbackInstanceId = null,
+        string? raidId = null)
+    {
+        var result = WeaponInventoryCap.Normalize(
+            handler.OwnedWeapons,
+            handler.EquippedWeaponInstanceId,
+            neededFallbackInstanceId,
+            Domain.ShopCatalog.Weapons);
+        if (result.LiquidatedWeapons.Count == 0)
+        {
+            handler.OwnedWeapons.Clear();
+            handler.OwnedWeapons.AddRange(result.RetainedWeapons);
+            return;
+        }
+
+        var totalCoins = result.LiquidatedWeapons.Aggregate(
+            0,
+            (total, item) => checked(total + item.CoinsReceived));
+        var coinsAfter = checked(handler.Coins + totalCoins);
+        var economyAfter = handler.Stats.Economy with
+        {
+            WeaponInstancesLiquidated = checked(
+                handler.Stats.Economy.WeaponInstancesLiquidated + result.LiquidatedWeapons.Count),
+            CoinsFromWeaponLiquidations = checked(
+                handler.Stats.Economy.CoinsFromWeaponLiquidations + totalCoins)
+        };
+        var eventIds = result.LiquidatedWeapons.Select(item =>
+            $"hub:weapon-liquidation:{transactionId}:{item.Weapon.InstanceId}").ToArray();
+        if (eventIds.Any(handler.PreparationEventIds.Contains))
+            throw new InvalidOperationException($"Weapon liquidation transaction '{transactionId}' was already recorded.");
+
+        handler.OwnedWeapons.Clear();
+        handler.OwnedWeapons.AddRange(result.RetainedWeapons);
+        handler.Coins = coinsAfter;
+        handler.Stats.RecordEconomy(_ => economyAfter);
+
+        foreach (var (liquidation, sourceEventId) in result.LiquidatedWeapons.Zip(eventIds))
+        {
+            var weapon = liquidation.Weapon;
+            var text = $"{weapon.Name} ({weapon.CurrentDurability}/{weapon.MaxDurability} durability) " +
+                $"was liquidated from owned overflow at {WeaponInventoryCap.SellBackPermille / 10}% " +
+                $"of catalog value {liquidation.CatalogValue} for {liquidation.CoinsReceived} coins. " +
+                $"Owned stock: {handler.OwnedWeapons.Count}; balance: {handler.Coins}.";
+            if (!handler.PreparationEventIds.Add(sourceEventId))
+                throw new InvalidOperationException($"Weapon liquidation event '{sourceEventId}' is duplicated.");
+            handler.Events.Add(new HandlerEventView(handler.Events.Count + 1, at, "WeaponLiquidated", text));
+            handler.LatestPreparationDecisions.Add(new PreparationDecisionView(at, "WeaponLiquidated", text));
+            AddJournalEntry(
+                handler,
+                raidId,
+                at,
+                "WeaponLiquidated",
+                "Hub",
+                text,
+                sourceEventId,
+                location: "Desperanza",
+                itemName: weapon.Name,
+                itemValue: liquidation.CoinsReceived,
+                itemInstanceId: weapon.InstanceId,
+                reason: $"catalog-value:{liquidation.CatalogValue}");
+        }
     }
 
     private static void RecordUnavailablePurchase(
@@ -1065,6 +1149,8 @@ public sealed class RaidCoordinator
                     throw new InvalidOperationException("Trader weapon stock changed during a serialized purchase.");
                 handler.Coins -= definition.Value;
                 handler.OwnedWeapons.Add(purchased);
+                NormalizeAndLiquidateOverflow(
+                    handler, at, $"purchase:{handler.HomeVisit}:{purchased.InstanceId}");
                 handler.Stats.RecordEconomy(e => e with
                 {
                     WeaponsBought = e.WeaponsBought + 1,

@@ -4,9 +4,7 @@ using Xunit.Abstractions;
 namespace AFKRaiders.Server.Tests;
 
 /// <summary>
-/// BAL-2 (approved 2026-11-01): experimental danger robot profiles and the two-slot shared defeat
-/// reward bundle replacing Service Depot loot, with contribution-ranked round-robin allocation and
-/// existing extraction/pocket/KO semantics.
+/// BAL-4 experimental High profile/reward tuning over the BAL-2 shared defeat settlement contract.
 /// </summary>
 public sealed class Bal2RobotDefeatTests(ITestOutputHelper output)
 {
@@ -14,16 +12,16 @@ public sealed class Bal2RobotDefeatTests(ITestOutputHelper output)
     private static readonly string[] Dangers = ["Low", "Medium", "High"];
 
     [Fact]
-    public void RulesVersionAdvertisesBal2()
+    public void RulesVersionAdvertisesBal4()
     {
-        Assert.Equal("desperanza-bal-2-v1", RaidSimulation.RulesVersion);
-        Assert.Equal("bal-2-defeat-v1", RobotDefeatRewards.RewardsVersion);
+        Assert.Equal("desperanza-bal-4-v1", RaidSimulation.RulesVersion);
+        Assert.Equal("bal-4-defeat-v1", RobotDefeatRewards.RewardsVersion);
     }
 
     [Theory]
     [InlineData("Low", 12, 8, 3)]
     [InlineData("Medium", 22, 12, 3)]
-    [InlineData("High", 45, 18, 4)]
+    [InlineData("High", 40, 18, 4)]
     public void ApprovedExperimentalProfilesAreExact(string danger, int health, int damage, int rounds)
     {
         var profile = RaidConditions.Profile(danger);
@@ -69,7 +67,7 @@ public sealed class Bal2RobotDefeatTests(ITestOutputHelper output)
     public void ExpectedGrossBundleValuesMatchTheApprovedProposalArithmetic()
     {
         var catalog = LootCatalog.Default;
-        foreach (var (danger, expected) in new[] { ("Low", 25.06), ("Medium", 76.805), ("High", 177.54) })
+        foreach (var (danger, expected) in new[] { ("Low", 25.06), ("Medium", 76.805), ("High", 695.95) })
         {
             var cargoMean = RobotDefeatRewards.CargoByDanger[danger]
                 .Sum(entry => catalog.GetItem(entry.CatalogId).Value * entry.Weight / 100.0);
@@ -107,12 +105,12 @@ public sealed class Bal2RobotDefeatTests(ITestOutputHelper output)
     public void CargoPickBoundariesFollowTableOrder()
     {
         var cargo = RobotDefeatRewards.CargoByDanger["High"];
-        // High order: arc_data_shard 50, circuit_bundle_messy 30, energy_core_overcharged 18, legendary 2.
-        Assert.Equal("arc_data_shard", RobotDefeatRewards.Pick(cargo, 0.499999));
-        Assert.Equal("circuit_bundle_messy", RobotDefeatRewards.Pick(cargo, 0.5));
-        Assert.Equal("energy_core_overcharged", RobotDefeatRewards.Pick(cargo, 0.8));
-        Assert.Equal("energy_core_overcharged", RobotDefeatRewards.Pick(cargo, 0.979999));
-        Assert.Equal("arc_data_shard_legendary", RobotDefeatRewards.Pick(cargo, 0.98));
+        // BAL-4 High weights: arc_data_shard 25, circuit_bundle_messy 25,
+        // energy_core_overcharged 15, legendary 35.
+        Assert.Equal("arc_data_shard", RobotDefeatRewards.Pick(cargo, 0.249999));
+        Assert.Equal("circuit_bundle_messy", RobotDefeatRewards.Pick(cargo, 0.25));
+        Assert.Equal("energy_core_overcharged", RobotDefeatRewards.Pick(cargo, 0.5));
+        Assert.Equal("arc_data_shard_legendary", RobotDefeatRewards.Pick(cargo, 0.65));
         Assert.Equal("arc_data_shard_legendary", RobotDefeatRewards.Pick(cargo, 0.999999));
     }
 
@@ -151,7 +149,7 @@ public sealed class Bal2RobotDefeatTests(ITestOutputHelper output)
                     first.Select(item => (item.InstanceId, item.CatalogId)),
                     second.Select(item => (item.InstanceId, item.CatalogId)));
                 Assert.NotEqual(first[0].InstanceId, first[1].InstanceId);
-                Assert.StartsWith("bal-2:4:raid:5:robot:defeat:", first[0].InstanceId, StringComparison.Ordinal);
+                Assert.StartsWith("bal-4:4:raid:5:robot:defeat:", first[0].InstanceId, StringComparison.Ordinal);
                 var weapons = first.Count(item => ShopCatalog.TryGetWeapon(item.CatalogId, out _));
                 Assert.InRange(weapons, 0, 1);
                 // Slot A is always nonweapon cargo.

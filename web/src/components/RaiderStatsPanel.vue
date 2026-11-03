@@ -22,6 +22,7 @@ export type EconomyStatsView = {
   emergencyShieldsBought?: number; shieldUpgrades?: number; coinsOnShields?: number
   shieldRepairs?: number; coinsOnShieldRepairs?: number; shieldPointsRepaired?: number
   unshieldedDeployDecisions?: number
+  weaponInstancesLiquidated?: number; coinsFromWeaponLiquidations?: number
 }
 export type ShieldStreakView = { current: number; longest: number; streaks: number }
 export type RaiderStatsView = {
@@ -71,6 +72,7 @@ const economyRows = computed(() => {
     { label: 'Repairs', value: `${e.repairs} for ${e.coinsOnRepairs} coins` },
     { label: 'Supplies bought', value: `${e.suppliesBought} for ${e.coinsOnSupplies} coins` },
     { label: 'Items sold', value: `${e.itemsSold} for ${e.coinsFromSales} coins` },
+    { label: 'Weapons liquidated at inventory cap', value: `${e.weaponInstancesLiquidated ?? 0} for ${e.coinsFromWeaponLiquidations ?? 0} coins` },
     { label: 'Loaner Tea Kettles', value: `${e.loanerKettles}` },
     { label: 'Shields bought (light / medium / heavy)', value: `${e.lightShieldsBought ?? 0} / ${e.mediumShieldsBought ?? 0} / ${e.heavyShieldsBought ?? 0} for ${e.coinsOnShields ?? 0} coins` },
     { label: 'Emergency shields / upgrades', value: `${e.emergencyShieldsBought ?? 0} / ${e.shieldUpgrades ?? 0}` },

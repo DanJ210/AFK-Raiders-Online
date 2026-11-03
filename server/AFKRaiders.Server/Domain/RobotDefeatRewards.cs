@@ -4,7 +4,7 @@ namespace AFKRaiders.Server.Domain;
 public sealed record RobotDefeatEntry(string CatalogId, int Weight);
 
 /// <summary>
-/// BAL-2 (approved 2026-11-01): pure, authored per-danger robot defeat reward rules.
+/// BAL-4: pure, authored per-danger robot defeat reward rules.
 /// On committed defeat the selected Service Depot opportunity's two generic draws are replaced
 /// by exactly two world-scoped defeat cargo slots. Slot A always draws nonweapon cargo;
 /// Slot B first rolls the per-danger weapon chance and otherwise draws nonweapon cargo.
@@ -13,7 +13,7 @@ public sealed record RobotDefeatEntry(string CatalogId, int Weight);
 /// </summary>
 public static class RobotDefeatRewards
 {
-    public const string RewardsVersion = "bal-2-defeat-v1";
+    public const string RewardsVersion = "bal-4-defeat-v1";
 
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<RobotDefeatEntry>> CargoByDanger =
         new Dictionary<string, IReadOnlyList<RobotDefeatEntry>>(StringComparer.Ordinal)
@@ -32,10 +32,10 @@ public static class RobotDefeatRewards
             ],
             ["High"] =
             [
-                new("arc_data_shard", 50),
-                new("circuit_bundle_messy", 30),
-                new("energy_core_overcharged", 18),
-                new("arc_data_shard_legendary", 2)
+                new("arc_data_shard", 25),
+                new("circuit_bundle_messy", 25),
+                new("energy_core_overcharged", 15),
+                new("arc_data_shard_legendary", 35)
             ]
         };
 
@@ -105,7 +105,7 @@ public static class RobotDefeatRewards
             Pick(cargo, RaidConditions.Roll(seed, RollKey(raidId, robotId, "a", "cargo"))), danger);
         var gateRoll = RaidConditions.Roll(seed, RollKey(raidId, robotId, "b", "weapon-gate"));
         ItemView ResolveInstance(string slot, LootCatalogItem item) =>
-            new($"bal-2:{raidId.Length}:{raidId}:{robotId.Length}:{robotId}:defeat:{slot}:{item.Id}",
+            new($"bal-4:{raidId.Length}:{raidId}:{robotId.Length}:{robotId}:defeat:{slot}:{item.Id}",
                 item.Id, item.Name, item.Value, item.Flavor);
         LootCatalogItem slotB;
         if (RollsWeapon(danger, gateRoll))
@@ -158,7 +158,7 @@ public static class RobotDefeatRewards
 
     private static string RollKey(string raidId, string robotId, string slot, string purpose) =>
         FormattableString.Invariant(
-            $"bal-2:{raidId.Length}:{raidId}:{robotId.Length}:{robotId}:defeat:{slot}:{purpose}");
+            $"bal-4:{raidId.Length}:{raidId}:{robotId.Length}:{robotId}:defeat:{slot}:{purpose}");
 
     private static void ValidateWeights(IReadOnlyList<RobotDefeatEntry> entries, string danger, string kind)
     {
