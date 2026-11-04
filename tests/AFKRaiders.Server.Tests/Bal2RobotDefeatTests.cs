@@ -16,6 +16,22 @@ public sealed class Bal2RobotDefeatTests(ITestOutputHelper output)
     {
         Assert.Equal("desperanza-bal-4-arm3-v1", RaidSimulation.RulesVersion);
         Assert.Equal("bal-4-defeat-v1", RobotDefeatRewards.RewardsVersion);
+        Assert.Equal("desperanza-bal-4-arm4a-v1",
+            BalanceExperimentRules.RulesVersion(BalanceExperimentArm.Arm4A));
+        Assert.Equal("desperanza-bal-4-arm4b-v1",
+            BalanceExperimentRules.RulesVersion(BalanceExperimentArm.Arm4B));
+        Assert.Equal("desperanza-bal-4-arm5-v1",
+            BalanceExperimentRules.RulesVersion(BalanceExperimentArm.Arm5));
+        Assert.Equal("bal-4-defeat-arm4a-v1",
+            RobotDefeatRewards.RewardsVersionFor(BalanceExperimentArm.Arm4A));
+        Assert.Equal("bal-4-defeat-arm4b-v1",
+            RobotDefeatRewards.RewardsVersionFor(BalanceExperimentArm.Arm4B));
+        Assert.Equal(
+            4,
+            Enum.GetValues<BalanceExperimentArm>()
+                .Select(BalanceExperimentRules.RulesVersion)
+                .Distinct(StringComparer.Ordinal)
+                .Count());
     }
 
     [Theory]
@@ -79,6 +95,77 @@ public sealed class Bal2RobotDefeatTests(ITestOutputHelper output)
         }
     }
 
+    [Fact]
+    public void EveryArmRewardTableHasValidWeightsAndReferences()
+    {
+        var catalog = LootCatalog.Default;
+        foreach (var arm in Enum.GetValues<BalanceExperimentArm>())
+        foreach (var danger in Dangers)
+        {
+            var cargo = BalanceExperimentRules.CargoTable(danger, arm);
+            Assert.Equal(100, cargo.Sum(entry => entry.Weight));
+            Assert.All(cargo, entry =>
+            {
+                Assert.True(entry.Weight > 0);
+                Assert.False(catalog.GetItem(entry.CatalogId).Category.Equals(
+                    "weapons", StringComparison.OrdinalIgnoreCase));
+                Assert.DoesNotContain("temptrest", entry.CatalogId, StringComparison.OrdinalIgnoreCase);
+            });
+            Assert.Equal(cargo.Count, cargo.Select(entry => entry.CatalogId)
+                .Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        }
+    }
+
+    [Theory]
+    [InlineData("Arm3Baseline", 695.95)]
+    [InlineData("Arm4A", 465.18)]
+    [InlineData("Arm4B", 546.49)]
+    [InlineData("Arm5", 695.95)]
+    public void HighRewardExpectedBundleValueMatchesEachArm(
+        string armName, double expectedHighBundle)
+    {
+        var arm = Enum.Parse<BalanceExperimentArm>(armName);
+        var catalog = LootCatalog.Default;
+        foreach (var (danger, expected) in new[]
+        {
+            ("Low", 25.06),
+            ("Medium", 76.805),
+            ("High", expectedHighBundle)
+        })
+        {
+            var cargoMean = BalanceExperimentRules.CargoTable(danger, arm)
+                .Sum(entry => catalog.GetItem(entry.CatalogId).Value * entry.Weight / 100.0);
+            var weaponMean = RobotDefeatRewards.WeaponsByDanger[danger]
+                .Sum(entry => catalog.GetItem(entry.CatalogId).Value * entry.Weight / 100.0);
+            var weaponChance = RobotDefeatRewards.WeaponChancePermille[danger] / 1000.0;
+            var bundle = cargoMean + (1 - weaponChance) * cargoMean + weaponChance * weaponMean;
+            Assert.Equal(expected, bundle, 3);
+        }
+    }
+
+    [Fact]
+    public void JackpotCandidateWeightsFollowCatalogValueOrderExactly()
+    {
+        Assert.Equal(
+            new[]
+            {
+                new RobotDefeatEntry("circuit_bundle_messy", 30),
+                new RobotDefeatEntry("arc_data_shard", 30),
+                new RobotDefeatEntry("energy_core_overcharged", 20),
+                new RobotDefeatEntry("arc_data_shard_legendary", 20)
+            },
+            BalanceExperimentRules.CargoTable("High", BalanceExperimentArm.Arm4A));
+        Assert.Equal(
+            new[]
+            {
+                new RobotDefeatEntry("circuit_bundle_messy", 25),
+                new RobotDefeatEntry("arc_data_shard", 30),
+                new RobotDefeatEntry("energy_core_overcharged", 20),
+                new RobotDefeatEntry("arc_data_shard_legendary", 25)
+            },
+            BalanceExperimentRules.CargoTable("High", BalanceExperimentArm.Arm4B));
+    }
+
     [Theory]
     [InlineData("Low", 0.02)]
     [InlineData("Medium", 0.06)]
@@ -137,13 +224,14 @@ public sealed class Bal2RobotDefeatTests(ITestOutputHelper output)
     public void CreateDefeatItemsIsDeterministicUniqueAndAtMostOneWeapon()
     {
         var catalog = LootCatalog.Default;
+        foreach (var arm in Enum.GetValues<BalanceExperimentArm>())
         foreach (var danger in Dangers)
         {
             var sawWeapon = false;
             for (var seed = 1; seed <= 400; seed++)
             {
-                var first = RobotDefeatRewards.CreateDefeatItems(catalog, "raid", seed, "robot", danger);
-                var second = RobotDefeatRewards.CreateDefeatItems(catalog, "raid", seed, "robot", danger);
+                var first = RobotDefeatRewards.CreateDefeatItems(catalog, "raid", seed, "robot", danger, arm);
+                var second = RobotDefeatRewards.CreateDefeatItems(catalog, "raid", seed, "robot", danger, arm);
                 Assert.Equal(2, first.Count);
                 Assert.Equal(
                     first.Select(item => (item.InstanceId, item.CatalogId)),

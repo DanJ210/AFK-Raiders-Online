@@ -42,7 +42,8 @@ public sealed record RaidStatsSample(
     double? TimeToTerminalSeconds = null,
     int MedicalHpRestored = 0,
     int MedicalHpWasted = 0,
-    bool RobotJackpotSecured = false)
+    bool RobotJackpotSecured = false,
+    bool RobotJackpotAwarded = false)
 {
     public const string UnratedDanger = "Unrated";
 
@@ -110,10 +111,12 @@ public sealed record RaidStatsSample(
         var robotCargo = projection.MyExtractedLoot
             .Where(item => item.InstanceId.Contains(":defeat:", StringComparison.Ordinal))
             .ToArray();
-        var robotCargoAwards = projection.Events
+        var defeatItemAwards = projection.Events
             .Where(raidEvent => raidEvent.Kind == "ItemAllocated"
-                && raidEvent.ItemInstanceId?.Contains(":defeat:", StringComparison.Ordinal) == true
-                && raidEvent.ParticipantIds.Contains(playerId))
+                && raidEvent.ItemInstanceId?.Contains(":defeat:", StringComparison.Ordinal) == true)
+            .ToArray();
+        var robotCargoAwards = defeatItemAwards
+            .Where(raidEvent => raidEvent.ParticipantIds.Contains(playerId))
             .ToArray();
         var robotWeaponsAllocated = robotCargoAwards.Count(raidEvent =>
             ShopCatalog.Weapons.Any(weapon => weapon.Name.Equals(raidEvent.ItemName, StringComparison.Ordinal)));
@@ -160,7 +163,8 @@ public sealed record RaidStatsSample(
             TimeToTerminalSeconds: (terminal.At - raidStartedAt).TotalSeconds,
             MedicalHpRestored: medicalHpRestored,
             MedicalHpWasted: medicalHpWasted,
-            RobotJackpotSecured: robotCargo.Any(item => item.Value == 900));
+            RobotJackpotSecured: robotCargo.Any(item => item.Value == 900),
+            RobotJackpotAwarded: defeatItemAwards.Any(raidEvent => raidEvent.ItemValue == 900));
     }
 }
 
@@ -381,7 +385,11 @@ public sealed record RaiderRunTelemetry(
     DateTimeOffset? EnrolledAt = null,
     int HighWorldsOffered = 0,
     int HighAdmissionsStarted = 0,
-    int HighGateBlocks = 0);
+    int HighGateBlocks = 0,
+    int HighAgeBlocks = 0,
+    IReadOnlyList<HighAdmissionEvent>? HighAdmissionEvents = null);
+
+public sealed record HighAdmissionEvent(DateTimeOffset At, string RaidId, string Kind);
 
 public sealed class RaiderStatistics
 {

@@ -26,6 +26,7 @@ public sealed class RaidSimulation
     private readonly ILootCatalog catalog;
     private readonly bool fastPacing;
     private readonly bool riskReward;
+    private readonly BalanceExperimentArm balanceExperimentArm;
     private readonly DangerProfile dangerProfile;
     private DateTimeOffset nextDecisionAt;
     private DateTimeOffset nextForecastAt;
@@ -63,10 +64,28 @@ public sealed class RaidSimulation
         bool? riskReward = null,
         string? danger = null,
         int conditionMomentum = 0)
+        : this(raidId, startsAt, seed, narrator, catalog, useTableBackedLoot, fastPacing,
+            riskReward, danger, conditionMomentum, BalanceExperimentArm.Arm3Baseline)
+    {
+    }
+
+    internal RaidSimulation(
+        string raidId,
+        DateTimeOffset startsAt,
+        int seed,
+        IRaidNarrator? narrator,
+        ILootCatalog? catalog,
+        bool useTableBackedLoot,
+        bool fastPacing,
+        bool? riskReward,
+        string? danger,
+        int conditionMomentum,
+        BalanceExperimentArm balanceExperimentArm)
     {
         RaidId = raidId;
         StartsAt = startsAt;
         this.seed = seed;
+        this.balanceExperimentArm = balanceExperimentArm;
         this.narrator = narrator ?? new TemplateRaidNarrator();
         this.catalog = catalog ?? LootCatalog.Default;
         this.fastPacing = fastPacing;
@@ -128,6 +147,7 @@ public sealed class RaidSimulation
     public ILootCatalog Catalog => catalog;
 
     public string RaidId { get; }
+    internal bool RobotDefeatAwardedJackpot { get; private set; }
     public DateTimeOffset StartsAt { get; }
     public ZoneConditionView Condition { get; }
     public string Zone { get; }
@@ -520,7 +540,8 @@ public sealed class RaidSimulation
         var currentThread = BuildActiveThread(me, serverTime);
         var recentThreads = me.CompletedThreads.TakeLast(5).ToArray();
         var salvageOpportunity = opportunities.Single(opportunity => opportunity.Location == "Salvage Yard");
-        return new RaidProjection(RaidId, Revision, RulesVersion, serverTime, Status,
+        return new RaidProjection(RaidId, Revision, BalanceExperimentRules.RulesVersion(balanceExperimentArm),
+            serverTime, Status,
             StartsAt + AdmissionWindow, NextActivityAt, riskReward ? Zone : "Scrapyard",
             OrderedRaiders().Select(raider => new PlayerView(raider.PlayerId, raider.Name, raider.PrimaryTrait,
                 raider.Location, raider.Activity, raider.Destination, raider.ActivityEndsAt)).ToArray(),
@@ -799,7 +820,9 @@ public sealed class RaidSimulation
             return;
         }
 
-        var generated = RobotDefeatRewards.CreateDefeatItems(catalog, RaidId, seed, robot.Id, Condition.Danger);
+        var generated = RobotDefeatRewards.CreateDefeatItems(
+            catalog, RaidId, seed, robot.Id, Condition.Danger, balanceExperimentArm);
+        RobotDefeatAwardedJackpot = generated.Any(item => item.Value == 900);
         var ordered = generated
             .OrderByDescending(item => item.Value)
             .ThenBy(item => item.InstanceId, StringComparer.Ordinal)

@@ -9,8 +9,25 @@ namespace AFKRaiders.Server.Tests;
 public sealed class NarrationCompatibilityTests(ITestOutputHelper output)
 {
     [Fact]
-    public void BundledNarrationAndCurrentSimulationHaveAStableCompatibilityFingerprint()
+    public void EachBalanceArmHasAStableCompatibilityFingerprint()
     {
+        var fingerprints = Enum.GetValues<BalanceExperimentArm>()
+            .ToDictionary(arm => arm, ComputeFingerprint);
+        foreach (var (arm, fingerprint) in fingerprints)
+            output.WriteLine($"{arm} ({BalanceExperimentRules.RulesVersion(arm)}): {fingerprint}");
+
+        Assert.Equal("4C3D0A00E28B25D579E8AE72D3EDC2422532088463BC3A87DB1BA3BF386FE4AC",
+            fingerprints[BalanceExperimentArm.Arm3Baseline]);
+        Assert.Equal("6BCECA6CE60AC87DAE8EB5D53FDD3635C1104E0A27F8615AFBEE78CC53F70C87",
+            fingerprints[BalanceExperimentArm.Arm4A]);
+        Assert.Equal("6285BA484563A01061EFC86D38060166A8AADF646C991D57837858AC8C94F5F5",
+            fingerprints[BalanceExperimentArm.Arm4B]);
+        Assert.Equal("A26935F4A799EA192DC3999489C0A6161CF1D1011A1BEF564FDB160D0C8D6744",
+            fingerprints[BalanceExperimentArm.Arm5]);
+        Assert.Equal(4, fingerprints.Values.Distinct(StringComparer.Ordinal).Count());
+
+        string ComputeFingerprint(BalanceExperimentArm arm)
+        {
         var kinds = new[] { "Deployment", "DutyAdmission", "Departure", "Travel", "Arrived", "Search",
             "SearchStarted", "CrossedPaths", "SearchJoined", "OpportunityExhausted", "SearchCompleted",
             "EncounterResolved", "ItemAllocated", "ItemAwarded", "PackingStarted", "PackingCompleted",
@@ -53,18 +70,21 @@ public sealed class NarrationCompatibilityTests(ITestOutputHelper output)
             {
                 // Freeze C4's original loot inputs; later loot expansions deliberately change outcomes.
                 var sim = new RaidSimulation("compatibility", start, seed,
-                    catalog: CatalogCompatibilityTests.C3Baseline(), fastPacing: false, riskReward: risk);
+                    narrator: null,
+                    catalog: CatalogCompatibilityTests.C3Baseline(),
+                    useTableBackedLoot: false,
+                    fastPacing: false,
+                    riskReward: risk,
+                    danger: null,
+                    conditionMomentum: 0,
+                    balanceExperimentArm: arm);
                 sim.AddAutonomousRaider("one", "raider-one", start);
                 sim.AddAutonomousRaider("two", "raider-two", start);
                 sim.Advance(start.AddHours(1));
                 lines.Add(JsonSerializer.Serialize(sim.Project("one", start.AddHours(1))));
                 lines.Add(JsonSerializer.Serialize(sim.Project("two", start.AddHours(1))));
             }
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
-        output.WriteLine($"Current narration and simulation fingerprint: {hash}");
-        // BAL-1 deliberately changed weapon damage and robot HP; BAL-1S changed shield resolution;
-        // BAL-2 changed profiles/defeat events; BAL-4 changed High profile/rewards; Arm 1 restored High 45 HP;
-        // Arm 2 lowered the overflow sell-back to 25%; Arm 3 adds the first-24h High readiness gate.
-        Assert.Equal("4C3D0A00E28B25D579E8AE72D3EDC2422532088463BC3A87DB1BA3BF386FE4AC", hash);
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
+        }
     }
 }

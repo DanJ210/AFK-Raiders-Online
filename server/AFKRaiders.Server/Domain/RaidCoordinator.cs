@@ -29,16 +29,33 @@ public sealed class RaidCoordinator
     private bool committingPriorityPredecessors;
     private readonly Func<int> nextSeed;
     private readonly Func<string> nextId;
+    private readonly BalanceExperimentArm balanceExperimentArm;
     private DateTimeOffset nextAdmissionAt;
     private string? activeAutonomousRaidId;
 
     public RaidCoordinator(TimeProvider time, IRaidNarrator? narrator = null, ILootCatalog? catalog = null, INarrativeGenerator? narrativeGenerator = null, bool fastPacing = false, Func<int>? nextSeed = null, int? traderSeed = null, Func<string>? nextId = null)
+        : this(time, narrator, catalog, narrativeGenerator, fastPacing, nextSeed, traderSeed, nextId,
+            BalanceExperimentArm.Arm3Baseline)
+    {
+    }
+
+    internal RaidCoordinator(
+        TimeProvider time,
+        IRaidNarrator? narrator,
+        ILootCatalog? catalog,
+        INarrativeGenerator? narrativeGenerator,
+        bool fastPacing,
+        Func<int>? nextSeed,
+        int? traderSeed,
+        Func<string>? nextId,
+        BalanceExperimentArm balanceExperimentArm)
     {
         this.time = time;
         this.narrator = narrator ?? new TemplateRaidNarrator();
         this.catalog = catalog ?? LootCatalog.Default;
         traderStockGenerator = new TraderStockGenerator(traderSeed ?? RandomNumberGenerator.GetInt32(int.MaxValue), time);
         this.fastPacing = fastPacing;
+        this.balanceExperimentArm = balanceExperimentArm;
         this.nextSeed = nextSeed ?? (() => RandomNumberGenerator.GetInt32(int.MaxValue));
         this.nextId = nextId ?? (() => Guid.NewGuid().ToString("N"));
         this.narrativeGenerator = narrativeGenerator ?? new TemplateNarrativeGenerator();
@@ -118,7 +135,9 @@ public sealed class RaidCoordinator
                 state.EnrolledAt,
                 state.OfferedHighRaidIds.Count,
                 state.HighAdmissionsStarted,
-                state.GateBlockedHighRaidIds.Count);
+                state.GateBlockedHighRaidIds.Count,
+                state.AgeBlockedHighRaidIds.Count,
+                state.HighAdmissionEvents.ToArray());
         }
     }
 
@@ -363,13 +382,12 @@ public sealed class RaidCoordinator
             if (participantCount >= RaidSimulation.MaxRaiders) return;
             if (world.Simulation.Condition.Danger == "High")
             {
-                handler.OfferedHighRaidIds.Add(world.Simulation.RaidId);
                 if (IsBlockedFromHigh(handler, at))
                 {
-                    // The gated Raider stays home and loses nothing; the next non-High world is its fallback.
-                    handler.GateBlockedHighRaidIds.Add(world.Simulation.RaidId);
+                    RecordHighBlock(handler, world.Simulation.RaidId, at);
                     continue;
                 }
+                RecordHighOffer(handler, world.Simulation.RaidId, at);
             }
             AdmitToAutonomousWorld(handler, world, at);
             revisions[world.Simulation.RaidId] =
@@ -386,15 +404,17 @@ public sealed class RaidCoordinator
         var world = raids[activeAutonomousRaidId!];
         if (world.Simulation.Condition.Danger == "High")
         {
-            first.OfferedHighRaidIds.Add(world.Simulation.RaidId);
             if (IsBlockedFromHigh(first, at))
             {
-                first.GateBlockedHighRaidIds.Add(world.Simulation.RaidId);
+                RecordHighBlock(first, world.Simulation.RaidId, at);
                 // Defensive: CreateAutonomousWorld only rolls High when an eligible ungated Raider exists.
                 var next = EligibleHandlers(at).FirstOrDefault(handler => !IsBlockedFromHigh(handler, at));
-                if (next is null) return;
+                if (next is null)
+                    throw new InvalidOperationException(
+                        "A High world was created without an eligible Raider despite the creation clamp.");
                 first = next;
             }
+            RecordHighOffer(first, world.Simulation.RaidId, at);
         }
         AdmitToAutonomousWorld(first, world, at);
     }
@@ -404,32 +424,47 @@ public sealed class RaidCoordinator
         var raidId = nextId();
         var eligible = EligibleHandlers(at).ToArray();
         var momentum = eligible.Select(h => h.Personality?.Greed ?? 0).DefaultIfEmpty(0).Max();
-        // BAL-4 Arm 3: never offer a High world that only readiness-gated Raiders could populate.
-        // Clamping below the High threshold keeps the roll on the policy's next-best dangers (Low/Medium),
-        // so a gated Raider always has an eligible danger at world creation and an empty world never idles.
+        // Never create a High world when all eligible Raiders are gated; preserve Low/Medium as fallback.
         if (eligible.Length > 0 && eligible.All(handler => IsBlockedFromHigh(handler, at)))
             momentum = Math.Min(momentum, 29);
-        var simulation = new RaidSimulation(raidId, at, nextSeed(), narrator, catalog, fastPacing: fastPacing,
-            conditionMomentum: momentum);
+        var simulation = new RaidSimulation(
+            raidId, at, nextSeed(), narrator, catalog, useTableBackedLoot: false,
+            fastPacing: fastPacing, riskReward: null, danger: null, conditionMomentum: momentum,
+            balanceExperimentArm: balanceExperimentArm);
         raids.Add(raidId, new RaidState(null, simulation));
         activeAutonomousRaidId = raidId;
     }
 
     /// <summary>
-    /// BAL-4 Arm 3 readiness gate. The age clock is the Raider's deterministic, server-owned creation
-    /// (enrollment) time, so shared worlds need no world-clock rule. During the first
-    /// <see cref="HighReadinessGateHours"/> hours of Raider age, a Raider is neither offered nor admitted
-    /// to a High world unless it deploys ready: a usable (not broken) equipped weapon, at least one
-    /// Medical-category supply it would actually carry (staged and in stock), and an unbroken owned shield.
-    /// Mature Raiders are unaffected and no world combat profile changes. A blocked Raider stays home and
-    /// is admitted to the next non-High world (the autonomous policy's next-best danger); if the active
-    /// world is High it waits, at most, until that world closes. Absent and polled Handlers see identical
-    /// outcomes because the gate runs entirely inside the coordinator's admission pulse.
+    /// BAL-4 admission rules use the Raider's deterministic, server-owned enrollment clock.
+    /// Arm 3 gates unready High deployments for the first 24 hours. Arm 5 blocks all High offers
+    /// under 8 hours, then applies the same readiness gate until 24 hours. Blocked Raiders retain
+    /// normal Low/Medium eligibility; High-world creation is clamped when no eligible Raider can join.
     /// </summary>
-    private const double HighReadinessGateHours = 24;
-
     private bool IsBlockedFromHigh(HandlerState handler, DateTimeOffset at) =>
-        at - handler.EnrolledAt < TimeSpan.FromHours(HighReadinessGateHours) && !IsHighReady(handler);
+        BalanceExperimentRules.BlocksHigh(
+            balanceExperimentArm, at - handler.EnrolledAt, IsHighReady(handler));
+
+    private void RecordHighBlock(HandlerState handler, string raidId, DateTimeOffset at)
+    {
+        var age = at - handler.EnrolledAt;
+        if (balanceExperimentArm == BalanceExperimentArm.Arm5 && age < TimeSpan.FromHours(8))
+        {
+            if (handler.AgeBlockedHighRaidIds.Add(raidId))
+                handler.HighAdmissionEvents.Add(new HighAdmissionEvent(at, raidId, "AgeBlocked"));
+            return;
+        }
+
+        RecordHighOffer(handler, raidId, at);
+        if (handler.GateBlockedHighRaidIds.Add(raidId))
+            handler.HighAdmissionEvents.Add(new HighAdmissionEvent(at, raidId, "ReadinessBlocked"));
+    }
+
+    private static void RecordHighOffer(HandlerState handler, string raidId, DateTimeOffset at)
+    {
+        if (handler.OfferedHighRaidIds.Add(raidId))
+            handler.HighAdmissionEvents.Add(new HighAdmissionEvent(at, raidId, "Offered"));
+    }
 
     internal static bool IsHighReadyForTesting(bool usableWeapon, bool carriesMedical, bool unbrokenShield) =>
         usableWeapon && carriesMedical && unbrokenShield;
@@ -472,8 +507,10 @@ public sealed class RaidCoordinator
         handler.LastAdmittedAt = at;
         if (world.Simulation.Condition.Danger == "High")
         {
-            handler.OfferedHighRaidIds.Add(world.Simulation.RaidId);
+            RecordHighOffer(handler, world.Simulation.RaidId, at);
             handler.HighAdmissionsStarted++;
+            handler.HighAdmissionEvents.Add(
+                new HighAdmissionEvent(at, world.Simulation.RaidId, "Started"));
         }
         handler.DeployedShield = handler.Shield;
         handler.DeployedWeaponCatalogId = equipped.CatalogId;
@@ -604,7 +641,8 @@ public sealed class RaidCoordinator
                 var sample = RaidStatsSample.FromProjection(
                     projection, world.Simulation.StartsAt, handler.PlayerId, isKnockedOut,
                     settledItems.WeaponsToKeep.Count, lostWeapon is not null,
-                    deployedShield, shieldWearCenti, shieldLost);
+                    deployedShield, shieldWearCenti, shieldLost)
+                    with { RobotJackpotAwarded = world.Simulation.RobotDefeatAwardedJackpot };
                 handler.Stats.RecordRaid(sample);
                 handler.Stats.RecordSettlementTelemetry(new SettledRaidRecord(
                     RaidId: world.Simulation.RaidId,
@@ -2171,6 +2209,8 @@ public sealed class RaidCoordinator
         public int HighAdmissionsStarted { get; set; }
         public HashSet<string> OfferedHighRaidIds { get; } = new(StringComparer.Ordinal);
         public HashSet<string> GateBlockedHighRaidIds { get; } = new(StringComparer.Ordinal);
+        public HashSet<string> AgeBlockedHighRaidIds { get; } = new(StringComparer.Ordinal);
+        public List<HighAdmissionEvent> HighAdmissionEvents { get; } = [];
         public RaiderPrimaryTrait PrimaryTrait => RaiderEconomyPolicy.TraitFromSeed(TraitSeed);
         public bool DutyEnabled { get; set; } = true;
         public bool IsHome { get; set; } = true;

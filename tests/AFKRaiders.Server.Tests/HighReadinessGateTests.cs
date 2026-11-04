@@ -36,13 +36,19 @@ public sealed class HighReadinessGateTests
             RaidCoordinator.IsHighReadyForTesting(usableWeapon, carriesMedical, unbrokenShield));
     }
 
-    private static (RaiderTelemetry[] Telemetry, int Settled) RunCohort(int seed, int hours, int pollSeconds)
+    private static (RaiderTelemetry[] Telemetry, int Settled) RunCohort(
+        int seed,
+        int hours,
+        int pollSeconds,
+        BalanceExperimentArm arm = BalanceExperimentArm.Arm3Baseline)
     {
         var clock = new Clock();
         var nextSeed = seed;
         var nextId = 0;
-        var coordinator = new RaidCoordinator(clock, nextSeed: () => nextSeed++, traderSeed: seed,
-            nextId: () => $"id{seed}x{nextId++:D4}");
+        var coordinator = new RaidCoordinator(
+            clock, narrator: null, catalog: null, narrativeGenerator: null, fastPacing: false,
+            nextSeed: () => nextSeed++, traderSeed: seed,
+            nextId: () => $"id{seed}x{nextId++:D4}", balanceExperimentArm: arm);
         var enrolled = Slots.Select(coordinator.EnrollHandler).ToArray();
         for (var t = 0; t <= hours * 3600; t += 5)
         {
@@ -89,9 +95,88 @@ public sealed class HighReadinessGateTests
                 // Funnel consistency: every block was an offer; every start was an offer.
                 Assert.True(raider.Run.HighGateBlocks <= raider.Run.HighWorldsOffered);
                 Assert.True(raider.Run.HighAdmissionsStarted <= raider.Run.HighWorldsOffered);
+                var events = raider.Run.HighAdmissionEvents
+                    ?? throw new InvalidOperationException("Admission events are required for funnel checks.");
+                Assert.Equal(raider.Run.HighWorldsOffered, events.Count(item => item.Kind == "Offered"));
+                Assert.Equal(raider.Run.HighAdmissionsStarted, events.Count(item => item.Kind == "Started"));
+                Assert.Equal(raider.Run.HighGateBlocks, events.Count(item => item.Kind == "ReadinessBlocked"));
+                Assert.Equal(raider.Run.HighAgeBlocks, events.Count(item => item.Kind == "AgeBlocked"));
+                Assert.True(raider.Run.Records.Count(record => record.Sample.Danger == "High")
+                    <= raider.Run.HighAdmissionsStarted);
             }
         }
         Assert.True(sawYoungHigh, "The seeded cohorts must exercise at least one young High admission.");
+    }
+
+    [Theory]
+    [InlineData("arm3", 7, true, false)]
+    [InlineData("arm3", 7, false, true)]
+    [InlineData("arm3", 8, true, false)]
+    [InlineData("arm3", 8, false, true)]
+    [InlineData("arm3", 23.999, true, false)]
+    [InlineData("arm3", 23.999, false, true)]
+    [InlineData("arm3", 24, false, false)]
+    [InlineData("arm3", 25, false, false)]
+    [InlineData("arm5", 7.999, true, true)]
+    [InlineData("arm5", 7.999, false, true)]
+    [InlineData("arm5", 8, true, false)]
+    [InlineData("arm5", 8, false, true)]
+    [InlineData("arm5", 23.999, true, false)]
+    [InlineData("arm5", 23.999, false, true)]
+    [InlineData("arm5", 24, false, false)]
+    [InlineData("arm5", 25, false, false)]
+    public void HighAdmissionAgeRuleHasExactBoundaries(
+        string armName, double ageHours, bool ready, bool expectedBlocked)
+    {
+        var arm = armName switch
+        {
+            "arm3" => BalanceExperimentArm.Arm3Baseline,
+            "arm5" => BalanceExperimentArm.Arm5,
+            _ => throw new ArgumentOutOfRangeException(nameof(armName))
+        };
+        Assert.Equal(expectedBlocked,
+            BalanceExperimentRules.BlocksHigh(arm, TimeSpan.FromHours(ageHours), ready));
+    }
+
+    [Fact]
+    public void Arm5ClampsYoungHighWorldsAndStillSettlesEveryRaider()
+    {
+        var (telemetry, settled) = RunCohort(
+            seed: 2, hours: 8, pollSeconds: int.MaxValue, arm: BalanceExperimentArm.Arm5);
+        Assert.True(settled > 0);
+        foreach (var raider in telemetry)
+        {
+            Assert.NotEmpty(raider.Run.Records);
+            Assert.All(raider.Run.Records, record =>
+            {
+                Assert.True((record.SettledAt - Start).TotalHours < 8);
+                Assert.NotEqual("High", record.Sample.Danger);
+            });
+            var events = raider.Run.HighAdmissionEvents
+                ?? throw new InvalidOperationException("Admission events are required.");
+            Assert.All(events.Where(item => item.Kind is "Offered" or "Started"), item =>
+                Assert.True((item.At - raider.Run.EnrolledAt!.Value).TotalHours >= 8));
+            Assert.Equal(0, raider.Run.HighAgeBlocks);
+        }
+    }
+
+    [Fact]
+    public void Arm5BlockedRaidersReachAnEligibleAdmissionWithoutStarvation()
+    {
+        var (telemetry, _) = RunCohort(
+            seed: 3, hours: 30, pollSeconds: int.MaxValue, arm: BalanceExperimentArm.Arm5);
+        foreach (var raider in telemetry)
+        {
+            var events = raider.Run.HighAdmissionEvents
+                ?? throw new InvalidOperationException("Admission events are required.");
+            foreach (var blocked in events.Where(item =>
+                item.Kind is "AgeBlocked" or "ReadinessBlocked"))
+            {
+                var next = raider.Run.Records.FirstOrDefault(record => record.AdmittedAt >= blocked.At);
+                Assert.NotNull(next);
+                Assert.InRange((next!.AdmittedAt!.Value - blocked.At).TotalSeconds, 0, 1350);
+            }
+        }
     }
 
     [Fact]
@@ -100,6 +185,18 @@ public sealed class HighReadinessGateTests
         var absent = RunCohort(seed: 3, hours: 26, pollSeconds: int.MaxValue);
         var polled = RunCohort(seed: 3, hours: 26, pollSeconds: 30);
         var repeat = RunCohort(seed: 3, hours: 26, pollSeconds: int.MaxValue);
+        Assert.Equal(JsonSerializer.Serialize(absent.Telemetry), JsonSerializer.Serialize(repeat.Telemetry));
+        Assert.Equal(JsonSerializer.Serialize(absent.Telemetry), JsonSerializer.Serialize(polled.Telemetry));
+    }
+
+    [Fact]
+    public void Arm5OutcomesAreDeterministicAndIdenticalForAbsentAndPolledHandlers()
+    {
+        var absent = RunCohort(seed: 3, hours: 26, pollSeconds: int.MaxValue,
+            arm: BalanceExperimentArm.Arm5);
+        var polled = RunCohort(seed: 3, hours: 26, pollSeconds: 30, arm: BalanceExperimentArm.Arm5);
+        var repeat = RunCohort(seed: 3, hours: 26, pollSeconds: int.MaxValue,
+            arm: BalanceExperimentArm.Arm5);
         Assert.Equal(JsonSerializer.Serialize(absent.Telemetry), JsonSerializer.Serialize(repeat.Telemetry));
         Assert.Equal(JsonSerializer.Serialize(absent.Telemetry), JsonSerializer.Serialize(polled.Telemetry));
     }

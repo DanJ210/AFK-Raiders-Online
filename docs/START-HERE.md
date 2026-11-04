@@ -86,9 +86,9 @@ See the Agent handoff checkpoint at the top of [IMPLEMENTATION_PROGRESS.md](IMPL
 ## Starter message for a new chat
 
 ```text
-Reference repo: https://github.com/DanJ210/AFK-Raiders-Online (main). Start with docs/START_HERE.md, then read the handoff checkpoint in docs/IMPLEMENTATION_PROGRESS.md. Use docs/balance/ and docs/lore/ as needed. Tell me if anything looks stale.
+Reference repo: https://github.com/DanJ210/AFK-Raiders-Online (main). Start with docs/START-HERE.md, then read the handoff checkpoint in docs/IMPLEMENTATION_PROGRESS.md. Use docs/balance/ and docs/lore/ as needed. Tell me if anything looks stale.
 ```
 
 ## Keeping this file current
 
-Update START_HERE.md only when files are added, renamed, or retired in docs/, docs/balance/ or docs/lore/. List the file names here, not their contents.
+Update START-HERE.md only when files are added, renamed, or retired in docs/, docs/balance/ or docs/lore/. List the file names here, not their contents.

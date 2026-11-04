@@ -15,6 +15,9 @@ public static class RobotDefeatRewards
 {
     public const string RewardsVersion = "bal-4-defeat-v1";
 
+    internal static string RewardsVersionFor(BalanceExperimentArm arm) =>
+        BalanceExperimentRules.RewardsVersion(arm);
+
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<RobotDefeatEntry>> CargoByDanger =
         new Dictionary<string, IReadOnlyList<RobotDefeatEntry>>(StringComparer.Ordinal)
         {
@@ -94,9 +97,18 @@ public static class RobotDefeatRewards
     /// Invalid tables or unknown references fail explicitly instead of producing default loot.
     /// </summary>
     public static IReadOnlyList<ItemView> CreateDefeatItems(
-        ILootCatalog catalog, string raidId, int seed, string robotId, string danger)
+        ILootCatalog catalog, string raidId, int seed, string robotId, string danger) =>
+        CreateDefeatItems(catalog, raidId, seed, robotId, danger, BalanceExperimentArm.Arm3Baseline);
+
+    internal static IReadOnlyList<ItemView> CreateDefeatItems(
+        ILootCatalog catalog,
+        string raidId,
+        int seed,
+        string robotId,
+        string danger,
+        BalanceExperimentArm arm)
     {
-        var cargo = RequireTable(CargoByDanger, danger);
+        var cargo = BalanceExperimentRules.CargoTable(danger, arm);
         ValidateWeights(cargo, danger, "cargo");
         var weapons = RequireTable(WeaponsByDanger, danger);
         ValidateWeights(weapons, danger, "weapon");

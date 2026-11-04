@@ -13,6 +13,7 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
     private static readonly DateTimeOffset Start = DateTimeOffset.Parse("2026-10-14T12:00:00Z");
     private static readonly string[] Slots = ["raider-one", "raider-two"];
     public const string ReportPathVariable = "AFK_BALANCE_REPORT_PATH";
+    public const string ArmVariable = "AFK_BALANCE_ARM";
 
     private sealed class Clock : TimeProvider
     {
@@ -25,14 +26,20 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
         IReadOnlyDictionary<string, (int Extracted, int KnockedOut)> ObservedSettlements,
         IReadOnlyList<RaiderTelemetry> Telemetry);
 
-    private static CohortResult RunRecurringCohort(int seed, int hours, int pollSeconds)
+    private static CohortResult RunRecurringCohort(
+        int seed,
+        int hours,
+        int pollSeconds,
+        BalanceExperimentArm arm = BalanceExperimentArm.Arm3Baseline)
     {
         var clock = new Clock();
         var nextSeed = seed;
         var nextId = 0;
         // Pinned trader stock and IDs: player IDs are the deterministic tie-break for shared trader stock.
-        var coordinator = new RaidCoordinator(clock, nextSeed: () => nextSeed++, traderSeed: seed,
-            nextId: () => $"id{seed}x{nextId++:D4}");
+        var coordinator = new RaidCoordinator(
+            clock, narrator: null, catalog: null, narrativeGenerator: null, fastPacing: false,
+            nextSeed: () => nextSeed++, traderSeed: seed,
+            nextId: () => $"id{seed}x{nextId++:D4}", balanceExperimentArm: arm);
         var enrolled = Slots.Select(coordinator.EnrollHandler).ToArray();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var observed = enrolled.ToDictionary(h => h.Projection.Slot, _ => (Extracted: 0, KnockedOut: 0));
@@ -168,17 +175,20 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
         }
         var seeds = int.Parse(Environment.GetEnvironmentVariable("AFK_BALANCE_SEEDS") ?? "24", CultureInfo.InvariantCulture);
         var hours = int.Parse(Environment.GetEnvironmentVariable("AFK_BALANCE_HOURS") ?? "8", CultureInfo.InvariantCulture);
+        var arm = ParseArm(Environment.GetEnvironmentVariable(ArmVariable));
         var cohorts = Enumerable.Range(1, seeds)
             .AsParallel().AsOrdered()
-            .Select(seed => RunRecurringCohort(seed, hours, pollSeconds: int.MaxValue))
+            .Select(seed => RunRecurringCohort(seed, hours, pollSeconds: int.MaxValue, arm: arm))
             .ToArray();
         var all = cohorts.SelectMany(cohort => cohort.Stats).ToArray();
         var telemetry = cohorts.SelectMany(cohort => cohort.Telemetry).ToArray();
         var starter = RunStarterLowCohort(seeds);
-        var report = BalanceReport.Render(all, seeds, hours, RaidSimulation.RulesVersion)
+        var rulesVersion = BalanceExperimentRules.RulesVersion(arm);
+        var report = BalanceReport.Render(all, seeds, hours, rulesVersion,
+                RobotDefeatRewards.RewardsVersionFor(arm))
             + BalanceReport.RenderWindows(telemetry, Start, hours)
             + starter
-            + RunStarterHighCohorts();
+            + RunStarterHighCohorts(arm);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         File.WriteAllText(path, report);
         var rawPath = Environment.GetEnvironmentVariable("AFK_BALANCE_RAW_PATH");
@@ -187,7 +197,9 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(rawPath))!);
             File.WriteAllText(rawPath, System.Text.Json.JsonSerializer.Serialize(new
             {
-                RaidSimulation.RulesVersion,
+                Arm = arm.ToString(),
+                RulesVersion = rulesVersion,
+                RewardsVersion = RobotDefeatRewards.RewardsVersionFor(arm),
                 Seeds = seeds,
                 Hours = hours,
                 Start,
@@ -196,6 +208,16 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
         }
         output.WriteLine(report);
     }
+
+    private static BalanceExperimentArm ParseArm(string? value) => value switch
+    {
+        null or "" or "arm3" => BalanceExperimentArm.Arm3Baseline,
+        "arm4a" => BalanceExperimentArm.Arm4A,
+        "arm4b" => BalanceExperimentArm.Arm4B,
+        "arm5" => BalanceExperimentArm.Arm5,
+        _ => throw new ArgumentException(
+            $"Unknown {ArmVariable} value '{value}'. Expected arm3, arm4a, arm4b, or arm5.")
+    };
 
     /// <summary>
     /// Fresh solo Low starter cohort: Tea Kettle plus a fresh initial Light shield, no Handler Signals.
@@ -228,7 +250,7 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
     /// default fresh loadout, unattended, solo High world, with and without the staged supply kit.
     /// This replaces the stale 57.9% starter High extraction figure for the current rules.
     /// </summary>
-    private static string RunStarterHighCohorts()
+    private static string RunStarterHighCohorts(BalanceExperimentArm arm)
     {
         StagedSupplyItem[] stagedKit =
         [
@@ -240,34 +262,81 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
         sb.AppendLine();
         sb.AppendLine("## Fresh first-raid High cohorts (120 seeds x 2 Raiders, unattended, no Signals)");
         sb.AppendLine();
-        sb.AppendLine("| Variant | Runs | Extracted | Extraction rate | KO rate | Robot fights | Robot defeats |");
+        sb.AppendLine("| Variant | Runs | Extracted | Extraction rate (95% CI) | KO rate (95% CI) | Robot fights | Robot defeats |");
         sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|");
         foreach (var (label, staged) in new[] { ("Starter (no staged supplies)", false), ("Staged supply kit", true) })
         {
-            var runs = 0;
+            var extractedBySeed = new int[120];
+            var knockoutsBySeed = new int[120];
             var extracted = 0;
             var knockouts = 0;
             var fights = 0;
             var defeats = 0;
-            foreach (var seed in Enumerable.Range(1, 120))
+            foreach (var (seed, seedIndex) in Enumerable.Range(1, 120).Select((seed, index) => (seed, index)))
+            {
                 foreach (var slot in Slots)
                 {
-                    var sim = new RaidSimulation("audit", Start, seed, danger: "High");
+                    var sim = new RaidSimulation(
+                        "audit", Start, seed, narrator: null, catalog: null, useTableBackedLoot: false,
+                        fastPacing: false, riskReward: null, danger: "High", conditionMomentum: 0,
+                        balanceExperimentArm: arm);
                     sim.AddAutonomousRaider("one", slot, Start, staged ? stagedKit : null);
                     for (var t = 5; t <= 1500 && !sim.Completed; t += 5) sim.Advance(Start.AddSeconds(t));
                     var final = sim.Project("one", Start.AddSeconds(1500));
-                    runs++;
-                    if (final.Events.Any(e => e.Kind == "Extracted")) extracted++;
-                    if (final.Events.Any(e => e.Kind == "KnockedOut")) knockouts++;
+                    if (final.Events.Any(e => e.Kind == "Extracted"))
+                    {
+                        extracted++;
+                        extractedBySeed[seedIndex]++;
+                    }
+                    if (final.Events.Any(e => e.Kind == "KnockedOut"))
+                    {
+                        knockouts++;
+                        knockoutsBySeed[seedIndex]++;
+                    }
                     if (final.RobotEncounter is not null) fights++;
                     if (final.RobotEncounter?.Resolution == "Defeated") defeats++;
                 }
+            }
+
+            var extractionInterval = SeedClusterInterval(extractedBySeed);
+            var knockoutInterval = SeedClusterInterval(knockoutsBySeed);
+            const int runs = 120 * 2;
             sb.AppendLine($"| {label} | {runs} | {extracted} "
-                + $"| {(100.0 * extracted / runs).ToString("F1", CultureInfo.InvariantCulture)}% "
-                + $"| {(100.0 * knockouts / runs).ToString("F1", CultureInfo.InvariantCulture)}% "
+                + $"| {FormatRatePercent(extracted, runs)} ({FormatPercent(100 * extractionInterval.Lower)}-{FormatPercent(100 * extractionInterval.Upper)}) "
+                + $"| {FormatRatePercent(knockouts, runs)} ({FormatPercent(100 * knockoutInterval.Lower)}-{FormatPercent(100 * knockoutInterval.Upper)}) "
                 + $"| {fights} | {defeats} |");
         }
         return sb.ToString();
+
+        static (double Lower, double Upper) SeedClusterInterval(IReadOnlyList<int> outcomesBySeed)
+        {
+            const int resamples = 20_000;
+            var random = new Random(20261103);
+            var rates = new double[resamples];
+            for (var resample = 0; resample < resamples; resample++)
+            {
+                var total = 0;
+                for (var cluster = 0; cluster < outcomesBySeed.Count; cluster++)
+                    total += outcomesBySeed[random.Next(outcomesBySeed.Count)];
+                rates[resample] = total / (double)(outcomesBySeed.Count * Slots.Length);
+            }
+
+            Array.Sort(rates);
+            return (Percentile(rates, 0.025), Percentile(rates, 0.975));
+        }
+
+        static double Percentile(IReadOnlyList<double> sorted, double p)
+        {
+            var rank = (sorted.Count - 1) * p;
+            var low = (int)Math.Floor(rank);
+            var high = (int)Math.Ceiling(rank);
+            return sorted[low] + (sorted[high] - sorted[low]) * (rank - low);
+        }
+
+        static string FormatRatePercent(double count, int denominator) =>
+            FormatPercent(100.0 * count / denominator);
+
+        static string FormatPercent(double value) => value.ToString("F1", CultureInfo.InvariantCulture) + "%";
     }
 }
 
@@ -276,7 +345,12 @@ public sealed record RaiderTelemetry(int Seed, string Slot, RaiderRunTelemetry R
 
 public static class BalanceReport
 {
-    public static string Render(IReadOnlyList<RaiderStatsView> raiders, int seeds, int hours, string rulesVersion)
+    public static string Render(
+        IReadOnlyList<RaiderStatsView> raiders,
+        int seeds,
+        int hours,
+        string rulesVersion,
+        string rewardsVersion)
     {
         var dangers = raiders.SelectMany(r => r.ByDanger)
             .GroupBy(d => d.Danger)
@@ -297,6 +371,7 @@ public static class BalanceReport
         sb.AppendLine("Generated by `BalanceMeasurementTests.WriteBalanceReportWhenRequested`. Do not edit by hand; regenerate after rule changes.");
         sb.AppendLine();
         sb.AppendLine($"- Rules version: `{rulesVersion}`");
+        sb.AppendLine($"- Reward version: `{rewardsVersion}`");
         sb.AppendLine($"- Cohort: {seeds} seeds x 2 unattended Raiders x {hours} simulated hours (recurring coordinator, autonomous economy, no Handler Signal use)");
         sb.AppendLine($"- Settled raids: {total.Raids}");
         sb.AppendLine("- Targets (experimental, BAL-4 2026-11-03): mature (48h+) KO Low <=10%, Medium 15-25%, High 25-40%; onboarding (first 24h) Low <=10%, Medium <=30%, High <=45%; medical used per raid (mature) Low 0-1, Medium 1-2, High 2-4.");
@@ -402,6 +477,9 @@ public static class BalanceReport
         var rows = new List<(int Window, int Seed, string Slot, string Danger, string Trait, RaidStatsSample Sample,
             SettledRaidRecord Record, int Net, int WeaponsBought, int LoanerKettles, int WeaponLosses,
             EconomyStatsView EconomyDelta, double? GapToNextAdmissionSeconds)>();
+        var admissionEvents = raiders.SelectMany(raider =>
+            (raider.Run.HighAdmissionEvents ?? [])
+                .Select(admission => (raider.Seed, raider.Slot, admission.At, admission.Kind))).ToArray();
         foreach (var raider in raiders)
         {
             if (raider.Run.InitialWeaponCount > WeaponInventoryCap.MaximumOwnedWeapons
@@ -475,6 +553,19 @@ public static class BalanceReport
             if (window.FromHours >= hours) continue;
             var inWindow = rows.Where(row => row.Window == windowIndex).ToArray();
             sb.AppendLine($"### Window [{window.FromHours},{window.ToHours})h");
+            sb.AppendLine();
+            var windowEvents = admissionEvents.Where(admission =>
+            {
+                var age = (admission.At - start).TotalHours;
+                return age >= window.FromHours && age < window.ToHours;
+            }).ToArray();
+            var windowSettledHigh = inWindow.Count(row => row.Danger == "High");
+            sb.AppendLine("| High offered | High started | High settled | Readiness blocks | Under-8h age exclusions |");
+            sb.AppendLine("|---:|---:|---:|---:|---:|");
+            sb.AppendLine($"| {windowEvents.Count(item => item.Kind == "Offered")} "
+                + $"| {windowEvents.Count(item => item.Kind == "Started")} | {windowSettledHigh} "
+                + $"| {windowEvents.Count(item => item.Kind == "ReadinessBlocked")} "
+                + $"| {windowEvents.Count(item => item.Kind == "AgeBlocked")} |");
             sb.AppendLine();
             if (inWindow.Length == 0)
             {
@@ -554,20 +645,29 @@ public static class BalanceReport
                     + $"| {group.Count(row => row.Sample.RobotResolution == "Escaped")} "
                     + $"| {F(group.Average(row => (double)row.Sample.RobotRoundsResolved))} |");
             }
-            // High jackpot sensitivity: exclude raids that secured a 900-value prime-archive shard.
+            // High jackpot sensitivity excludes every participant raid in a world awarding a 900-value item.
             var high = inWindow.Where(row => row.Danger == "High").ToArray();
-            var highNoJackpot = high.Where(row => !row.Sample.RobotJackpotSecured).ToArray();
+            var highNoJackpot = high.Where(row => !row.Sample.RobotJackpotAwarded).ToArray();
             if (high.Length > 0)
             {
                 var securedValues = high.Select(row => (double)row.Sample.ValueSecured).OrderBy(v => v).ToArray();
+                var defeatedHighWorlds = high
+                    .Where(row => row.Sample.RobotResolution == "Defeated")
+                    .GroupBy(row => row.Record.RaidId, StringComparer.Ordinal)
+                    .Select(group => group.Any(row => row.Sample.RobotJackpotAwarded))
+                    .ToArray();
                 sb.AppendLine($"\nHigh secured value/raid percentiles: p50 {F(Percentile(securedValues, 0.50))}, "
                     + $"p90 {F(Percentile(securedValues, 0.90))}, p99 {F(Percentile(securedValues, 0.99))} (n {high.Length}).");
                 if (highNoJackpot.Length != high.Length)
-                    sb.AppendLine($"\nHigh excluding secured 900-value jackpots: n {highNoJackpot.Length}, "
+                    sb.AppendLine($"\nHigh excluding 900-value jackpot worlds: n {highNoJackpot.Length}, "
                         + $"net mean {F(highNoJackpot.Average(row => (double)row.Net))} "
                         + $"(all High: {F(high.Average(row => (double)row.Net))}), "
                         + $"secured value mean {F(highNoJackpot.Average(row => (double)row.Sample.ValueSecured))} "
                         + $"(all High: {F(high.Average(row => (double)row.Sample.ValueSecured))}).");
+                if (defeatedHighWorlds.Length > 0)
+                    sb.AppendLine($"\nDefeated High worlds awarding at least one 900-value item: "
+                        + $"{defeatedHighWorlds.Count(awarded => awarded)}/{defeatedHighWorlds.Length} "
+                        + $"({PctF(defeatedHighWorlds.Count(awarded => awarded), defeatedHighWorlds.Length)}).");
             }
             // Time from each settlement in this window to the Raider's next admission.
             var failedWeapon = inWindow.Sum(row => row.EconomyDelta.FailedWeaponPurchases);
@@ -621,15 +721,16 @@ public static class BalanceReport
         var offered = raiders.Sum(raider => raider.Run.HighWorldsOffered);
         var started = raiders.Sum(raider => raider.Run.HighAdmissionsStarted);
         var gateBlocked = raiders.Sum(raider => raider.Run.HighGateBlocks);
+        var ageBlocked = raiders.Sum(raider => raider.Run.HighAgeBlocks);
         var settledHigh = raiders.Sum(raider => raider.Run.Records.Count(record => record.Sample.Danger == "High"));
         sb.AppendLine("### High admission funnel (whole run)");
         sb.AppendLine();
         sb.AppendLine("Offered counts distinct admitting High worlds seen per eligible Raider; started counts actual High admissions;");
         sb.AppendLine("settled counts committed High settlements. Readiness-gate blocks count distinct High worlds a gated Raider skipped.");
         sb.AppendLine();
-        sb.AppendLine("| High worlds offered (raider-distinct) | High admissions started | High raids settled | Readiness-gate blocks |");
-        sb.AppendLine("|---:|---:|---:|---:|");
-        sb.AppendLine($"| {offered} | {started} | {settledHigh} | {gateBlocked} |");
+        sb.AppendLine("| High worlds offered (raider-distinct) | High admissions started | High raids settled | Readiness-gate blocks | Under-8h age exclusions |");
+        sb.AppendLine("|---:|---:|---:|---:|---:|");
+        sb.AppendLine($"| {offered} | {started} | {settledHigh} | {gateBlocked} | {ageBlocked} |");
         sb.AppendLine();
         sb.AppendLine("### End-of-run unsettled endpoint");
         sb.AppendLine();
