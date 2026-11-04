@@ -1069,10 +1069,16 @@ public sealed class RaidCoordinator
         foreach (var (liquidation, sourceEventId) in result.LiquidatedWeapons.Zip(eventIds))
         {
             var weapon = liquidation.Weapon;
-            var text = $"{weapon.Name} ({weapon.CurrentDurability}/{weapon.MaxDurability} durability) " +
-                $"was liquidated from owned overflow at {WeaponInventoryCap.SellBackPermille / 10}% " +
-                $"of catalog value {liquidation.CatalogValue} for {liquidation.CoinsReceived} coins. " +
-                $"Owned stock: {handler.OwnedWeapons.Count}; balance: {handler.Coins}.";
+            var text = Content.NarrationContent.Default.Format(
+                "hub.economy-weapon-liquidated",
+                weapon.Name,
+                weapon.CurrentDurability,
+                weapon.MaxDurability,
+                WeaponInventoryCap.SellBackPermille / 10,
+                liquidation.CatalogValue,
+                liquidation.CoinsReceived,
+                handler.OwnedWeapons.Count,
+                handler.Coins);
             if (!handler.PreparationEventIds.Add(sourceEventId))
                 throw new InvalidOperationException($"Weapon liquidation event '{sourceEventId}' is duplicated.");
             handler.Events.Add(new HandlerEventView(handler.Events.Count + 1, at, "WeaponLiquidated", text));

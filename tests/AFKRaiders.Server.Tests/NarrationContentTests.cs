@@ -166,6 +166,24 @@ public sealed class NarrationContentTests
     }
 
     [Fact]
+    public void WeaponLiquidationLineReportsTransactionAndUsesCatalogComedy()
+    {
+        Assert.Equal(
+            "Vernerider (3/10 durability) was liquidated from owned overflow at 25% of catalog value 100 for 25 coins. " +
+            "Owned stock: 4; balance: 125. The inventory cap calls that a promotion to liquid asset.",
+            NarrationContent.Default.Format(
+                "hub.economy-weapon-liquidated",
+                "Vernerider",
+                3,
+                10,
+                25,
+                100,
+                25,
+                4,
+                125));
+    }
+
+    [Fact]
     public void EmbeddedStyleCuesStillFeedTheGuardedAiPrompt()
     {
         var prompt = OnnxGenAiNarrativeGenerator.BuildAmbientPrompt("Market", "Checking");
@@ -175,7 +193,7 @@ public sealed class NarrationContentTests
             new AmbientCommsContext("Desperanza", "reviewing my paperwork"));
         Assert.Contains("tube route maps", hubPrompt);
         Assert.Contains("tube route maps", OnnxGenAiNarrativeGenerator.BuildAmbientPrompt("Desperanza", "Checking"));
-        Assert.Equal("desperanza-narration-v5", NarrationContent.Default.ContentVersion);
+        Assert.Equal("desperanza-narration-v6", NarrationContent.Default.ContentVersion);
         Assert.Null(OnnxGenAiNarrativeGenerator.ValidateAmbient("I recovered legendary loot from a robot."));
         Assert.NotNull(OnnxGenAiNarrativeGenerator.ValidateAmbient("I consider paperwork a defective compass."));
     }

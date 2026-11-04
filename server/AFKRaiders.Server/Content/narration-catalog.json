@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contentVersion": "desperanza-narration-v5",
+  "contentVersion": "desperanza-narration-v6",
   "pools": [
     {
       "id": "survival.downed",
@@ -979,6 +979,10 @@
     {
       "id": "hub.economy-shield-unaffordable",
       "text": "A replacement {1} was {0} coins out of reach. The Raider deployed unshielded and called it aerodynamic."
+    },
+    {
+      "id": "hub.economy-weapon-liquidated",
+      "text": "{0} ({1}/{2} durability) was liquidated from owned overflow at {3}% of catalog value {4} for {5} coins. Owned stock: {6}; balance: {7}. The inventory cap calls that a promotion to liquid asset."
     },
     {
       "id": "hub.shield-lost",
