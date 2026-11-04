@@ -34,6 +34,12 @@ This ledger is the source of truth for implementation progress across agents. Up
 - In `GAME_DESIGN.md`, reconciled the historical High-combat interpretation, Shield Layer data model and 2026-10-10 shield-restoration note. In `MULTIPLAYER_REBUILD_BRIEF.md`, relabeled the duplicate 2026-10-23 shield-decision note as historical; checked `AI_SYSTEMS_DESIGN.md` and found no stale balance claims to change.
 - Documentation only: no runtime, content, test, rules-version or fingerprint changes; BAL-3, BAL-4 and ECON-3 were not started.
 
+### Web-client rules-version alignment (2026-11-02)
+
+- **Status:** Verified. The client compatibility check and README current-version/startup guidance now use `desperanza-bal-4-v1`, matching `RaidSimulation.RulesVersion`. Copilot instructions now require keeping those three references aligned when the server version changes.
+- **Scope:** Updated [App.vue](../web/src/App.vue), [README.md](../README.md), and [.github/copilot-instructions.md](../.github/copilot-instructions.md). Historical BAL-2 measurement references remain unchanged; no server or gameplay behavior changed.
+- **Verification:** Compared the client and README values with the server constant; `Set-Location web; npm run build` passed; `git diff --check` passed.
+
 ### BAL-2 - Danger robot tiers and defeat rewards (approved 2026-11-01)
 
 - **Status:** [x] Technically verified 2026-11-01 under the user's approval of the revised [proposal](balance/BAL-2-proposal.md). This bounded slice is not balance certification or authorization for BAL-3/BAL-4 work.

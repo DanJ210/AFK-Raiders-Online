@@ -179,7 +179,7 @@ type DesignateHiddenPocketResponse = {
 }
 type EnrollResponse = { accessToken: string; projection: HandlerProjection }
 
-const expectedRulesVersion = 'desperanza-bal-2-v1'
+const expectedRulesVersion = 'desperanza-bal-4-v1'
 const requestedIdentity = new URLSearchParams(window.location.search).get('handler')
 const slot = ref<'raider-one' | 'raider-two'>(requestedIdentity === 'two' ? 'raider-two' : 'raider-one')
 const session = shallowRef<HandlerAccess | null>(null)

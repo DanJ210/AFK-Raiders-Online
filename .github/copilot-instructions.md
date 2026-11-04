@@ -34,6 +34,7 @@ Keep these roles distinct. Implemented prototype rules are not validated balance
 ## Engineering boundaries
 
 - Backend: ASP.NET Core (.NET 10), C# domain rules, SignalR delivery. Frontend: Vue 3, TypeScript, Vite. Do not introduce a second client-side gameplay engine.
+- Keep `web/src/App.vue`'s `expectedRulesVersion` and the README's current rules version aligned with `RaidSimulation.RulesVersion`; update all three whenever the server rules version changes.
 - Keep scheduling, transport, persistence, and presentation outside domain rules. Inject time and make randomness reproducible; process explicit deadlines in deterministic order.
 - Serialize raid mutations through the coordinator. Repeated scheduling must not repeat rewards or settlement; future commands need authorization, validation, and deduplication. Autonomous trades are journaled events: each buy or sale commits exactly once, scarce trader stock is allocated in deterministic order, and coins or items are never duplicated.
 - Clients render filtered projections and submit intent only. Countdown animation and polling must never advance simulation or determine ownership.

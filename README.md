@@ -81,7 +81,7 @@ The model path is local configuration, not a bundled model. Set it in the same t
 
 ## G6: autonomous risk, residence and shared conditions (2026-10-14)
 
-Current rules version: **`desperanza-bal-2-v1`**. Core mechanics and return settlement run on the server without inference or mandatory Handler input.
+Current rules version: **`desperanza-bal-4-v1`**. Core mechanics and return settlement run on the server without inference or mandatory Handler input.
 
 Terminal raid defeat loses the equipped gun, unprotected backpack loot and all remaining carried supplies. The one designated Secret Hidden Pocket item is still secured. Weapons, supplies, stash and coins left at home are not death penalties; subsequent autonomous preparation can still spend or sell them normally. Successful extraction retains the equipped weapon with the existing one-point wear and returns unused carried supplies. Loss settlement happens once and appears in owner-private Comms and the return report; autonomous recovery can equip a home weapon or obtain the free Tea Kettle rather than restoring the lost instance.
 
@@ -140,7 +140,7 @@ $env:AFK_AI_MODEL_PATH = 'C:\Users\DanJ2\Models\Phi-3.5-mini-onnx'
 dotnet run --project server\AFKRaiders.Server
 ```
 
-Reload and re-enroll after startup; check for `desperanza-bal-2-v1`. Restart clears in-memory duty, inventory and results. Model initialization may take a minute; authored gameplay/narration does not wait on inference.
+Reload and re-enroll after startup; check for `desperanza-bal-4-v1`. Restart clears in-memory duty, inventory and results. Model initialization may take a minute; authored gameplay/narration does not wait on inference.
 
 ### Historical pre-G6 Comms and area residence (2026-10-13)
 
