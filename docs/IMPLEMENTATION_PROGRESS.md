@@ -1,5 +1,7 @@
 # Implementation progress
 
+New here? Start with the documentation index: [START_HERE.md](START_HERE.md).
+
 Last updated: 2026-11-02
 
 ## Agent handoff checkpoint

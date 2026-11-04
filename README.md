@@ -1,5 +1,7 @@
 # AFK Raiders Online
 
+Documentation entry point: [docs/START_HERE.md](docs/START_HERE.md).
+
 ## Product direction
 
 AFK Raiders Online is an autonomous zero-player RPG inspired by extraction shooters, expanding the [original solo concept](https://github.com/DanJ210/afk-raiders) with live social integration.
