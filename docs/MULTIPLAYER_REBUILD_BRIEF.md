@@ -55,15 +55,24 @@ persistence/authentication, and live backend restart are outside this approval.
 The [ledger](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint) records the
 verified technical status; all new balance remains experimental.
 
-### BAL-4 experimental first arm (2026-11-02)
+### BAL-4 experimental first arm (2026-11-02) and measured arms 1-3 (2026-11-03)
 
 The user later authorized the first bounded BAL-4 tuning arm: High robot HP
 40 (18 raw damage/four rounds), High reward cargo weights 25/25/15/35 for
 values 60/35/150/900 within the existing two shared slots, and a four-owned-
-weapon cap with deterministic 50%-catalog-value overflow liquidation. This
+weapon cap with deterministic 50%-catalog-value overflow liquidation. On
+2026-11-03 the designer set two-band KO targets (mature 48h+ and softer
+first-24h onboarding) and approved three separately measured one-lever
+follow-up arms: Arm 1 restored High HP 45; Arm 2 lowered the overflow
+sell-back to 25% of catalog value; Arm 3 added a first-24h new-Raider High
+readiness gate (usable weapon, carried medical, unbroken shield; per-Raider
+enrollment age clock; blocked Raiders fall back to the next Low/Medium
+world). The deferred Arm 4 jackpot re-check was not started. This
 does not validate the balance or retune Medium risk, shield prices/repair/wear,
 or start BAL-3/ECON-3; those remain separate decisions. See the [BAL-4
-proposal](balance/BAL-4-proposal.md) and [implementation checkpoint](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint).
+proposal](balance/BAL-4-proposal.md), the measured
+[BAL-4 arms](balance/BAL-4-arms.md), and the
+[implementation checkpoint](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint).
 
 ## 2. Product definition
 

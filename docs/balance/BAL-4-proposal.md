@@ -1,12 +1,48 @@
 # BAL-4 tuning proposal
 
 **Status: first experimental arm implemented and measured under user
-direction; not balance-certified.** The arm is High 40/18/4, High reward
+direction; superseded in part by the measured follow-up arms 1-3
+(2026-11-03) in [BAL-4-arms.md](BAL-4-arms.md); not balance-certified.**
+The first arm was High 40/18/4, High reward
 weights 25/25/15/35, and a deterministic four-owned-weapon cap with 50%-value
-overflow liquidation. It meets the late all-loot value-order target but misses
-both ends of the High risk curve and leaves Medium's early/late conflict
-unresolved. Medium risk staging and shield tuning remain deferred. BAL-3 and
-ECON-3 are out of scope.
+overflow liquidation. It met the late all-loot value-order target but missed
+both ends of the High risk curve and left Medium's early/late conflict
+unresolved. The follow-up arms restored High HP 45 (Arm 1), lowered the
+sell-back to 25% (Arm 2), and added a first-24h High readiness gate (Arm 3);
+the worktree now holds the cumulative Arm 3 state under
+`desperanza-bal-4-arm3-v1`. Medium risk staging and shield tuning remain
+deferred. BAL-3 and ECON-3 are out of scope.
+
+## Designer decisions (2026-11-03)
+
+The designer reviewed the measured first arm and set this follow-up contract.
+Separately measured experiment arms, one lever per arm, are run as deltas from
+the implemented first arm; results live in [BAL-4-arms.md](BAL-4-arms.md).
+
+1. **KO targets use two experimental bands.** Mature play (settlement time 48h
+   and later): Low <=10%, Medium 15-25%, High 25-40%. Onboarding (first 24h,
+   softer): High <=45%, Medium <=30%, Low <=10%. A 20-30% High
+   participant-fight defeat rate over 96h is accepted as the provisional
+   target.
+2. **Medical ranges** stay Low 0-1, Medium 1-2, High 2-4 per raid (mature
+   window).
+3. **"Value order" means secured loot value per raid** (High > Medium > Low)
+   in the mature window. Guardrail: High mean net asset change must not stay
+   negative in the mature window — report it, do not tune to it yet.
+4. **Medium robot stats are not staged or retuned in BAL-4.** Medium's
+   early/late conflict is hazard-driven and is deferred to BAL-3. Medium stays
+   22/12/3.
+5. **Shields are held** (price 300, 60% curve, wear x1/x1.5/x2).
+6. **Keep the four-weapon cap** and its deterministic ranking.
+7. **Keep High reward weights 25/25/15/35 for now**; re-measure after Arm 1
+   before judging them.
+8. **One lever per arm. No bundling.**
+
+The approved follow-up arms are: Arm 1 — restore High HP 45 (reversal of the
+first arm's 45->40 HP change only); Arm 2 — weapon overflow sell-back 50% ->
+25% of catalog value on top of Arm 1; Arm 3 — a first-24h new-Raider readiness
+gate for High admission on top of Arm 2. Arm 4 (jackpot re-check) is not
+started; Arm 1's measurements only report whether that re-check is necessary.
 
 ## Summary and recommendation
 

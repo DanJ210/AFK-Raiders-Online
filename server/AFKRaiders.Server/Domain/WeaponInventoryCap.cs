@@ -12,7 +12,8 @@ public sealed record WeaponInventoryCapResult(
 public static class WeaponInventoryCap
 {
     public const int MaximumOwnedWeapons = 4;
-    public const int SellBackPermille = 500;
+    // BAL-4 Arm 2: overflow sell-back floor(0.25 x catalog value); Kettle stays 0.
+    public const int SellBackPermille = 250;
 
     private sealed record Candidate(
         OwnedWeapon Weapon,

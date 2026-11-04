@@ -14,14 +14,14 @@ public sealed class Bal2RobotDefeatTests(ITestOutputHelper output)
     [Fact]
     public void RulesVersionAdvertisesBal4()
     {
-        Assert.Equal("desperanza-bal-4-v1", RaidSimulation.RulesVersion);
+        Assert.Equal("desperanza-bal-4-arm3-v1", RaidSimulation.RulesVersion);
         Assert.Equal("bal-4-defeat-v1", RobotDefeatRewards.RewardsVersion);
     }
 
     [Theory]
     [InlineData("Low", 12, 8, 3)]
     [InlineData("Medium", 22, 12, 3)]
-    [InlineData("High", 40, 18, 4)]
+    [InlineData("High", 45, 18, 4)]
     public void ApprovedExperimentalProfilesAreExact(string danger, int health, int damage, int rounds)
     {
         var profile = RaidConditions.Profile(danger);

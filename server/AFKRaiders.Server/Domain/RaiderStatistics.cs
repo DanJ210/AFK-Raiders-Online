@@ -302,7 +302,11 @@ public sealed record EconomyStatsView(
     int ShieldPointsRepaired = 0,
     int UnshieldedDeployDecisions = 0,
     int WeaponInstancesLiquidated = 0,
-    int CoinsFromWeaponLiquidations = 0)
+    int CoinsFromWeaponLiquidations = 0,
+    int FailedWeaponPurchases = 0,
+    int FailedSupplyPurchases = 0,
+    int FailedRepairs = 0,
+    int ReserveViolations = 0)
 {
     public static readonly EconomyStatsView Empty = new(0, 0, 0, 0, 0, 0, 0, 0, 0);
 
@@ -316,7 +320,11 @@ public sealed record EconomyStatsView(
         CoinsOnShieldRepairs + o.CoinsOnShieldRepairs, ShieldPointsRepaired + o.ShieldPointsRepaired,
         UnshieldedDeployDecisions + o.UnshieldedDeployDecisions,
         WeaponInstancesLiquidated + o.WeaponInstancesLiquidated,
-        CoinsFromWeaponLiquidations + o.CoinsFromWeaponLiquidations);
+        CoinsFromWeaponLiquidations + o.CoinsFromWeaponLiquidations,
+        FailedWeaponPurchases + o.FailedWeaponPurchases,
+        FailedSupplyPurchases + o.FailedSupplyPurchases,
+        FailedRepairs + o.FailedRepairs,
+        ReserveViolations + o.ReserveViolations);
 }
 
 /// <summary>
@@ -359,7 +367,8 @@ public sealed record SettledRaidRecord(
     int WeaponsBoughtCumulative,
     int LoanerKettlesCumulative,
     int WeaponsLostCumulative,
-    EconomyStatsView EconomyAfter);
+    EconomyStatsView EconomyAfter,
+    DateTimeOffset? AdmittedAt = null);
 
 public sealed record RaiderRunTelemetry(
     IReadOnlyList<SettledRaidRecord> Records,
@@ -368,7 +377,11 @@ public sealed record RaiderRunTelemetry(
     int FinalAssetValue,
     int FinalWeaponCount,
     int FinalCoins,
-    string FinalShieldTier);
+    string FinalShieldTier,
+    DateTimeOffset? EnrolledAt = null,
+    int HighWorldsOffered = 0,
+    int HighAdmissionsStarted = 0,
+    int HighGateBlocks = 0);
 
 public sealed class RaiderStatistics
 {

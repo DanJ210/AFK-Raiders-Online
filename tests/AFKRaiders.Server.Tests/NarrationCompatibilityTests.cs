@@ -63,7 +63,8 @@ public sealed class NarrationCompatibilityTests(ITestOutputHelper output)
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines))));
         output.WriteLine($"Current narration and simulation fingerprint: {hash}");
         // BAL-1 deliberately changed weapon damage and robot HP; BAL-1S changed shield resolution;
-        // BAL-2 changed profiles/defeat events; BAL-4 changes the High profile, rewards and rules version.
-        Assert.Equal("ABCA8643017ABF32A6D5709CAFB63E387C34A442D8F5D61E368221AA604BA6E6", hash);
+        // BAL-2 changed profiles/defeat events; BAL-4 changed High profile/rewards; Arm 1 restored High 45 HP;
+        // Arm 2 lowered the overflow sell-back to 25%; Arm 3 adds the first-24h High readiness gate.
+        Assert.Equal("4C3D0A00E28B25D579E8AE72D3EDC2422532088463BC3A87DB1BA3BF386FE4AC", hash);
     }
 }

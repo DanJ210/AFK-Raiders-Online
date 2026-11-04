@@ -27,7 +27,8 @@ public sealed record RaiderPreparationPlan(
     bool UpdateStagedSupplies,
     int ReserveFloor,
     int RepairReserveFloor,
-    ShieldPreparationPlan? Shield = null);
+    ShieldPreparationPlan? Shield = null,
+    bool RepairSkippedUnaffordable = false);
 
 public enum ShieldPlanAction
 {
@@ -144,6 +145,10 @@ public static class RaiderEconomyPolicy
             weaponToRepair = repairWeapon.InstanceId;
             RepairInPlan(weapons, repairWeapon.InstanceId);
         }
+        // Diagnostic only: a due repair the reserve-constrained budget could not fund this visit.
+        var repairSkippedUnaffordable = weaponToRepair is null
+            && repairWeapon is not null
+            && IsRepairDue(repairWeapon, weights.RepairThresholdPercent);
 
         var kettle = weaponCatalog.FirstOrDefault(weapon =>
             weapon.Id.Equals("tea_kettle", StringComparison.OrdinalIgnoreCase))
@@ -332,7 +337,8 @@ public static class RaiderEconomyPolicy
             Math.Max(percentageReserve, weaponToRepair is null
                 ? 0
                 : ownedWeapons.First(weapon => weapon.InstanceId == weaponToRepair).RepairCost),
-            shieldPlan);
+            shieldPlan,
+            repairSkippedUnaffordable);
     }
 
     public static int ShieldRepairThresholdPercent(RaiderPrimaryTrait trait) => Weights(trait).RepairThresholdPercent;

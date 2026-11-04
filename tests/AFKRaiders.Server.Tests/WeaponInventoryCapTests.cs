@@ -5,7 +5,7 @@ namespace AFKRaiders.Server.Tests;
 public sealed class WeaponInventoryCapTests
 {
     [Fact]
-    public void NormalizationProtectsEquippedAndNeededFallbackThenSellsWorstOverflowAtHalfValue()
+    public void NormalizationProtectsEquippedAndNeededFallbackThenSellsWorstOverflowAtQuarterValue()
     {
         var weapons = new[]
         {
@@ -30,8 +30,9 @@ public sealed class WeaponInventoryCapTests
         Assert.Contains(result.RetainedWeapons, weapon => weapon.InstanceId == "vernerider");
         Assert.Equal(["asp", "broken-vernerider"],
             result.LiquidatedWeapons.Select(item => item.Weapon.InstanceId).Order(StringComparer.Ordinal));
-        Assert.Equal(32, result.LiquidatedWeapons.Single(item => item.Weapon.InstanceId == "asp").CoinsReceived);
-        Assert.Equal(70, result.LiquidatedWeapons.Single(item => item.Weapon.InstanceId == "broken-vernerider").CoinsReceived);
+        // BAL-4 Arm 2: floor(0.25 x catalog value): Aspperigo floor(16.25) = 16, Vernerider 35.
+        Assert.Equal(16, result.LiquidatedWeapons.Single(item => item.Weapon.InstanceId == "asp").CoinsReceived);
+        Assert.Equal(35, result.LiquidatedWeapons.Single(item => item.Weapon.InstanceId == "broken-vernerider").CoinsReceived);
     }
 
     [Fact]
@@ -56,6 +57,9 @@ public sealed class WeaponInventoryCapTests
             second.RetainedWeapons.Select(weapon => weapon.InstanceId).Order(StringComparer.Ordinal));
         Assert.Equal(["broken-heavy", "kettle"],
             first.LiquidatedWeapons.Select(item => item.Weapon.InstanceId).Order(StringComparer.Ordinal));
+        // The zero-value loaner Kettle liquidates for exactly zero coins at any sell-back rate.
+        Assert.Equal(0, first.LiquidatedWeapons.Single(item => item.Weapon.InstanceId == "kettle").CoinsReceived);
+        Assert.Equal(70, first.LiquidatedWeapons.Single(item => item.Weapon.InstanceId == "broken-heavy").CoinsReceived);
     }
 
     [Fact]

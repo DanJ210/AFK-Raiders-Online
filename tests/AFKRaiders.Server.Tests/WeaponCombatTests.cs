@@ -115,8 +115,8 @@ public sealed class WeaponCombatTests(ITestOutputHelper output)
             {
                 Assert.Equal(0, rates[0]);
                 Assert.Equal(0, rates[1]);
-                // BAL-4: four max-damage Vernerider rounds can now clear the 40 HP High profile.
-                Assert.True(rates[2] > 0, "Vernerider must retain possible High solo victories.");
+                // BAL-4 Arm 1 restores 45 HP: Vernerider (max 4x11 = 44 < 45) cannot solo High within four rounds.
+                Assert.Equal(0, rates[2]);
                 // High solo success is an aspiration, not a balance gate; retain legal wins
                 // without requiring a minimum observed rate from this small seeded cohort.
                 Assert.True(rates[3] > 0, "Temptrest must retain possible High solo victories.");

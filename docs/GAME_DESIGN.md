@@ -34,13 +34,15 @@ G6 now implements server-owned shared conditions/danger, evolving greed/mood/res
 
 Online ordinary extraction eligibility is 900/960/1020 seconds by danger, with early distress/support exits and a 1320-second world deadline. One condition belongs to the world, not each Handler. No SLM creates mechanical weather, actors, loot or rewards. See the [G6 ledger](IMPLEMENTATION_PROGRESS.md#g6-autonomous-riskreward-conditions-and-broader-parody-content) for frozen audits and exact experimental rules. Low unattended viability and support thresholds passed; High starter unattended survival is only 1.67% in the frozen solo cohort, and staged High unattended mean net is negative. This is not final balance or human comedy/pacing approval. The legacy tick counts, generation examples and progression below are not online implementation claims.
 
-### BAL-2 foundation and BAL-4 experimental tuning (2026-11-02)
+### BAL-2 foundation and BAL-4 experimental tuning (2026-11-02; arms updated 2026-11-03)
 
 The bounded [BAL-2 proposal](balance/BAL-2-proposal.md) has been implemented
 and technically verified; the [ledger checkpoint](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint)
 is authoritative for step status, and the [paired measurement report](balance/BAL-2-measurements.md)
 records BAL-2 outcomes and limitations. BAL-4 changes the experimental Low/Medium/High
-robot profiles to 12/8/3, 22/12/3, and 40/18/4 (HP/raw damage/rounds), and
+robot profiles to 12/8/3, 22/12/3, and 45/18/4 (HP/raw damage/rounds; the
+first arm briefly measured High at 40 HP, and the measured
+[BAL-4 Arm 1](balance/BAL-4-arms.md) restored 45), and
 replaces—not supplements—the Service Depot's two generic draws with two
 world-scoped defeat rewards. On committed defeat, actual positive capped-damage
 contributors are ranked and receive cargo round-robin with deterministic ties.
@@ -49,12 +51,18 @@ Cargo follows existing extraction, KO, and designated pocket semantics.
 
 BAL-4 keeps the two-slot reward structure and raises the High table tail to
 35% for the existing 900-value cargo. Owned weapon stock is capped at four
-across all sources; overflow is deterministically sold for half the authoritative
-catalog value with owner-private receipts. Preserve BAL-1 weapon rules and
+across all sources; overflow is deterministically sold for a quarter of the authoritative
+catalog value (floor; BAL-4 Arm 2) with owner-private receipts. During a
+Raider's first 24 hours of age (deterministic server-owned enrollment clock),
+it is not offered or admitted to a High raid unless it deploys with a usable
+weapon, a carried medical supply, and an unbroken shield; blocked Raiders
+fall back to the next Low/Medium world and mature Raiders are unaffected
+(BAL-4 Arm 3 — an experimental onboarding admission rule, not a mature-play
+equipment gate). Preserve BAL-1 weapon rules and
 BAL-1S shield values, trader-only Temptrest, and once-only wear/settlement.
 The older solo-High best-healing wording is a balance
-aspiration: favorable lesser-loadout wins remain legal, with no equipment gate
-or nonlethal floor. BAL-4 implementation remains experimental and is not
+aspiration: favorable lesser-loadout wins remain legal, with no mature-play
+equipment gate or nonlethal floor. BAL-4 implementation remains experimental and is not
 balance certification. It does not authorize Handler equipment controls,
 PvP/theft, BAL-3 activities, or ECON-3.
 

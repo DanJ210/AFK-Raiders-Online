@@ -69,7 +69,9 @@ public sealed class RaidCoordinator
             var accessToken = CreateSecret(32);
             var state = new HandlerState(slot, nextId(), requestId, accessToken)
             {
-                TraitSeed = nextSeed()
+                TraitSeed = nextSeed(),
+                // The Raider age clock: deterministic, server-owned creation time.
+                EnrolledAt = time.GetUtcNow()
             };
             state.EquippedWeaponInstanceId = state.OwnedWeapons[0].InstanceId;
             state.LastSignalRegenAt = time.GetUtcNow();
@@ -112,7 +114,11 @@ public sealed class RaidCoordinator
                 CurrentAssetValue(state),
                 state.OwnedWeapons.Count,
                 state.Coins,
-                state.Shield.Tier.ToString());
+                state.Shield.Tier.ToString(),
+                state.EnrolledAt,
+                state.OfferedHighRaidIds.Count,
+                state.HighAdmissionsStarted,
+                state.GateBlockedHighRaidIds.Count);
         }
     }
 
@@ -355,6 +361,16 @@ public sealed class RaidCoordinator
             if (!world.Simulation.CanAdmit(at)) return;
             var participantCount = world.Simulation.ParticipantCount;
             if (participantCount >= RaidSimulation.MaxRaiders) return;
+            if (world.Simulation.Condition.Danger == "High")
+            {
+                handler.OfferedHighRaidIds.Add(world.Simulation.RaidId);
+                if (IsBlockedFromHigh(handler, at))
+                {
+                    // The gated Raider stays home and loses nothing; the next non-High world is its fallback.
+                    handler.GateBlockedHighRaidIds.Add(world.Simulation.RaidId);
+                    continue;
+                }
+            }
             AdmitToAutonomousWorld(handler, world, at);
             revisions[world.Simulation.RaidId] =
                 new RaidRevision(world.Simulation.RaidId, world.Simulation.Revision);
@@ -367,17 +383,69 @@ public sealed class RaidCoordinator
         var first = EligibleHandlers(at).FirstOrDefault();
         if (first is null) return;
         CreateAutonomousWorld(at);
-        AdmitToAutonomousWorld(first, raids[activeAutonomousRaidId!], at);
+        var world = raids[activeAutonomousRaidId!];
+        if (world.Simulation.Condition.Danger == "High")
+        {
+            first.OfferedHighRaidIds.Add(world.Simulation.RaidId);
+            if (IsBlockedFromHigh(first, at))
+            {
+                first.GateBlockedHighRaidIds.Add(world.Simulation.RaidId);
+                // Defensive: CreateAutonomousWorld only rolls High when an eligible ungated Raider exists.
+                var next = EligibleHandlers(at).FirstOrDefault(handler => !IsBlockedFromHigh(handler, at));
+                if (next is null) return;
+                first = next;
+            }
+        }
+        AdmitToAutonomousWorld(first, world, at);
     }
 
     private void CreateAutonomousWorld(DateTimeOffset at)
     {
         var raidId = nextId();
-        var momentum = EligibleHandlers(at).Select(h => h.Personality?.Greed ?? 0).DefaultIfEmpty(0).Max();
+        var eligible = EligibleHandlers(at).ToArray();
+        var momentum = eligible.Select(h => h.Personality?.Greed ?? 0).DefaultIfEmpty(0).Max();
+        // BAL-4 Arm 3: never offer a High world that only readiness-gated Raiders could populate.
+        // Clamping below the High threshold keeps the roll on the policy's next-best dangers (Low/Medium),
+        // so a gated Raider always has an eligible danger at world creation and an empty world never idles.
+        if (eligible.Length > 0 && eligible.All(handler => IsBlockedFromHigh(handler, at)))
+            momentum = Math.Min(momentum, 29);
         var simulation = new RaidSimulation(raidId, at, nextSeed(), narrator, catalog, fastPacing: fastPacing,
             conditionMomentum: momentum);
         raids.Add(raidId, new RaidState(null, simulation));
         activeAutonomousRaidId = raidId;
+    }
+
+    /// <summary>
+    /// BAL-4 Arm 3 readiness gate. The age clock is the Raider's deterministic, server-owned creation
+    /// (enrollment) time, so shared worlds need no world-clock rule. During the first
+    /// <see cref="HighReadinessGateHours"/> hours of Raider age, a Raider is neither offered nor admitted
+    /// to a High world unless it deploys ready: a usable (not broken) equipped weapon, at least one
+    /// Medical-category supply it would actually carry (staged and in stock), and an unbroken owned shield.
+    /// Mature Raiders are unaffected and no world combat profile changes. A blocked Raider stays home and
+    /// is admitted to the next non-High world (the autonomous policy's next-best danger); if the active
+    /// world is High it waits, at most, until that world closes. Absent and polled Handlers see identical
+    /// outcomes because the gate runs entirely inside the coordinator's admission pulse.
+    /// </summary>
+    private const double HighReadinessGateHours = 24;
+
+    private bool IsBlockedFromHigh(HandlerState handler, DateTimeOffset at) =>
+        at - handler.EnrolledAt < TimeSpan.FromHours(HighReadinessGateHours) && !IsHighReady(handler);
+
+    internal static bool IsHighReadyForTesting(bool usableWeapon, bool carriesMedical, bool unbrokenShield) =>
+        usableWeapon && carriesMedical && unbrokenShield;
+
+    private static bool IsHighReady(HandlerState handler)
+    {
+        var equipped = handler.OwnedWeapons.FirstOrDefault(weapon =>
+            weapon.InstanceId == handler.EquippedWeaponInstanceId);
+        var usableWeapon = equipped is not null && !equipped.IsBroken;
+        var carriesMedical = handler.StagedSupplies.Any(entry =>
+            Math.Min(entry.Value, handler.SupplyStock.GetValueOrDefault(entry.Key, 0)) > 0
+            && Domain.ShopCatalog.TryGetSupply(entry.Key, out var definition)
+            && definition is not null
+            && definition.Category == "Medical");
+        var unbrokenShield = handler.Shield.HasShield && handler.Shield.DurabilityCenti > 0;
+        return IsHighReadyForTesting(usableWeapon, carriesMedical, unbrokenShield);
     }
 
     private void AdmitToAutonomousWorld(HandlerState handler, RaidState world, DateTimeOffset at)
@@ -401,6 +469,12 @@ public sealed class RaidCoordinator
 
         world.Simulation.AddAutonomousRaider(handler.PlayerId, handler.Slot, at, staged, handler.Personality,
             handler.VoiceState, handler.PrimaryTrait, weapon, handler.Shield);
+        handler.LastAdmittedAt = at;
+        if (world.Simulation.Condition.Danger == "High")
+        {
+            handler.OfferedHighRaidIds.Add(world.Simulation.RaidId);
+            handler.HighAdmissionsStarted++;
+        }
         handler.DeployedShield = handler.Shield;
         handler.DeployedWeaponCatalogId = equipped.CatalogId;
         handler.CurrentRaidId = world.Simulation.RaidId;
@@ -553,7 +627,8 @@ public sealed class RaidCoordinator
                     WeaponsBoughtCumulative: handler.Stats.Economy.WeaponsBought,
                     LoanerKettlesCumulative: handler.Stats.Economy.LoanerKettles,
                     WeaponsLostCumulative: handler.Stats.Project().Total.WeaponsLost,
-                    EconomyAfter: handler.Stats.Economy));
+                    EconomyAfter: handler.Stats.Economy,
+                    AdmittedAt: handler.LastAdmittedAt));
 
                 var payoff = new HaulPayoffView(
                     SettlementId: $"settlement:{world.Simulation.RaidId}:{handler.PlayerId}",
@@ -1065,6 +1140,8 @@ public sealed class RaidCoordinator
         var arrivedAt = handler.HomeArrivedAt
             ?? throw new InvalidOperationException("A home visit must have an arrival time before preparation.");
         var plan = DecidePreparation(handler, arrivedAt);
+        if (plan.RepairSkippedUnaffordable)
+            handler.Stats.RecordEconomy(e => e with { FailedRepairs = e.FailedRepairs + 1 });
 
         var stops = new List<(string Label, Action<DateTimeOffset> Commit)>();
 
@@ -1135,6 +1212,10 @@ public sealed class RaidCoordinator
                 if (selectedId is null
                     || !CanBuyWeapon(handler, stock, selectedId, plan.ReserveFloor))
                 {
+                    handler.Stats.RecordEconomy(e => e with
+                    {
+                        FailedWeaponPurchases = e.FailedWeaponPurchases + 1
+                    });
                     RecordUnavailablePurchase(handler, at, weaponCatalogId,
                         stock.Remaining(weaponCatalogId) == 0);
                     EnsureTeaKettleFallback(handler, at);
@@ -1191,6 +1272,10 @@ public sealed class RaidCoordinator
                 // Standing offers are unlimited, so re-deciding against current coins is deterministic and never touches cycle stock.
                 var decision = RaiderEconomyPolicy.DecideShield(plan.PrimaryTrait, handler.Coins, plan.ReserveFloor, handler.Shield);
                 CommitShieldDecision(handler, at, decision);
+                // Diagnostic: emergency shield actions may legally dip below the trait reserve.
+                if (decision.Action is not ShieldPlanAction.None and not ShieldPlanAction.DeployUnshielded
+                    && handler.Coins < plan.ReserveFloor)
+                    handler.Stats.RecordEconomy(e => e with { ReserveViolations = e.ReserveViolations + 1 });
             }));
         }
 
@@ -1242,9 +1327,17 @@ public sealed class RaidCoordinator
                 }
                 var purchasedCount = acquired.Values.Sum();
                 if (purchasedCount < purchase.Quantity)
+                {
+                    handler.Stats.RecordEconomy(e => e with
+                    {
+                        FailedSupplyPurchases = e.FailedSupplyPurchases + (purchase.Quantity - purchasedCount)
+                    });
                     RecordUnavailablePurchase(handler, at, purchase.CatalogId,
                         stock.Remaining(purchase.CatalogId) == 0,
                         $"supply:{purchaseIndex}");
+                }
+                if (handler.Coins < plan.ReserveFloor)
+                    handler.Stats.RecordEconomy(e => e with { ReserveViolations = e.ReserveViolations + 1 });
             }));
         }
 
@@ -2067,6 +2160,11 @@ public sealed class RaidCoordinator
         public string EnrollmentRequestId { get; } = enrollmentRequestId;
         public string AccessToken { get; } = accessToken;
         public int TraitSeed { get; init; }
+        public DateTimeOffset EnrolledAt { get; set; }
+        public DateTimeOffset? LastAdmittedAt { get; set; }
+        public int HighAdmissionsStarted { get; set; }
+        public HashSet<string> OfferedHighRaidIds { get; } = new(StringComparer.Ordinal);
+        public HashSet<string> GateBlockedHighRaidIds { get; } = new(StringComparer.Ordinal);
         public RaiderPrimaryTrait PrimaryTrait => RaiderEconomyPolicy.TraitFromSeed(TraitSeed);
         public bool DutyEnabled { get; set; } = true;
         public bool IsHome { get; set; } = true;

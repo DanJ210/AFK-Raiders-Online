@@ -177,7 +177,8 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
         var starter = RunStarterLowCohort(seeds);
         var report = BalanceReport.Render(all, seeds, hours, RaidSimulation.RulesVersion)
             + BalanceReport.RenderWindows(telemetry, Start, hours)
-            + starter;
+            + starter
+            + RunStarterHighCohorts();
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         File.WriteAllText(path, report);
         var rawPath = Environment.GetEnvironmentVariable("AFK_BALANCE_RAW_PATH");
@@ -221,6 +222,53 @@ public sealed class BalanceMeasurementTests(ITestOutputHelper output)
             + $"| Seeds | KO rate | Robot fights | Robot defeats |\n|---:|---:|---:|---:|\n"
             + $"| {seeds} | {(100.0 * knockouts / seeds).ToString("F1", CultureInfo.InvariantCulture)}% | {fights} | {robotDefeats} |\n";
     }
+
+    /// <summary>
+    /// Fresh first-raid High cohort matching the historical 120-seed x 2-Raider BAL-1S-era sample:
+    /// default fresh loadout, unattended, solo High world, with and without the staged supply kit.
+    /// This replaces the stale 57.9% starter High extraction figure for the current rules.
+    /// </summary>
+    private static string RunStarterHighCohorts()
+    {
+        StagedSupplyItem[] stagedKit =
+        [
+            new("bandage_white", "White Bandage", "Medical", 2),
+            new("bandage_green", "Green Bandage", "Medical", 1),
+            new("fizz_cell", "Fizz Cell", "ShieldRecharger", 1)
+        ];
+        var sb = new StringBuilder();
+        sb.AppendLine();
+        sb.AppendLine("## Fresh first-raid High cohorts (120 seeds x 2 Raiders, unattended, no Signals)");
+        sb.AppendLine();
+        sb.AppendLine("| Variant | Runs | Extracted | Extraction rate | KO rate | Robot fights | Robot defeats |");
+        sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|");
+        foreach (var (label, staged) in new[] { ("Starter (no staged supplies)", false), ("Staged supply kit", true) })
+        {
+            var runs = 0;
+            var extracted = 0;
+            var knockouts = 0;
+            var fights = 0;
+            var defeats = 0;
+            foreach (var seed in Enumerable.Range(1, 120))
+                foreach (var slot in Slots)
+                {
+                    var sim = new RaidSimulation("audit", Start, seed, danger: "High");
+                    sim.AddAutonomousRaider("one", slot, Start, staged ? stagedKit : null);
+                    for (var t = 5; t <= 1500 && !sim.Completed; t += 5) sim.Advance(Start.AddSeconds(t));
+                    var final = sim.Project("one", Start.AddSeconds(1500));
+                    runs++;
+                    if (final.Events.Any(e => e.Kind == "Extracted")) extracted++;
+                    if (final.Events.Any(e => e.Kind == "KnockedOut")) knockouts++;
+                    if (final.RobotEncounter is not null) fights++;
+                    if (final.RobotEncounter?.Resolution == "Defeated") defeats++;
+                }
+            sb.AppendLine($"| {label} | {runs} | {extracted} "
+                + $"| {(100.0 * extracted / runs).ToString("F1", CultureInfo.InvariantCulture)}% "
+                + $"| {(100.0 * knockouts / runs).ToString("F1", CultureInfo.InvariantCulture)}% "
+                + $"| {fights} | {defeats} |");
+        }
+        return sb.ToString();
+    }
 }
 
 /// <summary>Per-raider measurement telemetry for one cohort run.</summary>
@@ -251,7 +299,7 @@ public static class BalanceReport
         sb.AppendLine($"- Rules version: `{rulesVersion}`");
         sb.AppendLine($"- Cohort: {seeds} seeds x 2 unattended Raiders x {hours} simulated hours (recurring coordinator, autonomous economy, no Handler Signal use)");
         sb.AppendLine($"- Settled raids: {total.Raids}");
-        sb.AppendLine("- Targets (experimental, BAL-4): KO Low <=10%, Medium 15-25%, High 25-40%; medical used per raid Low 0-1, Medium 1-2, High 2-4.");
+        sb.AppendLine("- Targets (experimental, BAL-4 2026-11-03): mature (48h+) KO Low <=10%, Medium 15-25%, High 25-40%; onboarding (first 24h) Low <=10%, Medium <=30%, High <=45%; medical used per raid (mature) Low 0-1, Medium 1-2, High 2-4.");
         sb.AppendLine("- Danger is chosen by the coordinator per world, so per-danger sample sizes differ. Small samples are noisy.");
         sb.AppendLine();
         sb.AppendLine("## Survival and healing");
@@ -280,6 +328,10 @@ public static class BalanceReport
         sb.AppendLine("| Weapons bought | Coins on weapons | Repairs | Coins on repairs | Loaner Kettles | Supplies bought | Coins on supplies | Items sold | Coins from sales | Weapons liquidated | Coins from weapon liquidation |");
         sb.AppendLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         sb.AppendLine($"| {economy.WeaponsBought} | {economy.CoinsOnWeapons} | {economy.Repairs} | {economy.CoinsOnRepairs} | {economy.LoanerKettles} | {economy.SuppliesBought} | {economy.CoinsOnSupplies} | {economy.ItemsSold} | {economy.CoinsFromSales} | {economy.WeaponInstancesLiquidated} | {economy.CoinsFromWeaponLiquidations} |");
+        sb.AppendLine();
+        sb.AppendLine("| Failed weapon purchases | Failed supply purchase units | Unaffordable due repairs | Below-reserve commits |");
+        sb.AppendLine("|---:|---:|---:|---:|");
+        sb.AppendLine($"| {economy.FailedWeaponPurchases} | {economy.FailedSupplyPurchases} | {economy.FailedRepairs} | {economy.ReserveViolations} |");
         sb.AppendLine();
         sb.AppendLine($"Weapon flow (found + bought + loaner) vs outflow (KO loss + cap liquidation): {total.WeaponsFound + economy.WeaponsBought + economy.LoanerKettles} in / {total.WeaponsLost} KO losses / {economy.WeaponInstancesLiquidated} cap liquidations.");
         sb.AppendLine();
@@ -341,11 +393,15 @@ public static class BalanceReport
             current.ShieldPointsRepaired - previous.ShieldPointsRepaired,
             current.UnshieldedDeployDecisions - previous.UnshieldedDeployDecisions,
             current.WeaponInstancesLiquidated - previous.WeaponInstancesLiquidated,
-            current.CoinsFromWeaponLiquidations - previous.CoinsFromWeaponLiquidations);
+            current.CoinsFromWeaponLiquidations - previous.CoinsFromWeaponLiquidations,
+            current.FailedWeaponPurchases - previous.FailedWeaponPurchases,
+            current.FailedSupplyPurchases - previous.FailedSupplyPurchases,
+            current.FailedRepairs - previous.FailedRepairs,
+            current.ReserveViolations - previous.ReserveViolations);
 
         var rows = new List<(int Window, int Seed, string Slot, string Danger, string Trait, RaidStatsSample Sample,
             SettledRaidRecord Record, int Net, int WeaponsBought, int LoanerKettles, int WeaponLosses,
-            EconomyStatsView EconomyDelta)>();
+            EconomyStatsView EconomyDelta, double? GapToNextAdmissionSeconds)>();
         foreach (var raider in raiders)
         {
             if (raider.Run.InitialWeaponCount > WeaponInventoryCap.MaximumOwnedWeapons
@@ -361,7 +417,7 @@ public static class BalanceReport
             var previousLoaners = 0;
             var previousLosses = 0;
             var previousEconomy = EconomyStatsView.Empty;
-            foreach (var record in raider.Run.Records)
+            foreach (var (recordIndex, record) in raider.Run.Records.Index())
             {
                 var atHours = (record.SettledAt - start).TotalHours;
                 var window = Array.FindIndex(SettlementWindows, w => atHours >= w.FromHours && atHours < w.ToHours);
@@ -394,8 +450,12 @@ public static class BalanceReport
                 previousLosses = record.WeaponsLostCumulative;
                 previousEconomy = record.EconomyAfter;
                 if (window < 0) continue;
+                var nextAdmission = recordIndex + 1 < raider.Run.Records.Count
+                    ? raider.Run.Records[recordIndex + 1].AdmittedAt
+                    : null;
                 rows.Add((window, raider.Seed, raider.Slot, record.Sample.Danger, record.PrimaryTrait, record.Sample,
-                    record, net, bought, loaners, losses, economyDelta));
+                    record, net, bought, loaners, losses, economyDelta,
+                    nextAdmission is { } next ? (next - record.SettledAt).TotalSeconds : null));
             }
         }
 
@@ -497,10 +557,42 @@ public static class BalanceReport
             // High jackpot sensitivity: exclude raids that secured a 900-value prime-archive shard.
             var high = inWindow.Where(row => row.Danger == "High").ToArray();
             var highNoJackpot = high.Where(row => !row.Sample.RobotJackpotSecured).ToArray();
-            if (high.Length > 0 && highNoJackpot.Length != high.Length)
-                sb.AppendLine($"\nHigh excluding secured 900-value jackpots: n {highNoJackpot.Length}, "
-                    + $"net mean {F(highNoJackpot.Average(row => (double)row.Net))} "
-                    + $"(all High: {F(high.Average(row => (double)row.Net))}).");
+            if (high.Length > 0)
+            {
+                var securedValues = high.Select(row => (double)row.Sample.ValueSecured).OrderBy(v => v).ToArray();
+                sb.AppendLine($"\nHigh secured value/raid percentiles: p50 {F(Percentile(securedValues, 0.50))}, "
+                    + $"p90 {F(Percentile(securedValues, 0.90))}, p99 {F(Percentile(securedValues, 0.99))} (n {high.Length}).");
+                if (highNoJackpot.Length != high.Length)
+                    sb.AppendLine($"\nHigh excluding secured 900-value jackpots: n {highNoJackpot.Length}, "
+                        + $"net mean {F(highNoJackpot.Average(row => (double)row.Net))} "
+                        + $"(all High: {F(high.Average(row => (double)row.Net))}), "
+                        + $"secured value mean {F(highNoJackpot.Average(row => (double)row.Sample.ValueSecured))} "
+                        + $"(all High: {F(high.Average(row => (double)row.Sample.ValueSecured))}).");
+            }
+            // Time from each settlement in this window to the Raider's next admission.
+            var failedWeapon = inWindow.Sum(row => row.EconomyDelta.FailedWeaponPurchases);
+            var failedSupply = inWindow.Sum(row => row.EconomyDelta.FailedSupplyPurchases);
+            var failedRepair = inWindow.Sum(row => row.EconomyDelta.FailedRepairs);
+            var reserveViolations = inWindow.Sum(row => row.EconomyDelta.ReserveViolations);
+            sb.AppendLine($"\nPreparation shortfalls attributed to this window's settlements: "
+                + $"failed weapon purchases {failedWeapon}, failed supply purchase units {failedSupply}, "
+                + $"unaffordable due repairs {failedRepair}, below-reserve commits {reserveViolations}.");
+            var gaps = inWindow.Where(row => row.GapToNextAdmissionSeconds is not null)
+                .Select(row => row.GapToNextAdmissionSeconds!.Value)
+                .OrderBy(v => v)
+                .ToArray();
+            if (gaps.Length > 0)
+            {
+                var highGaps = inWindow.Where(row => row.Danger == "High" && row.GapToNextAdmissionSeconds is not null)
+                    .Select(row => row.GapToNextAdmissionSeconds!.Value)
+                    .OrderBy(v => v)
+                    .ToArray();
+                sb.AppendLine($"\nTime-to-next-admission after settlement (s): mean {F(gaps.Average())}, "
+                    + $"p50 {F(Percentile(gaps, 0.50))}, p90 {F(Percentile(gaps, 0.90))} (n {gaps.Length})"
+                    + (highGaps.Length > 0
+                        ? $"; after High settlements: mean {F(highGaps.Average())}, p50 {F(Percentile(highGaps, 0.50))} (n {highGaps.Length})."
+                        : "."));
+            }
             // End-of-window owned stock from each raider's last settlement in or before this window.
             var closing = raiders.Select(raider => raider.Run.Records.LastOrDefault(record =>
                     (record.SettledAt - start).TotalHours < window.ToHours))
@@ -509,6 +601,7 @@ public static class BalanceReport
                 .ToArray();
             if (closing.Length > 0)
             {
+                var coinDistribution = closing.Select(r => (double)r.CoinsAfter).OrderBy(v => v).ToArray();
                 sb.AppendLine();
                 sb.AppendLine($"Closing stock at {window.ToHours}h (per raider with any settlement): "
                     + $"coins {F(closing.Average(r => (double)r.CoinsAfter))}, stash value {F(closing.Average(r => (double)r.StashValueAfter))}, "
@@ -517,9 +610,27 @@ public static class BalanceReport
                     + $"broken weapons {F(closing.Average(r => (double)r.BrokenWeaponsOwned))}, shield none/L/M/H "
                     + $"{closing.Count(r => r.OwnedShieldTierAfter == "None")}/{closing.Count(r => r.OwnedShieldTierAfter == "Light")}/"
                     + $"{closing.Count(r => r.OwnedShieldTierAfter == "Medium")}/{closing.Count(r => r.OwnedShieldTierAfter == "Heavy")}.");
+                sb.AppendLine();
+                sb.AppendLine($"Closing coins per raider at {window.ToHours}h: p10 {F(Percentile(coinDistribution, 0.10))}, "
+                    + $"p50 {F(Percentile(coinDistribution, 0.50))}, p90 {F(Percentile(coinDistribution, 0.90))}, "
+                    + $"p99 {F(Percentile(coinDistribution, 0.99))} (n {coinDistribution.Length}).");
             }
             sb.AppendLine();
         }
+        // High admission funnel: worlds a Raider could have joined, actual High admissions, settled High raids.
+        var offered = raiders.Sum(raider => raider.Run.HighWorldsOffered);
+        var started = raiders.Sum(raider => raider.Run.HighAdmissionsStarted);
+        var gateBlocked = raiders.Sum(raider => raider.Run.HighGateBlocks);
+        var settledHigh = raiders.Sum(raider => raider.Run.Records.Count(record => record.Sample.Danger == "High"));
+        sb.AppendLine("### High admission funnel (whole run)");
+        sb.AppendLine();
+        sb.AppendLine("Offered counts distinct admitting High worlds seen per eligible Raider; started counts actual High admissions;");
+        sb.AppendLine("settled counts committed High settlements. Readiness-gate blocks count distinct High worlds a gated Raider skipped.");
+        sb.AppendLine();
+        sb.AppendLine("| High worlds offered (raider-distinct) | High admissions started | High raids settled | Readiness-gate blocks |");
+        sb.AppendLine("|---:|---:|---:|---:|");
+        sb.AppendLine($"| {offered} | {started} | {settledHigh} | {gateBlocked} |");
+        sb.AppendLine();
         sb.AppendLine("### End-of-run unsettled endpoint");
         sb.AppendLine();
         sb.AppendLine("This separates costs/assets after the last settled raid, rather than silently dropping an unfinished raid or preparation.");
