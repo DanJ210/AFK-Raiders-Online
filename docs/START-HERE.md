@@ -12,6 +12,7 @@ Reference repo: https://github.com/DanJ210/AFK-Raiders-Online (branch main). Rea
 | [GAME_DESIGN.md](GAME_DESIGN.md) | The original offline game design document; the main-game design baseline (autonomous loop, Comms Log, loot, stash, survival, Handler interactions). | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/GAME_DESIGN.md) |
 | [MULTIPLAYER_REBUILD_BRIEF.md](MULTIPLAYER_REBUILD_BRIEF.md) | The confirmed product direction and milestone brief for the server-authoritative shared-world rebuild. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/MULTIPLAYER_REBUILD_BRIEF.md) |
 | [AI_SYSTEMS_DESIGN.md](AI_SYSTEMS_DESIGN.md) | The AI/ONNX narration-enrichment architecture plan, with the bounded runtime status of local-model narration (AI voices committed events; it never decides outcomes). | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/AI_SYSTEMS_DESIGN.md) |
+| [STORY_SYSTEM_PROPOSAL.md](STORY_SYSTEM_PROPOSAL.md) | **Proposal, awaiting approval:** shared moments, Raider memory, story direction, and narration architecture. | This workspace |
 
 ### docs/balance/
 

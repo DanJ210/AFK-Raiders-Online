@@ -12,7 +12,7 @@ The runtime calls `IRaidNarrator.FormatEvent` on every committed event. It retai
 
 Normal experimental fixtures target 900–1200 seconds via three nonreward surveying/checking/rummaging activities per arrival. This is authorized-autopilot tuning, not approved balance; no repeated loot or additional enemy is created.
 
-Local Phi-3.5 mini CPU evidence: initialization 70.04s; 31-token short response 13.42s cold / 8.29s warm (48-token output cap). A 1.5s complete-response target is therefore superseded by **25s** for bounded optional mood, including model-gate wait. The eight-request queue never blocks the simulation; queue-full requests explicitly retain fallback, live requests expire at 90s or world completion. One model gate serializes all Comms/AAR/appraisal access. Cancellation registers GenAI's native `terminate_session` option and awaits inference exit before releasing the gate; it does not merely cancel task scheduling.
+Local Phi-3.5 mini CPU evidence: initialization 70.04s; 31-token short response 13.42s cold / 8.29s warm (48-token output cap). An earlier 1.5s complete-response target was never benchmarked and is superseded by **25s** for bounded optional mood, including model-gate wait. The eight-request queue never blocks the simulation; queue-full requests explicitly retain fallback, live requests expire at 90s or world completion. One model gate serializes all Comms/AAR/appraisal access. Cancellation registers GenAI's native `terminate_session` option and awaits inference exit before releasing the gate; it does not merely cancel task scheduling.
 
 Phi prompts use `<|system|>`, `<|user|>`, `<|assistant|>` and `<|end|>` tokens, `I consider` prefill, and physical-object cues. As of COMMS-4 (2026-10-16), `max_length` is encoded prompt length **plus 96 output tokens**, with early stopping at the first sentence ending and the unchanged 25-second total deadline. COMMS-5 (2026-10-19) doubles only the character cap: both prompt builders request a complete dry opinion joke of at most **400 characters**. Validation accepts 8-400 characters and at least four words, with no separate word-count maximum; it retains the single first-person sentence, punctuation/character, outcome/actor denylist, and unknown-proper-noun checks. Logging keeps a 400-character preview and reports raw length plus truncation explicitly. Preview truncation is separate from acceptance and never rewrites text. The 96-token completion budget remains unchanged; this character-cap change is not native latency or acceptance-rate evidence. This is not proof that arbitrary subjective prose contains no world claim: model input excludes rewards/health/outcome details, and factual receipts remain separate. AAR/appraisal facts remain deterministic and accepted mood is appended with a Generated label. Fallback AAR results retain `ArchivalLog`, not a false Generated source.
 
@@ -32,7 +32,7 @@ The unchanged current prompt accepted 12/12 isolated samples (8 distinct) before
 
 Initial changed-code native smoke (2026-10-13): init 59.19s; Market Surveying ambient took 25.18s and fell back to ArchivalLog (prompt too long, closed ~28-option grammar); 100ms cancellation returned fallback in 0.20s. Subsequent compact-prompt generation and live delivery succeeded, as recorded in the progress ledger. The latest rejection-tuning smoke accepted Checking and Surveying in 21.36s / 11.06s; Rummaging fell back in 18.59s with `MissingSentenceTerminator`. Rejection logs now distinguish validation reasons and explicitly label preview truncation, rather than implying that a 120-character preview is the complete model output. The unchanged guard never patches an unfinished sentence or loosens outcome checks. Fallback remains the entertainment baseline; smoke samples do not establish an acceptance-rate or latency guarantee.
 
-The sections below retain future architectural intent; candidate latency numbers and generative world/fact examples are not current runtime guarantees.
+The sections below retain future architectural intent; unmeasured candidate latency claims and generative world/fact examples are not current runtime guarantees.
 
 ---
 
@@ -51,7 +51,7 @@ The emergence of efficient Small Language Models (SLMs) and ONNX Runtime provide
    - **Autonomous economy (confirmed 2026-10-17):** The Raider's own Desperanza decisions (sell, buy, equip, repair, depart) come from a deterministic, trait-weighted utility policy in C#, never from a language model. Models may explain those committed decisions in the Raider's voice. A model picking among pre-ranked legal options is a deferred, unapproved experiment; it would require journaling the pick for replay and falling back to the top deterministic choice.
 
 2. **Strict Non-Blocking Simulation Ticks:**
-   - The authoritative simulation tick loop (`RaidClock.cs`) must run in sub-millisecond cycles.
+   - The authoritative simulation tick loop (`RaidClock.cs`) must not wait on inference.
    - **Never execute AI inference synchronously inside `AdvanceTicks()`**.
    - Generative inference runs asynchronously in background worker services (`System.Threading.Channels` or `IHostedService`) and streams or broadcasts narrative updates via SignalR (`RaidHub.cs`).
 
@@ -64,14 +64,39 @@ The emergence of efficient Small Language Models (SLMs) and ONNX Runtime provide
    - No external API keys (OpenAI, Anthropic, etc.) are mandatory for core gameplay; the server remains self-contained.
    - A deterministic, template-based narration engine acts as the primary fallback if an ONNX model is uninitialized, disabled, or fails validation.
 
+## Pacing options (proposal, not approved)
+
+No values or rules change here. Keep narrative presentation cadence separate from simulation timing:
+
+### (a) Narrative-only cadence
+
+These can be slowed without changing mechanical outcomes:
+
+- **Beat cooldowns:** A presentation-only cooldown could be added around optional authored/AI beats. There is no dedicated cooldown today; committed beats originate in [RaidSimulation.cs](../server/AFKRaiders.Server/Domain/RaidSimulation.cs) and optional live narration is queued in [RaidCoordinator.cs](../server/AFKRaiders.Server/Domain/RaidCoordinator.cs) (`QueueLiveNarration`).
+- **Hub downtime:** Flavor-only Hub activity uses `HubActivityInterval` in [RaidCoordinator.cs](../server/AFKRaiders.Server/Domain/RaidCoordinator.cs); `RecordHubActivities` records no gameplay effects. This does not include `HomeInterval`, which schedules autonomous Raider preparation and admission.
+- **Delayed reactions:** Optional enrichment may arrive later through `QueueLiveNarration` and [OnnxGenAiNarrativeGenerator.cs](../server/AFKRaiders.Server/AI/OnnxGenAiNarrativeGenerator.cs). Delay only the narrative; retain immediate authored fallback and do not defer committed events.
+- **Current AI bounds:** Live narration expires after 90 seconds in `QueueLiveNarration`; the 25-second model deadline is `InferenceBudget` in [OnnxGenAiNarrativeGenerator.cs](../server/AFKRaiders.Server/AI/OnnxGenAiNarrativeGenerator.cs). These govern optional flavor, not simulation outcomes.
+- **Admission bound:** [RaidSimulation.cs](../server/AFKRaiders.Server/Domain/RaidSimulation.cs) (`TryQueueNarration`) allows only one pending live request per world. This is a backpressure invariant, not a timer; this proposal does not relax it.
+
+### (b) Mechanical timings and BAL comparison windows
+
+Do not change these as pacing tweaks. Any mechanical-timing change requires a new BAL-0 baseline; changing measurement windows also requires a new comparison baseline.
+
+- **5-second robot rounds:** `RobotRoundInterval` in [RaidSimulation.cs](../server/AFKRaiders.Server/Domain/RaidSimulation.cs); danger profiles are in [RaidConditions.cs](../server/AFKRaiders.Server/Domain/RaidConditions.cs).
+- **30-second admission pulse:** `AdmissionPulse` in [RaidCoordinator.cs](../server/AFKRaiders.Server/Domain/RaidCoordinator.cs).
+- **1,320-second world expiry:** `RaidConditions.DeadlineSeconds` in [RaidConditions.cs](../server/AFKRaiders.Server/Domain/RaidConditions.cs).
+- **900–1,200-second raid target:** experimental fixture bounds in [CommsAndPacingTests.cs](../tests/AFKRaiders.Server.Tests/CommsAndPacingTests.cs) and [G6RiskRewardTests.cs](../tests/AFKRaiders.Server.Tests/G6RiskRewardTests.cs), not approved balance.
+- **8h/24h/48h/96h measurement windows:** `SettlementWindows` in [BalanceMeasurementTests.cs](../tests/AFKRaiders.Server.Tests/BalanceMeasurementTests.cs); changing them changes the comparison frame.
+- **8h High age block and 24h readiness gate:** `BalanceExperimentRules.BlocksHigh` in [BalanceExperimentRules.cs](../server/AFKRaiders.Server/Domain/BalanceExperimentRules.cs), applied by `RaidCoordinator.IsBlockedFromHigh` in [RaidCoordinator.cs](../server/AFKRaiders.Server/Domain/RaidCoordinator.cs).
+
 ---
 
 ## 2. Technical Stack & Model Evaluation
 
 | Component | Technology | Rationale |
 |---|---|---|
-| **Runtime Engine** | `Microsoft.ML.OnnxRuntimeGenAI` (or `DirectML` on Windows Server) | Native C# bindings for high-throughput, low-latency token generation on CPU/GPU. |
-| **Primary SLM Candidate** | **SmolLM2-360M-Instruct** (or 135M) (INT4/ONNX) | ~250MB–400MB memory footprint. Sub-50ms CPU generation for short 1-2 sentence radio diary lines. Extremely fast. |
+| **Runtime Engine** | `Microsoft.ML.OnnxRuntimeGenAI` (or `DirectML` on Windows Server) | Native C# bindings for local token generation on CPU/GPU. |
+| **Primary SLM Candidate** | **SmolLM2-360M-Instruct** (or 135M) (INT4/ONNX) | ~250MB–400MB memory footprint. Unmeasured. Earlier drafts claimed sub-50ms; this was never benchmarked. The only measured model is Phi-3.5 mini on CPU: 8-13s per short reply, 20-70s initialization (see the measured evidence above). Treat any smaller model as untested until benchmarked on the target hardware. |
 | **Complex Generator Candidate** | **Qwen2.5-0.5B-Instruct** or **Phi-3.5-mini-Instruct** (INT4) | Capable of emitting reliable structured JSON for shared zone conditions, anomalies, and multi-bullet mission debriefs. |
 | **Inter-Process Decoupling** | `System.Threading.Channels.Channel<NarrativeRequest>` | Producers (simulation events) enqueue requests without waiting; consumers (ONNX worker) pop, generate, and dispatch via SignalR. |
 
@@ -111,7 +136,7 @@ The emergence of efficient Small Language Models (SLMs) and ONNX Runtime provide
 
 ### Pipeline D: Utility AI for Raider Personality (Non-LLM / Classical ONNX)
 - **Concept:** A small multi-layer perceptron (MLP) trained via behavioral cloning or reinforcement learning and exported to an ONNX classification model (< 100 KB).
-- **Execution:** Runs synchronously in sub-millisecond time inside `RaidSimulation.cs` during decision ticks (e.g. weighting autonomous branch selection or extraction appetite based on Raider traits).
+- **Execution:** Proposed to run synchronously inside `RaidSimulation.cs` during decision ticks (e.g. weighting autonomous branch selection or extraction appetite based on Raider traits); latency is unmeasured.
 - **Economy note (2026-10-17):** The autonomous economy starts with hand-authored deterministic utility scoring. A learned model could later supply weights only if it is versioned, deterministic for identical inputs, and its decisions remain journaled and validated by the coordinator.
 
 ---
@@ -196,6 +221,6 @@ The older draft labeled G6 conditions "Step 4", conflicting with the progress le
 ## 6. Verification & Quality Acceptance
 
 - **Safety & Tone Guardrails:** Generated strings must pass lightweight regex filters ensuring compliance with [LEGAL_GUARDRAILS.md](lore/content-guidelines/LEGAL_GUARDRAILS.md) and [TONE_VOICE.md](lore/content-guidelines/TONE_VOICE.md).
-- **Zero Simulation Stall:** Benchmark tests ensure server tick rate remains steady at 250ms/tick under peak AI generation load.
+- **Zero Simulation Stall:** Acceptance target is a steady 250ms tick cadence under peak AI generation load; the available deterministic tests do not establish native-model tick performance.
 - **Graceful Degradation:** Current bounded optional mood uses a 25s deadline and native session cancellation; template facts remain in place on timeout, rejected quality, missing model, stale callback, or queue saturation. More expressive fact-bearing generation remains proposed.
 - **Test Suite Determinism:** All `dotnet test` runs execute against the template provider by default, guaranteeing deterministic and instant test verification.

@@ -22,6 +22,8 @@ This ledger is the source of truth for implementation progress across agents. Up
 | Known technical blockers | No known blocker. Balance acceptance choices remain unresolved; persistence/accounts and restart recovery remain prerequisites for external release. Do not restart a user-managed backend for verification |
 | Latest evidence | BAL-4 follow-up (2026-11-04): focused balance/readiness/compatibility tests 68/68; deterministic report-generation check 1/1; full server suite 512/512 with `DOTNET_PROCESSOR_COUNT=2`; web production build passed; six independent matched 64-seed x 2-Raider runs (4A, 4B, 5 at 8h and 96h) passed. 4A High defeat rate 19.6% (below the 20% point floor); 4B 21.3%; Arm 5 22.9%, with no [0,8) High settlements. The 120-seed first-raid High cohort is 32.5% starter (25.4-40.0%) / 20.0% staged (15.0-25.4%), 20,000-resample seed-cluster intervals. Full results, candidate versions/fingerprints, band judgments and limits are in [BAL-4 arms](balance/BAL-4-arms.md). `git diff --check` passed; local Markdown path links in the three updated docs all resolve; malformed start-index spellings are fixed. No combined confirmation, backend restart, commit, or push |
 
+**Story-system proposal:** [STORY_SYSTEM_PROPOSAL.md](STORY_SYSTEM_PROPOSAL.md) — proposed, awaiting approval. No story-system implementation is active.
+
 ### BAL-4 independent follow-up arms 4A, 4B and 5 (2026-11-04)
 
 - **Status:** Implemented, independently measured against the Arm 3 cumulative state, and technically verified; experimental only, not balance-certified. Each arm has its own rules version and compatibility fingerprint. Designer decisions from 2026-11-04 are recorded above and in [BAL-4 arms](balance/BAL-4-arms.md).
