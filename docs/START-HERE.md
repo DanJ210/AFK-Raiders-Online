@@ -11,7 +11,7 @@ Reference repo: https://github.com/DanJ210/AFK-Raiders-Online (branch main). Rea
 | [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md) | The progress ledger and handoff checkpoint; the source of truth for status, decisions, and open questions. It is very large — read the "Agent handoff checkpoint" table at the top first. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/IMPLEMENTATION_PROGRESS.md) |
 | [GAME_DESIGN.md](GAME_DESIGN.md) | The original offline game design document; the main-game design baseline (autonomous loop, Comms Log, loot, stash, survival, Handler interactions). | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/GAME_DESIGN.md) |
 | [MULTIPLAYER_REBUILD_BRIEF.md](MULTIPLAYER_REBUILD_BRIEF.md) | The confirmed product direction and milestone brief for the server-authoritative shared-world rebuild. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/MULTIPLAYER_REBUILD_BRIEF.md) |
-| [AI_SYSTEMS_DESIGN.md](AI_SYSTEMS_DESIGN.md) | The AI/ONNX narration-enrichment architecture plan, with the bounded runtime status of local-model narration (AI voices committed events; it never decides outcomes). | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/AI_SYSTEMS_DESIGN.md) |
+| [AI_SYSTEMS_DESIGN.md](AI_SYSTEMS_DESIGN.md) | AI architecture decisions and current implementation: local ONNX narration with authored fallback. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/AI_SYSTEMS_DESIGN.md) |
 | [STORY_SYSTEM_PROPOSAL.md](STORY_SYSTEM_PROPOSAL.md) | **Proposal, awaiting approval:** shared moments, Raider memory, story direction, and narration architecture. | This workspace |
 
 ### docs/balance/
@@ -75,7 +75,8 @@ Raw URLs are easier for tools and assistants to read than the normal GitHub page
 
 - The ledger's handoff checkpoint is the authority on status; do not trust older chat summaries.
 - Check the ledger's "Last updated" date and the latest commit before advising, and say if something might be stale.
-- Frozen contracts are listed in the ledger and balance proposals (for example trader-only Temptrest, once-per-raid weapon wear, deterministic ownership, once-only settlement, no Handler economy controls, no PvP/theft, no AI authority over outcomes). Do not suggest changing them without flagging it.
+- Frozen contracts are listed in the ledger and balance proposals (for example trader-only Temptrest, once-per-raid weapon wear, deterministic ownership, once-only settlement, no Handler economy controls, no PvP/theft). Do not suggest changing them without flagging it.
+- Cloud models, paid APIs, and AI decision-making are allowed design options; specific roles and implementations still need an approved design.
 - Balance values are experimental until a human approves them.
 - Follow docs/lore/content-guidelines (use "A.R.C." with periods, never raw "ARC"; original AFK names only; deadpan tone). Shield names are placeholders pending approval.
 - Do not commit, push or restart user-managed services unless asked.

@@ -25,9 +25,9 @@ Keep these roles distinct. Implemented prototype rules are not validated balance
 - Human encounters involve actual Raiders in the same current server-owned raid, never saved opponent snapshots presented as live participants.
 - Use one authoritative server timeline and shared world entities. Loot creation, transfer, consumption, and extraction must preserve unique ownership.
 - Crates are autonomous event/contest opportunities, not reflex-based claim races. Handler commands, when implemented, remain limited and optional.
-- The Raider runs its own economy (confirmed 2026-10-17, Godville-style): it sells, buys, equips, repairs, stashes, and departs on its own through a deterministic, trait-weighted, server-owned utility policy. ECON-1 implements arrival preparation; ECON-2 adds seeded finite trader stock and owned field weapons. Do not add or extend Handler shop, sell, equip, repair, or loadout-staging controls; the remaining Loadout & Inventory view is read-only.
+- **Current implementation (ECON-1/2):** The Raider runs its own economy (confirmed 2026-10-17, Godville-style): it sells, buys, equips, repairs, stashes, and departs on its own through deterministic, trait-weighted, server-owned utility scoring. This describes current behavior, not a permanent constraint on future decision systems. Do not add or extend Handler shop, sell, equip, repair, or loadout-staging controls; the remaining Loadout & Inventory view is read-only.
 - The Handler interacts only through spendable Signal actions. Signals may temporarily nudge scoring weights (greed, spending, caution) but never pick a specific item or bypass validation. An absent Handler loses nothing owed.
-- AI models never decide Raider actions, purchases, prices, or outcomes. They may voice committed decisions with authored fallbacks. Any future hybrid that lets a model pick among pre-ranked legal options needs separate approval, must journal the pick for replay, and must fall back to the top deterministic choice.
+- **Designer decision (2026-11-06):** The former rule that AI could not decide or direct systems, and the offline/zero-cost/no-API-key constraint, are removed. AI decision-making, AI-controlled agents, cloud models, and paid APIs are permitted design options subject to approved designs; none is approved for implementation by this decision alone. See the [decision authority checkpoint](../docs/IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint).
 - Disconnecting a Handler does not withdraw their Raider or erase unfavorable outcomes. Server outages require an explicit recovery policy, not browser-side replay.
 - Preserve original parody identity. The sibling `afk-raiders` project is a read-only reference and selective content source, not an implementation dependency. Record source revisions for reused content; do not import its saves, local ticker, or balance by default.
 
@@ -46,7 +46,7 @@ Keep these roles distinct. Implemented prototype rules are not validated balance
 
 ## AI narrative enrichment
 
-- Local model narration is optional enrichment, never part of simulation authority or a reason to delay committed gameplay. Preserve authored narration as the immediate fallback and retain factual validation.
+- **Current implementation:** Local model narration is optional enrichment with authored fallback and factual validation. This current behavior does not prohibit future AI decision-making or hosted models; follow the approved design for any future change.
 - Before changing prompts or acceptance thresholds, inspect the enrichment status and failure reason. Distinguish `NotRequested`, busy/queued, timeout, expired/stale, rejected, and accepted output; do not count authored or `NotRequested` entries as model rejections.
 - Benchmark end-to-end latency and acceptance on the available target hardware before setting budgets. Keep backpressure and stale-event guards, report sample size and limitations, and check that authored fallbacks remain varied when enrichment is unavailable.
 

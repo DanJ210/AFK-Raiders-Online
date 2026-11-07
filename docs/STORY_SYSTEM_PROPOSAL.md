@@ -4,13 +4,15 @@
 
 This is a design document only. It does not authorize code, runtime content, gameplay, balance, rules-version, or fingerprint changes. The counts and limits suggested below are proposals, not validated targets. Quantitative runtime evidence is marked **Measured (docs)**; projections are **Estimates**; future choices are **Proposals**.
 
+Several sections below were written under the former assumptions that AI only narrated and inference had to remain local/offline. Those assumptions were removed on 2026-11-06; see [Assumptions changed on 2026-11-06](#assumptions-changed-on-2026-11-06). The proposal remains unapproved and is not redesigned by that decision.
+
 ## 1. Summary and recommendation
 
 Make the shared event the unchanging part of the story, and make each Raider's reaction a personal layer on top of it. The server first records what actually happened once. Every participant sees that same event and outcome; their own Handler may then see a separate reaction shaped by that Raider's traits and remembered encounters.
 
 Start with **one shared server narrator** and pass it a committed event plus a small, private context for each participant. It can return a set of reactions for that moment, while the shared event itself remains server-authored and authoritative. Keep authored narration as the immediate baseline and fallback; initially use AI only for a measured subset of eligible moments. Do not load one model per player. With the current CPU evidence, separate models multiply memory use without evidence of better story quality or acceptable concurrent latency.
 
-This system should create continuity from a small authored beat library, structured relationships, and deterministic selection—not from an unbounded collection of hand-written storylines. It is an optional narration layer; it never changes the simulation.
+This system should create continuity from a small authored beat library, structured relationships, and deterministic selection—not from an unbounded collection of hand-written storylines. This description of a deterministic, narration-only system was written under the former assumption removed on 2026-11-06; it is a proposal, not a project-wide restriction.
 
 ## 2. Current-state audit
 
@@ -23,7 +25,7 @@ This system should create continuity from a small authored beat library, structu
 | Live admission | At most one eligible live request may be pending per world; other eligible events keep authored narration as `NotRequested / LiveBudgetBusy` and are not retried later. | This is admission control, not parallel inference. The queue also serves terminal debriefs. Live requests expire after **90 seconds** or world completion (**Measured (docs)**). |
 | Native CPU samples | The docs record several isolated Phi-3.5 mini runs. | **Measured (docs):** one record reports **70.04 seconds** initialization and a **31-token** response in **13.42 seconds cold / 8.29 seconds warm**. Other isolated runs report **32.58 seconds** initialization with **6/6** accepted samples at **12.60–23.48 seconds**, and **20.22 seconds** initialization with **6/6** accepted at **5.99–9.29 seconds**. These are different small smoke samples, not a concurrency benchmark or a latency guarantee. |
 | Acceptance samples and validators | The current guard accepts a single first-person sentence of **8–400 characters** and at least **4 words**, with punctuation/character checks, actor/outcome denylist terms, and context-allowed proper nouns; it revalidates on delivery. The completion budget is **96 output tokens**. Unknown proper nouns fail. | **Measured (docs):** samples include **0/6**, **1/6**, **6/6**, and an earlier **12/12** isolated prompt set (only **8 distinct** outputs). Small, isolated samples do not establish an acceptance rate, humor quality, or factual safety. The lexical guard can false-positive and is not a complete semantic fact checker. |
-| Traits and deterministic economy | The current four primary traits are **Brawler, Cautious, Gadgeteer, and Hoarder**. They already affect deterministic utility scoring. | Traits currently tune decisions, not a validated narrative voice model. Do not infer hidden motives from a trait. |
+| Traits and current economy implementation | The current four primary traits are **Brawler, Cautious, Gadgeteer, and Hoarder**. The current economy uses deterministic utility scoring. | **Current implementation**, not a permanent constraint on future AI decisions. Traits are not a validated narrative voice model; do not infer hidden motives from a trait. |
 | Shared-world and persistence state | Shared conditions, robots, loot, event ordering, and settlement are server-owned. | **Current limit (docs):** Development identities and the raid/duty state are in-memory, limited to **two hard-coded development identities**, and erased by restart. There are no durable accounts, persistent home assets, restart recovery, or established event-retention policy. S6 is design-only and is a prerequisite for production continuity. |
 
 The AI design doc's suggested **250–400 MB** SmolLM2 footprint and **sub-50 ms** short-line CPU generation are **unmeasured candidate claims in that document**, not observed runtime performance. They must not be used as planning guarantees. Current Phi initialization and response timings above are the relevant measured evidence; model RAM and CPU utilization are not reported.
@@ -105,7 +107,7 @@ Per-Raider memory may contain:
 
 ## 5. Deterministic story director
 
-The story director is a server-owned, deterministic rule set. It examines committed event and memory state, selects an eligible authored beat, and records that choice. It does not ask a model what should happen.
+**Written under the former AI-narration-only assumption, removed on 2026-11-06:** This section proposes a server-owned, deterministic rule set that examines committed event and memory state, selects an eligible authored beat, and records that choice. Its rule that the director does not ask a model what should happen is not a project-wide constraint; this proposal has not designed or approved an AI director.
 
 Suggested selection order:
 
@@ -138,7 +140,7 @@ Several rows require event types or favor mechanics that may not currently exist
 
 ## 6. AI role and architecture options
 
-AI may voice an already selected beat; it does not select beats, decide actions, set prices, grant rewards, establish relationships, or determine outcomes. Keep a single common fact block and pass small per-Raider context for reactions. A shared narrator can generate a structured set of reactions for a shared event, while each Handler sees the same committed moment and only their own private line.
+**Former assumption (removed 2026-11-06):** This proposal originally limited AI to voicing an already selected beat and excluded AI selection of beats, actions, prices, rewards, relationships, and outcomes. AI decision-making is now permitted as a future design option, subject to approved designs. The proposal's shared facts and private-context recommendations remain proposals; they do not prevent an AI system from making a decision before the authoritative server commits it.
 
 | Option | Latency and memory/CPU | Consistency, trade-offs, and fallback |
 |---|---|---|
@@ -168,7 +170,7 @@ The “sub-50 ms” small-model latency and “250–400 MB” memory statements
 
 ## 7. Guardrails
 
-- **Facts first:** commit the Shared Moment from server state before narration. The director and model cannot alter participants, roles, actions, results, timestamps, item ownership, or settlement.
+- **Committed facts remain factual:** commit the Shared Moment from server state before narrating it. A director or model cannot rewrite already-committed participants, roles, actions, results, timestamps, item ownership, or settlement. An approved AI decision must be recorded and validated before it takes effect.
 - **Structured reaction only:** require exactly the expected participant IDs and one reaction per participant. Reject unknown IDs, missing/duplicate reactions, extra fields, malformed output, or any factual name/item/outcome not present in the authorized fact set. The shared moment itself remains authored from facts.
 - **Reuse current checks, do not overclaim:** retain sentence/character checks, actor/outcome denial, allowed proper-noun vocabulary, delivery-time revalidation, and explicit failure reasons. Add exact participant and fact allowlists. The current lexical checks are not a semantic proof that prose contains no implied claim; keep reactions short and subjective, and keep the mechanically complete shared line visible independently.
 - **Fallback:** an authored line is immediately available. On timeout, busy/full queue, model unavailability, stale event, rejection, or validation error, show it and preserve the reason/status. No silent “generated” success, no retry that duplicates or rewrites a committed moment.
@@ -241,11 +243,18 @@ No balance values or rules changes are requested by these decisions.
 - Implementing any code, runtime content, tests, balance tuning, rules version/fingerprint changes, or model deployment.
 - Changing simulation outcomes, autonomous economy, Handler economy controls, ownership, or settlement.
 - PvP, theft, or any new favor, rescue, or betrayal mechanic.
-- Letting AI choose beats, actions, relationship state, loot, prices, or outcomes.
+- Designing AI-directed choices is not part of this proposal's current slice. The former project-wide prohibition was removed on 2026-11-06; see the assumptions section below.
 - Treating generated prose as canon, or adding any proposed example as approved AFK lore.
 - Replacing authored narration as the entertainment baseline.
 - One model per player, freeform player chat, public matchmaking, production accounts, or a claim that current tests prove production scale.
 - Writing millions of hand-crafted storylines or promising limitless generated variety.
+
+## Assumptions changed on 2026-11-06
+
+- The former rule that AI could only voice an already selected beat, and could not decide or direct systems, was removed. Future AI decision-making and AI-controlled agents are allowed design options, not implementation approvals.
+- The former offline-only, zero-cost, no-API-key constraint was removed. Cloud-hosted models and paid APIs may be considered.
+- Sections 1, 5, and 6; the AI-related guardrail and acceptance proposals in §§7 and 9; the rollout recommendations in §11; and the former AI exclusion in §12 were written under the old assumptions. Their deterministic director, authored-first rollout, and narration-only language is proposal history, not a frozen project rule.
+- The measured local ONNX timings and current authored fallback describe the implementation and evidence available when this proposal was written. They do not restrict model or provider choices.
 
 ## Source documents consulted
 

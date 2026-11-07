@@ -29,8 +29,9 @@ here before implementation:
 Frozen: trader-only Temptrest, once-per-raid weapon wear, deterministic
 ownership/allocation, once-only settlement, two shared defeat-reward slots
 per world, the 12% single-weapon slot chance and weapon rules, no Handler
-economy controls, no PvP/theft, no AI authority over outcomes, and existing
-extraction/KO/pocket semantics.
+economy controls, no PvP/theft, and existing extraction/KO/pocket semantics.
+The historical “no AI authority over outcomes” clause was superseded on
+2026-11-06; see the [decision authority checkpoint](../IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint).
 
 ## Protocol
 

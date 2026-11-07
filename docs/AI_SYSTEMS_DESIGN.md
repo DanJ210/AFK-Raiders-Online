@@ -8,7 +8,7 @@ Baseline alignment: [GAME_DESIGN.md](GAME_DESIGN.md), [MULTIPLAYER_REBUILD_BRIEF
 
 ## Current bounded implementation (G6, 2026-10-14)
 
-The runtime calls `IRaidNarrator.FormatEvent` on every committed event. It retains original receipts separately from immediate first-person canon fallback and queues optional live-event enrichment through the coordinator, outside domain mutation. Source-ID upserts propagate callbacks into private journals, snapshot polling, and active/recent threads. A shared event is queued once and remains visible only to actual participants. G6 implements curated, deterministic shared conditions and danger-specific robots. **Generative mechanical anomalies and learned utility AI remain unimplemented proposals**, not requirements on world startup. Residence/condition diary uses immediate authored pools, not extra inference load; voice rotation persists across admissions.
+**Current implementation:** The runtime calls `IRaidNarrator.FormatEvent` on every committed event. It retains original receipts separately from immediate first-person canon fallback and queues optional local ONNX live-event enrichment through the coordinator, outside domain mutation. Source-ID upserts propagate callbacks into private journals, snapshot polling, and active/recent threads. A shared event is queued once and remains visible only to actual participants. The current simulation and G6's curated shared conditions and danger-specific robots are deterministic. **Generative mechanical anomalies and learned utility AI remain unimplemented proposals**, not requirements on world startup. Residence/condition diary uses immediate authored pools, not extra inference load; voice rotation persists across admissions. This describes current behavior, not a restriction on future approved AI decision-making or hosting choices.
 
 Normal experimental fixtures target 900–1200 seconds via three nonreward surveying/checking/rummaging activities per arrival. This is authorized-autopilot tuning, not approved balance; no repeated loot or additional enemy is created.
 
@@ -26,7 +26,7 @@ Verification: final G6 regression **157 server tests**, **5 frontend journal/lif
 
 **COMMS-3 structured prompts (2026-10-15):** Live asides now receive an `AmbientCommsContext` (location, committed activity, event kind, condition, danger, robot name, anonymous nearby-Raider count) instead of a single style hint. The context maps to one of nine categories (AreaActivity, Search, Travel, Robot, SharedRobot, Exit, Diary, Floor, General), each with its own situation phrase and joke subject; locations add a short lore cue. The prompt contains only committed facts. The validator uses context-derived allowed proper nouns: the robot name and robot vocabulary are allowed only for robot categories, and the system prompt forbids naming winners or injuries. The same terms are used to revalidate output on delivery. Scheduling, deadlines, the 32-token cap and the one-request-per-world admission are unchanged. Deferred: Desperanza resting and Hub-crowd prompts, which need an AI-eligible Hub event cadence and a privacy decision about crowd counts.
 
-**Offline diagnosis follow-up (2026-10-15):** The observed running Development backend reported `OnnxGenAiNarrator / available: false / Offline (Template Fallback)`. That explains eligible authored-only entries without establishing whether its launch omitted the path or model initialization failed. Missing/invalid model directories now produce explicit startup warnings. Blank `AI:ModelPath` falls through to `AFK_AI_MODEL_PATH`; no hard-coded model path or automatic download is introduced. Eligible events observed while ONNX is unavailable retain `NotRequested / ModelUnavailable`, propagated to explanatory journal details. Repeated reads do not repeatedly increment the presentation revision. An isolated launch with the existing model and blank configuration verified available status and accepted live AI-enhanced browser delivery. Guards, candidate catalog, deadlines and single-pending admission remain unchanged.
+**Current implementation—offline diagnosis follow-up (observed 2026-10-15):** The observed running Development backend reported `OnnxGenAiNarrator / available: false / Offline (Template Fallback)`. That explains eligible authored-only entries without establishing whether its launch omitted the path or model initialization failed. Missing/invalid model directories now produce explicit startup warnings. Blank `AI:ModelPath` falls through to `AFK_AI_MODEL_PATH`; no hard-coded model path or automatic download is introduced. Eligible events observed while ONNX is unavailable retain `NotRequested / ModelUnavailable`, propagated to explanatory journal details. Repeated reads do not repeatedly increment the presentation revision. An isolated launch with the existing model and blank configuration verified available status and accepted live AI-enhanced browser delivery. Guards, candidate catalog, deadlines and single-pending admission remain unchanged.
 
 The unchanged current prompt accepted 12/12 isolated samples (8 distinct) before admission changes; this does **not** establish why the user's historical 41 fallbacks occurred. Updated result handling accepted 6/6 distinct samples in 5.99-9.29s, init 20.22s, and native cancellation produced explicit `CallerCancelled` fallback in 0.19s. No model/guard/prompt budget was changed. Fixed-prompt repeats remain possible: deterministic decoding with a finite topic set is not limitless generated variety. The admission policy targets burst backlog/expiry, not guaranteed generation quality.
 
@@ -40,15 +40,15 @@ The sections below retain future architectural intent; unmeasured candidate late
 
 AFK Raiders Online is an autonomous extraction comedy RPG where the player acts as a remote **Handler** in Desperanza monitoring an autonomous **Raider** via the **Comms Log**. 
 
-The emergence of efficient Small Language Models (SLMs) and ONNX Runtime provides an opportunity to deliver emergent, non-repetitive comedy, deadpan radio dialogue, unique shared zone anomalies, and post-raid After-Action Reports (AARs) without relying on expensive, high-latency cloud APIs.
+Local ONNX Runtime provides one option for emergent, non-repetitive comedy, deadpan radio dialogue, unique shared zone anomalies, and post-raid After-Action Reports (AARs). The current bounded implementation uses local inference for optional narration. Cloud-hosted models and paid APIs are also permitted by the designer decision recorded in the [implementation ledger](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint); model, provider, and role choices remain future design work.
 
 ### Core Architectural Invariants
 
-1. **Mechanics First, Generative Narrative Second ("AI Skinning"):**
-   - The server domain simulation (`RaidSimulation.cs`) remains 100% deterministic, authoritative, and testable.
-   - Core gameplay numbers (damage, health deltas, item drop tiers, timestamps, participant status) are strictly decided by the C# engine using seeded rules.
-   - AI models never decide whether a Raider lives, dies, or successfully loots. They interpret, narrate, and contextualize committed mechanical facts into parody dialogue conforming to [TONE_VOICE.md](lore/content-guidelines/TONE_VOICE.md).
-   - **Autonomous economy (confirmed 2026-10-17):** The Raider's own Desperanza decisions (sell, buy, equip, repair, depart) come from a deterministic, trait-weighted utility policy in C#, never from a language model. Models may explain those committed decisions in the Raider's voice. A model picking among pre-ranked legal options is a deferred, unapproved experiment; it would require journaling the pick for replay and falling back to the top deterministic choice.
+1. **AI authority follows approved design:**
+   - The designer decision of 2026-11-06 removed the permanent rule that AI cannot decide outcomes. Future approved designs may let AI participate in decisions, direct systems, and act as agents, including AI-controlled Handlers or Raiders.
+   - This permission is not implementation approval. The current simulation is deterministic, authoritative, and testable; its seeded C# rules describe current behavior, not a permanent ban on AI decision-making.
+   - **Current implementation (ECON-1/2):** Raider sell, buy, equip, repair, and departure decisions use a deterministic, trait-weighted C# utility policy. This is current behavior, not a frozen requirement for future decision systems.
+   - AI-generated output must remain consistent with the facts and state committed by the authoritative server. Narration currently follows [TONE_VOICE.md](lore/content-guidelines/TONE_VOICE.md).
 
 2. **Strict Non-Blocking Simulation Ticks:**
    - The authoritative simulation tick loop (`RaidClock.cs`) must not wait on inference.
@@ -59,10 +59,17 @@ The emergence of efficient Small Language Models (SLMs) and ONNX Runtime provide
    - When multiple Raiders experience a shared event (e.g. co-present salvage contest, shared A.R.C. robot encounter), all Handlers must see consistent facts.
    - A shared event narrative is generated once on the server and distributed to all present Handlers. Individual raiders only receive private generative flavor for private inventory or personal status changes.
 
-4. **Offline & Zero-Cost Infrastructure (Local ONNX):**
-   - Inference uses quantized on-device / in-process models via `Microsoft.ML.OnnxRuntimeGenAI`.
-   - No external API keys (OpenAI, Anthropic, etc.) are mandatory for core gameplay; the server remains self-contained.
-   - A deterministic, template-based narration engine acts as the primary fallback if an ONNX model is uninitialized, disabled, or fails validation.
+4. **Model and hosting choices are open:**
+   - The designer decision of 2026-11-06 removed the offline-only, zero-cost, and no-API-key constraints. Cloud-hosted models and paid APIs are permitted options; see the [implementation ledger](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint).
+   - **Current implementation:** Local inference uses `Microsoft.ML.OnnxRuntimeGenAI`; authored template narration is available immediately and remains the fallback when the local model is uninitialized, disabled, or fails validation. Neither local hosting nor zero-cost operation is a permanent requirement.
+
+## Consequences to design for (not blockers)
+
+- Tests, replay, and the balance harness currently rely on deterministic seeds; an AI decider would need a recorded or stubbed mode so measurements stay repeatable.
+- Once-only settlement and idempotency require AI decisions to be recorded before they take effect.
+- Cloud models add cost, latency variance, an API key/secret to manage, availability risk, and privacy considerations for any player data sent to a provider.
+- AI-controlled participants should be clearly labelled. The existing rule against presenting saved opponents as live participants still applies.
+- Balance measurements should keep AI-driven participants out of matched cohorts unless they are deliberately being measured.
 
 ## Pacing options (proposal, not approved)
 
@@ -137,7 +144,7 @@ Do not change these as pacing tweaks. Any mechanical-timing change requires a ne
 ### Pipeline D: Utility AI for Raider Personality (Non-LLM / Classical ONNX)
 - **Concept:** A small multi-layer perceptron (MLP) trained via behavioral cloning or reinforcement learning and exported to an ONNX classification model (< 100 KB).
 - **Execution:** Proposed to run synchronously inside `RaidSimulation.cs` during decision ticks (e.g. weighting autonomous branch selection or extraction appetite based on Raider traits); latency is unmeasured.
-- **Economy note (2026-10-17):** The autonomous economy starts with hand-authored deterministic utility scoring. A learned model could later supply weights only if it is versioned, deterministic for identical inputs, and its decisions remain journaled and validated by the coordinator.
+- **Historical economy note (2026-10-17; AI restriction superseded 2026-11-06):** The autonomous economy started with hand-authored deterministic utility scoring. The former requirement that any learned model remain deterministic for identical inputs is no longer a project rule; any future AI decision system remains subject to an approved design and authoritative validation/recording.
 
 ---
 

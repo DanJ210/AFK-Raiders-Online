@@ -557,8 +557,10 @@ Frozen: BAL-1 equipped snapshots, seeded rounded rolls, shared capped actual
 damage, slot order, outgoing before retaliation, no killing-round retaliation,
 once-per-extraction weapon wear and KO equipment loss. All BAL-1S defaults and
 autonomous preparation prices/reserves/thresholds remain unchanged. Temptrest
-is trader-only. No BAL-3/4, new controls, PvP/theft, auth/persistence, AI authority,
-dependencies or user-managed backend restart.
+is trader-only. No BAL-3/4, new controls, PvP/theft, auth/persistence,
+dependencies or user-managed backend restart. **Historical AI exclusion
+superseded 2026-11-06:** the former “no AI authority” limit is removed; see the
+[decision authority checkpoint](../IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint).
 
 Approved experimental profiles: Low HP12/raw8/3 rounds, Medium HP22/raw12/3,
 High HP45/raw18/4; rounds every 5s. Apply to normal risk/reward mode only;

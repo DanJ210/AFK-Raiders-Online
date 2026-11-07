@@ -184,7 +184,7 @@ weapon sinks described here. Keep frozen:
 - Deterministic ownership and allocation, and once-only settlement.
 - The autonomous Raider economy; no Handler buy/sell/equip/repair controls.
 - No direct PvP, theft, or saved opponents presented as live participants.
-- No AI authority over combat, decisions, purchases, or outcomes.
+- **Superseded 2026-11-06:** the former no-AI-authority limit on combat, decisions, purchases, or outcomes was removed; see the [decision authority checkpoint](../IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint). This historical proposal remains unchanged otherwise.
 
 No Handler Signal, simulation scheduling, extraction/KO/pocket semantics,
 shared-world ownership, or reward count is changed by this proposal.
