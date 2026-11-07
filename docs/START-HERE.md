@@ -12,7 +12,7 @@ Reference repo: https://github.com/DanJ210/AFK-Raiders-Online (branch main). Rea
 | [GAME_DESIGN.md](GAME_DESIGN.md) | The original offline game design document; the main-game design baseline (autonomous loop, Comms Log, loot, stash, survival, Handler interactions). | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/GAME_DESIGN.md) |
 | [MULTIPLAYER_REBUILD_BRIEF.md](MULTIPLAYER_REBUILD_BRIEF.md) | The confirmed product direction and milestone brief for the server-authoritative shared-world rebuild. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/MULTIPLAYER_REBUILD_BRIEF.md) |
 | [AI_SYSTEMS_DESIGN.md](AI_SYSTEMS_DESIGN.md) | AI architecture decisions and current implementation: local ONNX narration with authored fallback. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/AI_SYSTEMS_DESIGN.md) |
-| [STORY_SYSTEM_PROPOSAL.md](STORY_SYSTEM_PROPOSAL.md) | **Proposal, awaiting approval:** shared moments, Raider memory, story direction, and narration architecture. | This workspace |
+| [STORY_SYSTEM_PROPOSAL.md](STORY_SYSTEM_PROPOSAL.md) | **Proposal, awaiting approval:** shared moments, Raider memory, story direction, and narration architecture. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/STORY_SYSTEM_PROPOSAL.md) |
 
 ### docs/balance/
 
@@ -25,7 +25,7 @@ Reference repo: https://github.com/DanJ210/AFK-Raiders-Online (branch main). Rea
 | [BAL-2-proposal.md](balance/BAL-2-proposal.md) | Approved BAL-2 robot-tier and defeat-loot proposal; preserved for reasoning and approval history, current values live elsewhere. | Historical |
 | [BAL-2-measurements.md](balance/BAL-2-measurements.md) | Matched before/after BAL-2 measurement diagnostics. | Historical |
 | [BAL-4-proposal.md](balance/BAL-4-proposal.md) | The BAL-4 tuning proposal and first-arm results; superseded in part by the measured follow-up arms. | Superseded |
-| [BAL-4-arms.md](balance/BAL-4-arms.md) | The measured BAL-4 experiment arms 1–3 (one lever per arm), awaiting designer accept/hold decisions. | Current |
+| [BAL-4-arms.md](balance/BAL-4-arms.md) | Measured BAL-4 experiment arms 1-3, 4A, 4B and 5 (one lever per arm), with recommendations and open designer decisions. | Current |
 
 ### docs/lore/
 
@@ -48,6 +48,7 @@ Raw URLs are easier for tools and assistants to read than the normal GitHub page
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/GAME_DESIGN.md
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/MULTIPLAYER_REBUILD_BRIEF.md
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/AI_SYSTEMS_DESIGN.md
+- https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/STORY_SYSTEM_PROPOSAL.md
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/balance/BAL-0-baseline.md
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/balance/BAL-1-measurements.md
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/balance/BAL-1S-measurements.md
