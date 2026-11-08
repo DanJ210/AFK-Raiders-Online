@@ -6,6 +6,11 @@ Every arm is experimental and nothing here is balance-certified.** Arms 4A,
 they are not stacked on each other. Each new arm has its own rules version,
 compatibility fingerprint and matched-seed 8h/96h measurement.
 
+**Current served rules version:** `desperanza-bal-4-arm3-v1`, matching the
+web client's compatibility check. Arms 4A, 4B and 5 remain independent
+measurement candidates, not the default served rules. Earlier versions below
+identify historical measurement baselines.
+
 The decisions governing this follow-up are recorded in the
 [progress ledger's](../IMPLEMENTATION_PROGRESS.md) decision-authority row and
 here before implementation:

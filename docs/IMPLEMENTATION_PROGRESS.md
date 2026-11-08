@@ -2,7 +2,7 @@
 
 New here? Start with the documentation index: [START-HERE.md](START-HERE.md).
 
-Last updated: 2026-11-07
+Last updated: 2026-11-08
 
 ## Agent handoff checkpoint
 
@@ -11,7 +11,7 @@ This ledger is the source of truth for implementation progress across agents. Up
 | Field | Current value |
 |---|---|
 | Last verified step | BAL-4 follow-up arms 4A, 4B and 5 independently implemented and measured (2026-11-04; technical verification only; matched 64-seed 8h/96h cohorts, each from Arm 3, with separate rules versions/fingerprints and 20,000-resample intervals); BAL-4 experiment arms 1-3 implemented and measured (2026-11-03; technical verification only — Arm 1 High HP restore to 45, Arm 2 25% sell-back, Arm 3 first-24h High readiness gate; each with its own rules version, fingerprint, full-suite pass and matched 64-seed 8h/96h measurements); BAL-4 first-arm implementation and 64-seed measurements (2026-11-02; technical verification only, balance targets missed in early/late KO windows and cash inflation flagged); BAL-2 danger robot profiles, replacement defeat rewards and paired 64-seed measurements (2026-11-01; balance experimental); BAL-1S shield tiers, persistent wear and paid autonomous repair (2026-11-01); BAL-1 weapons matter and per-danger re-measurement (2026-11-01); BAL-0 Raider stats, Stats panel, balance report and owned-supply staging fix; COMMS-6 grounded possessive names in ambient asides; LOSS-1 equipped-weapon loss on defeat; COMMS-5 400-character AI asides/previews; ECON-2 seeded finite Desperanza trader stock and field weapon loot; ECON-1 autonomous Desperanza preparation and Handler Outfitter retirement; OUTFITTER-2 purchased supply visibility (historically verified, controls superseded); LOOT-1 field opportunity/activity and loot variety expansion; HUB-4 Ready Up costs 2 Signal; HUB-3 ten-minute Hub residence, autonomous parody Comms and Ready Up; UI-R5 Continuous Comms bottom spacing; UI-R4 panel spacing and Comms placement; UI-R3 collapsible Handler panels; UI-R2 manifest layout and catalog-backed armament damage; C6 lore-guided Hub narration and prompt style; COMMS-4 limits superseded by COMMS-5; OUTFITTER-1 client action API repair; HUB-2 shared extraction boarding and visible Hub residency; HUB-1 Desperanza deployment and staged extraction; UI-R1 item rarity presentation; C5/C4/C3/C2/C1 remain verified; G6 bounded technical implementation and G5/AI-4 remain implemented |
-| Active implementation | None. BAL-4 follow-up arms 4A, 4B and 5 are independently measured and technically verified; balance remains experimental pending designer selection. |
+| Active implementation | None. Web-client Arm 3 rules-version alignment verified 2026-11-08; client, server and README agree on `desperanza-bal-4-arm3-v1`. BAL-4 follow-up arms 4A, 4B and 5 are independently measured and technically verified; balance remains experimental pending designer selection. |
 | Decision authority (2026-11-06) | Designer decision: remove the categorical rule that AI cannot decide outcomes, direct systems, or act as agents; future AI participation, including AI-controlled Handlers or Raiders, is allowed subject to approved designs. Remove the offline/zero-cost/no-API-key constraint; cloud-hosted models and paid APIs are allowed. This is permission, not implementation approval. This supersedes the earlier “no AI outcome authority,” “deterministic utility policy,” and “AI voices but never decides” constraints, which remain in the dated ledger history only. Everything else in the frozen list remains unchanged, including trader-only Temptrest, once-per-raid weapon wear, ownership/allocation, once-only settlement, no PvP/theft, no saved opponents as live participants, extraction/KO/pocket semantics, and no Handler economy controls. |
 | Current implementation note (ECON-1/2) | The Raider economy still uses deterministic utility scoring. The superseded rule was that all future decisions must use that policy or that AI could never make decisions. |
 | Decisions still open (AI) | Specific AI roles, designs, model/provider, and deployment remain unselected; these are design choices, not blockers. The former AI-decision and offline/zero-cost constraints are no longer open project rules. |
@@ -60,9 +60,16 @@ This ledger is the source of truth for implementation progress across agents. Up
 - In `GAME_DESIGN.md`, reconciled the historical High-combat interpretation, Shield Layer data model and 2026-10-10 shield-restoration note. In `MULTIPLAYER_REBUILD_BRIEF.md`, relabeled the duplicate 2026-10-23 shield-decision note as historical; checked `AI_SYSTEMS_DESIGN.md` and found no stale balance claims to change.
 - Documentation only: no runtime, content, test, rules-version or fingerprint changes; BAL-3, BAL-4 and ECON-3 were not started.
 
-### Web-client rules-version alignment (2026-11-02)
+### Web-client Arm 3 rules-version alignment (2026-11-08)
 
-- **Status:** Verified. The client compatibility check and README current-version/startup guidance now use `desperanza-bal-4-v1`, matching `RaidSimulation.RulesVersion`. Copilot instructions now require keeping those three references aligned when the server version changes.
+- **Status:** [x] Verified. The web client now requires the server's current `desperanza-bal-4-arm3-v1` rules version; README current-version/startup guidance already matches.
+- **Scope:** [App.vue](../web/src/App.vue) compatibility constant and current-version notes in this ledger, [BAL-4-arms.md](balance/BAL-4-arms.md), and [BAL-4-proposal.md](balance/BAL-4-proposal.md). Preserve historical first-arm measurement versions and fingerprints; no server, gameplay, balance-selection, or backend-restart changes.
+- **Verification (2026-11-08):** `Set-Location web; npm run build` passed (Vue/TypeScript check and Vite production build); exact client/server/README version agreement confirmed; local Markdown path links in all three updated documents resolve; `git diff --check` passed.
+- **Limitations and next action:** Compatibility alignment only, not new balance certification. Active implementation cleared; retain the existing designer balance-review next step. No backend restart.
+
+### Historical web-client rules-version alignment (2026-11-02)
+
+- **Status:** Verified at that checkpoint. The client compatibility check and README current-version/startup guidance then used `desperanza-bal-4-v1`, matching `RaidSimulation.RulesVersion` at the time; superseded by the Arm 3 alignment above. Copilot instructions require keeping those three references aligned when the server version changes.
 - **Scope:** Updated [App.vue](../web/src/App.vue), [README.md](../README.md), and [.github/copilot-instructions.md](../.github/copilot-instructions.md). Historical BAL-2 measurement references remain unchanged; no server or gameplay behavior changed.
 - **Verification:** Compared the client and README values with the server constant; `Set-Location web; npm run build` passed; `git diff --check` passed.
 

@@ -9,8 +9,11 @@ overflow liquidation. It met the late all-loot value-order target but missed
 both ends of the High risk curve and left Medium's early/late conflict
 unresolved. The follow-up arms restored High HP 45 (Arm 1), lowered the
 sell-back to 25% (Arm 2), and added a first-24h High readiness gate (Arm 3);
-the worktree now holds the cumulative Arm 3 state under
-`desperanza-bal-4-arm3-v1`. Medium risk staging and shield tuning remain
+the server currently serves the cumulative Arm 3 state under
+`desperanza-bal-4-arm3-v1`, matching the web client's compatibility check.
+References to `desperanza-bal-4-v1` below identify the historical first-arm
+implementation and measurements, not the current served version.
+Medium risk staging and shield tuning remain
 deferred. BAL-3 and ECON-3 are out of scope.
 
 ## Designer decisions (2026-11-03)
