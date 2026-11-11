@@ -14,6 +14,7 @@ Reference repo: https://github.com/DanJ210/AFK-Raiders-Online (branch main). Rea
 | [AI_SYSTEMS_DESIGN.md](AI_SYSTEMS_DESIGN.md) | AI architecture decisions and current implementation: local ONNX narration with authored fallback. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/AI_SYSTEMS_DESIGN.md) |
 | [STORY_SYSTEM_PROPOSAL.md](STORY_SYSTEM_PROPOSAL.md) | **Proposal, awaiting approval:** shared moments, Raider memory, story direction, and narration architecture. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/STORY_SYSTEM_PROPOSAL.md) |
 | [WORLD_ACTIVITY_PROPOSAL.md](WORLD_ACTIVITY_PROPOSAL.md) | **Proposal, awaiting approval:** crossing metrics, ambient/solo events, maps, and AI activity options. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/WORLD_ACTIVITY_PROPOSAL.md) |
+| [DIARY_VARIETY_PROPOSAL.md](DIARY_VARIETY_PROPOSAL.md) | **Proposal, awaiting approval:** measured diary repetition, event-fit options, and authored-content workflow. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/DIARY_VARIETY_PROPOSAL.md) |
 
 ### docs/balance/
 
@@ -51,6 +52,7 @@ Raw URLs are easier for tools and assistants to read than the normal GitHub page
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/AI_SYSTEMS_DESIGN.md
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/STORY_SYSTEM_PROPOSAL.md
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/WORLD_ACTIVITY_PROPOSAL.md
+- https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/DIARY_VARIETY_PROPOSAL.md
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/balance/BAL-0-baseline.md
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/balance/BAL-1-measurements.md
 - https://raw.githubusercontent.com/DanJ210/AFK-Raiders-Online/main/docs/balance/BAL-1S-measurements.md
