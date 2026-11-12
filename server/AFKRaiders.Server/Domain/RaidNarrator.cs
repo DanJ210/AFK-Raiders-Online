@@ -95,6 +95,8 @@ public sealed class TemplateRaidNarrator : IRaidNarrator
     {
         if (evt.OriginalText is not null)
         {
+            if (evt.Details?.TryGetValue("SelectedLine", out var selectedLine) == true)
+                return $"{evt.OriginalText}\nRaider: {selectedLine}";
             var rotates = evt.Details?.TryGetValue("VoiceIndex", out _) == true;
             var voiceIndex = rotates ? long.Parse(evt.Details!["VoiceIndex"], System.Globalization.CultureInfo.InvariantCulture) : evt.Sequence;
             return $"{evt.OriginalText}\nRaider: {RaiderCommsContent.Line(evt.Kind, evt.Activity, voiceIndex, raider?.PrimaryTrait, rotates)}";

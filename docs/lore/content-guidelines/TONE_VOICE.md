@@ -27,3 +27,24 @@ AFK Raiders is deadpan, absurd, and affectionate. The raider is brave enough to 
 - Include mechanical changes through existing engine suffixes where possible, such as `Greed +5.` or `Mood -1.`
 - Do not explain the joke in UI text.
 - Do not hardcode reusable comedy in TypeScript; add it to content JSON.
+
+## DIARY VARIETY pilot voices (2026-11-11 decision; drafts require review)
+
+Event fit and committed consequences come before trait colour. The existing general
+pool is not a dedicated Cautious voice; new trait/family lines are deferred to the
+review-gated pilot, not enabled by this guide.
+
+- **Brawler:** direct, confrontational overconfidence; a close call is an argument
+  the Raider expected to win. Do not imply a fight or charged shield without evidence.
+- **Cautious:** attentive, practical risk assessment and dry survival understatement.
+  Notices exits, uncertain footing and kit limits; cautiously optimistic only when
+  the event supports it. Not a coward, not an omniscient predictor, and not merely
+  the general paperwork voice.
+- **Gadgeteer:** gear obsession and technical rationalization; trusts the tool more
+  than the theory. Never invent carried gear, working equipment or successful fixes.
+- **Hoarder:** loot appetite and object overvaluation; future usefulness competes
+  with sensible departure. Never invent acquisitions, value or ownership.
+
+Rotate gear obsession, overconfidence, false optimism, genre tension, loot greed
+and bureaucracy. At most a quarter of pilot candidates may depend on office or
+paperwork metaphors. Hub resident references and live AI are outside slice 1.

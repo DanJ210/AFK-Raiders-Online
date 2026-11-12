@@ -2,7 +2,7 @@
 
 New here? Start with the documentation index: [START-HERE.md](START-HERE.md).
 
-Last updated: 2026-11-08
+Last updated: 2026-11-12
 
 ## Agent handoff checkpoint
 
@@ -10,24 +10,82 @@ This ledger is the source of truth for implementation progress across agents. Up
 
 | Field | Current value |
 |---|---|
-| Last verified step | BAL-4 follow-up arms 4A, 4B and 5 independently implemented and measured (2026-11-04; technical verification only; matched 64-seed 8h/96h cohorts, each from Arm 3, with separate rules versions/fingerprints and 20,000-resample intervals); BAL-4 experiment arms 1-3 implemented and measured (2026-11-03; technical verification only — Arm 1 High HP restore to 45, Arm 2 25% sell-back, Arm 3 first-24h High readiness gate; each with its own rules version, fingerprint, full-suite pass and matched 64-seed 8h/96h measurements); BAL-4 first-arm implementation and 64-seed measurements (2026-11-02; technical verification only, balance targets missed in early/late KO windows and cash inflation flagged); BAL-2 danger robot profiles, replacement defeat rewards and paired 64-seed measurements (2026-11-01; balance experimental); BAL-1S shield tiers, persistent wear and paid autonomous repair (2026-11-01); BAL-1 weapons matter and per-danger re-measurement (2026-11-01); BAL-0 Raider stats, Stats panel, balance report and owned-supply staging fix; COMMS-6 grounded possessive names in ambient asides; LOSS-1 equipped-weapon loss on defeat; COMMS-5 400-character AI asides/previews; ECON-2 seeded finite Desperanza trader stock and field weapon loot; ECON-1 autonomous Desperanza preparation and Handler Outfitter retirement; OUTFITTER-2 purchased supply visibility (historically verified, controls superseded); LOOT-1 field opportunity/activity and loot variety expansion; HUB-4 Ready Up costs 2 Signal; HUB-3 ten-minute Hub residence, autonomous parody Comms and Ready Up; UI-R5 Continuous Comms bottom spacing; UI-R4 panel spacing and Comms placement; UI-R3 collapsible Handler panels; UI-R2 manifest layout and catalog-backed armament damage; C6 lore-guided Hub narration and prompt style; COMMS-4 limits superseded by COMMS-5; OUTFITTER-1 client action API repair; HUB-2 shared extraction boarding and visible Hub residency; HUB-1 Desperanza deployment and staged extraction; UI-R1 item rarity presentation; C5/C4/C3/C2/C1 remain verified; G6 bounded technical implementation and G5/AI-4 remain implemented |
-| Active implementation | None. Web-client Arm 3 rules-version alignment verified 2026-11-08; client, server and README agree on `desperanza-bal-4-arm3-v1`. BAL-4 follow-up arms 4A, 4B and 5 are independently measured and technically verified; balance remains experimental pending designer selection. |
+| Last verified step | DIARY VARIETY slice 1 Parts A/B (2026-11-12): audited and technically verified presentation/selection only; 24 matched 8h/24h outcome fingerprints equal; 83 focused and 535 full server tests, 28 web tests/build and eight populated viewport/panel checks pass. Targets are not met for all traits; Part C awaits review. All earlier verified BAL-4/BAL-2/BAL-1S/BAL-1/BAL-0, COMMS/LOSS/ECON/LOOT/HUB/UI/C-series and bounded G/S work remains as recorded in the dated sections below; balance review is unchanged. |
+| Active implementation | None. DIARY VARIETY Parts A/B technically verified; **stopped for designer review before Part C**. Gameplay, simulation state, timing, decisions, items, rewards, Signal, balance, rules versions and gameplay fingerprints remain frozen. No backend restart, commit or push. |
+| Decision authority (DIARY VARIETY, 2026-11-11) | Designer approves a content-only first slice: presentation and selection only, no new event types or gameplay changes. Experimental per-trait representative 8h targets: <=10% exact quotes repeat a previous-20 quote; second proposed target <=20% repeat a previous-50 quote. Pilot size: eight candidate lines per event family per trait, sized after Part A. Keep every mechanical number visible in a concise suffix or expandable detail; hide recurring no-effect/co-presence boilerplate from the main sentence, retaining it in the event record. All four traits require dedicated voices, with Cautious explicitly defined; event fit precedes trait colour. Offline AI drafting with human review is approved; live AI narration and Hub resident references are out of scope. Only narration compatibility fingerprints/content version may change, with explanations. Stop after Part B for review before drafting Part C; drafts must not be loaded. |
 | Decision authority (2026-11-06) | Designer decision: remove the categorical rule that AI cannot decide outcomes, direct systems, or act as agents; future AI participation, including AI-controlled Handlers or Raiders, is allowed subject to approved designs. Remove the offline/zero-cost/no-API-key constraint; cloud-hosted models and paid APIs are allowed. This is permission, not implementation approval. This supersedes the earlier “no AI outcome authority,” “deterministic utility policy,” and “AI voices but never decides” constraints, which remain in the dated ledger history only. Everything else in the frozen list remains unchanged, including trader-only Temptrest, once-per-raid weapon wear, ownership/allocation, once-only settlement, no PvP/theft, no saved opponents as live participants, extraction/KO/pocket semantics, and no Handler economy controls. |
 | Current implementation note (ECON-1/2) | The Raider economy still uses deterministic utility scoring. The superseded rule was that all future decisions must use that policy or that AI could never make decisions. |
 | Decisions still open (AI) | Specific AI roles, designs, model/provider, and deployment remain unselected; these are design choices, not blockers. The former AI-decision and offline/zero-cost constraints are no longer open project rules. |
-| Current phase | Experimental balance review only. Arm 3 remains the matched reference state. Designer decisions settle 25% sell-back, High 45/18/4 and the four-weapon cap; mature High KO at 24-25% is in band, with about a 2-point noise floor. No balance certification or BAL-3/ECON-3 authorization. |
-| Next proposed step | Designer reviews the independent 4A/4B/5 results and selects which experimental rule(s), if any, to retain. The proposed next measurement is a combined 4B+5 confirmation only if explicitly requested; do not run it now. |
+| Current phase | DIARY VARIETY Part B review gate. No further implementation or drafting is active. Balance review remains separate and unchanged; Arm 3 remains the matched reference state; no BAL-3/ECON-3 authorization. |
+| Next proposed step | Designer reviews [DIARY VARIETY audit](DIARY_VARIETY_AUDIT.md), presentation, conservative route reuse, pilot families and dedicated Cautious definition. Only after review: Part C draft-only pilot, eight candidates per chosen family per trait, not runtime content. BAL-4 selections/combined-confirmation authorization remain independent and open; do not run a combined arm now. |
 | Prerequisites satisfied | S1-S5 bounded slice, G1 Comms journal, G2 loot catalog & opportunity tables, G3 cumulative home stash & coins, AI-1 async AI spine with Post-Raid AAR debriefs, G4/AI-3 equipment, shop, repair, staging, item appraisal, G5/AI-4 survival lifecycle, secret pocket, Handler support & combat comms, ECON-1 autonomous preparation, HUB-3 residence, HUB-4 Ready Up and HUB-5 paced errands |
-| Next action | Review [BAL-4 arms](balance/BAL-4-arms.md) and decide between the Arm 3 reward weights, Arm 4A, or Arm 4B; decide whether Arm 5 replaces the early-High behavior; then explicitly authorize or decline the proposed combined 4B+5 confirmation. No combined run is authorized yet. |
+| Next action | **Wait for designer review.** Exact resume point: Part C has not started; do not create the pilot document until reviewed. A/B changed files, metrics, verification evidence, remaining fallthroughs and proposed family sizing are linked in the DIARY VARIETY section below and audit. No pilot lines have been loaded. |
 | Additional proposal (2026-11-07) | [World activity proposal](WORLD_ACTIVITY_PROPOSAL.md) drafted for designer review; **proposed, awaiting approval**. Documentation only. No implementation is active or authorized, and the current balance-review checkpoint is unchanged. |
-| Additional proposal (2026-11-08) | [Diary variety proposal](DIARY_VARIETY_PROPOSAL.md) drafted for designer review; **proposed, awaiting approval**. Documentation and read-only analysis only. No implementation is active or authorized, and the current balance-review checkpoint is unchanged. |
+| Additional proposal (2026-11-08; decision 2026-11-11) | [Diary variety proposal](DIARY_VARIETY_PROPOSAL.md): slice 1 A/B authorized and technically verified; broader options remain proposals. Part C is gated on review and will be draft-only. No balance scope was expanded. |
 | Decision authority (BAL-4, 2026-11-04) | Designer decisions: (1) accept 25% overflow sell-back as standing experimental value; a no-cash sink is a possible later arm, not this task; (2) keep High robot HP/raw/rounds 45/18/4 and cap four; (3) mature High KO about 24-25% counts as in band even when the interval straddles the 25% floor; do not tune mature High risk and do not chase differences under ~2 percentage points; (4) [0,8) High KO 55-61% is unacceptable; test the Arm 5 early-High block; (5) run the Arm 4 jackpot re-check as one lever, in independent candidates 4A and 4B; (6) Medium stats, shields and Arm 3 kit gate stay unchanged except Arm 5's explicit age rule; Medium hazard work remains BAL-3; (7) each arm is a separate delta from Arm 3, not stacked. Frozen: trader-only Temptrest, once-per-raid weapon wear, deterministic ownership/allocation, once-only settlement, two shared defeat-reward slots/world, 12% single-weapon slot chance and weapon rules, no Handler economy controls, no PvP/theft, no AI outcome authority, and extraction/KO/pocket semantics. |
 | Decision authority | **2026-11-03: designer set the BAL-4 follow-up contract**: (1) KO targets use two experimental bands — mature play (settlement time 48h+): Low <=10%, Medium 15-25%, High 25-40%; onboarding (first 24h, softer): High <=45%, Medium <=30%, Low <=10%; a 20-30% High participant-fight defeat rate over 96h is the accepted provisional target. (2) Medical ranges stay Low 0-1, Medium 1-2, High 2-4 per raid in the mature window. (3) "Value order" means secured loot value per raid (High > Medium > Low) in the mature window, with a report-only guardrail that High mean net asset change must not stay negative in the mature window (report, do not tune to it yet). (4) Medium robot stats are not staged or retuned in BAL-4; Medium's hazard-driven early/late conflict is deferred to BAL-3; Medium stays 22/12/3. (5) Shields held (price 300, 60% curve, wear x1/x1.5/x2). (6) Keep the four-weapon cap and deterministic ranking. (7) Keep High reward weights 25/25/15/35 and re-measure after Arm 1 before judging them. (8) One lever per experiment arm; no bundling. Earlier: **2026-11-01: user approved the revised BAL-2 proposal**: experimental robot profiles, two shared defeat rewards replacing Depot loot, contribution-ranked round-robin allocation, existing extraction/pocket/KO semantics, removal of the Depot search delay/personality gain, preserved weapon inventory (caps and liquidation deferred to BAL-4), and the "best healing only" solo-High reading as a **balance aspiration** (lesser-loadout wins remain legal; no equipment gate or nonlethal floor). BAL-1/BAL-1S values, trader-only Temptrest, once-per-raid weapon wear, deterministic ownership/allocation and once-only settlement remain frozen. Earlier: 2026-10-17 user confirmed the autonomous Raider economy (Godville-style; Raider sells/buys/equips/repairs/departs; Handler acts only via Signal; deterministic utility policy; AI voices but never decides) as game direction, not an experiment. Exact numbers remain unvalidated balance. Prior HUB-3/HUB-4 choices remain as recorded below. Timing and Signal cost remain experimental; S6 remains design-only |
 | Decisions still open | BAL-4: select Arm 3 weights, 4A, or 4B (or defer the jackpot decision); decide whether Arm 5 replaces Arm 3's under-24h behavior; separately authorize or decline a combined 4B+5 confirmation. No combined arm is authorized. The no-cash sink remains a possible later arm. All balance remains experimental. Medium hazards remain deferred to BAL-3; Medium staging/shared-world clock and shield price/repair/wear changes remain deferred. See [BAL-4 arms](balance/BAL-4-arms.md) and the [BAL-4 proposal](balance/BAL-4-proposal.md). Shield display names remain placeholders; shield and Raider persistence is in-memory only. Robot damage is per round, per active Raider. BAL-1S values remain experimental; other open product decisions remain as recorded below. |
 | Known technical blockers | No known blocker. Balance acceptance choices remain unresolved; persistence/accounts and restart recovery remain prerequisites for external release. Do not restart a user-managed backend for verification |
-| Latest evidence | BAL-4 follow-up (2026-11-04): focused balance/readiness/compatibility tests 68/68; deterministic report-generation check 1/1; full server suite 512/512 with `DOTNET_PROCESSOR_COUNT=2`; web production build passed; six independent matched 64-seed x 2-Raider runs (4A, 4B, 5 at 8h and 96h) passed. 4A High defeat rate 19.6% (below the 20% point floor); 4B 21.3%; Arm 5 22.9%, with no [0,8) High settlements. The 120-seed first-raid High cohort is 32.5% starter (25.4-40.0%) / 20.0% staged (15.0-25.4%), 20,000-resample seed-cluster intervals. Full results, candidate versions/fingerprints, band judgments and limits are in [BAL-4 arms](balance/BAL-4-arms.md). `git diff --check` passed; local Markdown path links in the three updated docs all resolve; malformed start-index spellings are fixed. No combined confirmation, backend restart, commit, or push |
+| Latest evidence | DIARY VARIETY (2026-11-12): 83/83 focused, 535/535 full server tests (Release, `DOTNET_PROCESSOR_COUNT=2`), 28/28 web tests/build, eight populated viewport/panel checks plus keyboard expansion; 24 matched trait/seed/horizon outcome fingerprints unchanged against `e1dfa85`. Full per-trait/kind/pool denominators, top ten quotes and per-stay Hub counts in [audit](DIARY_VARIETY_AUDIT.md). Diff/local Markdown path/raw-acronym checks passed; no tracked bin/obj. No new runtime lines, live-AI feature, backend restart, commit or push. Earlier balance evidence remains in [BAL-4 arms](balance/BAL-4-arms.md). |
 
 **Story-system proposal:** [STORY_SYSTEM_PROPOSAL.md](STORY_SYSTEM_PROPOSAL.md) — proposed, awaiting approval. No story-system implementation is active.
+
+### DIARY VARIETY slice 1 - Parts A/B (2026-11-12)
+
+- [x] **Part A - Measure/audit:** [utility](../tools/DiaryVarietyReadOnlyAnalysis/Program.cs)
+  now reports independent seeds 101/202/303 per trait at 8h/24h, previous-20/50
+  repeats by kind and source pool, pool shares/sizes, top ten exact quotes,
+  event fallthrough coverage and Hub entry/unique counts for each stay.
+  [Audit](DIARY_VARIETY_AUDIT.md) preserves measured denominators and separates
+  source evidence/inference. Tool is outside the main solution/default test run;
+  no bin/obj files are tracked.
+- [x] **Part B - Presentation/selection:** [client helper](../web/src/journal.ts),
+  [component](../web/src/components/DiaryEntryText.vue), [App](../web/src/App.vue)
+  and [styles](../web/src/style.css) retain full event records behind details.
+  [Event-fit subsets](../server/AFKRaiders.Server/Domain/RaiderCommsContent.cs)
+  reuse only existing approved lines. [Narration memory](../server/AFKRaiders.Server/Content/NarrationSelectionMemory.cs)
+  is carried by the existing voice checkpoint through
+  [simulation](../server/AFKRaiders.Server/Domain/RaidSimulation.cs) and
+  [coordinator](../server/AFKRaiders.Server/Domain/RaidCoordinator.cs).
+  [Narrator](../server/AFKRaiders.Server/Domain/RaidNarrator.cs) formats the committed
+  selection, with no gameplay RNG, timing or decision changes.
+- [x] **Bounded acceptance/verification:** [focused tests](../tests/AFKRaiders.Server.Tests/DiaryVarietyTests.cs)
+  freeze twelve pre-slice 8h gameplay hashes; all 24 8h/24h pairings match untouched
+  `e1dfa85`. Final focused narration/replay/admission-order tests **83/83** and
+  full server suite **535/535** passed in Release with `DOTNET_PROCESSOR_COUNT=2`;
+  web tests **28/28** and production build passed. The known cancellation-sensitive
+  test did not fail, so no cancellation rerun was needed. Populated short/long
+  diary and shield receipts passed collapsed/expanded checks at
+  360/540/900/1280px, plus keyboard detail expansion. Temporary frontend fixture
+  and its Vite process were removed/stopped; user-managed backend untouched.
+- [x] **Compatibility explained:** [narration catalog](../server/AFKRaiders.Server/Content/narration-catalog.json)
+  changes only `desperanza-narration-v6` -> `v7`. Only
+  [narration compatibility fingerprints](../tests/AFKRaiders.Server.Tests/NarrationCompatibilityTests.cs)
+  change (all four experimental-arm fixtures include formatted narration).
+  Exact old/new hashes are in the audit; rules versions, gameplay/catalog
+  compatibility fingerprints, templates and authored pool text are unchanged.
+- **Measured limits:** 8h previous-20 before -> after: Cautious 5.38% -> 1.07%,
+  Hoarder 25.95% -> 9.42%, Brawler 30.56% -> 12.38%, Gadgeteer 29.28% -> 11.06%.
+  Previous-50 after: 16.82%, 27.34%, 27.86%, 27.08%, respectively.
+  Cautious meets both experimental targets; Hoarder meets previous 20 only
+  (all three seeds, seed 202 narrowly 211/2,111); Brawler/Gadgeteer miss both.
+  Hub within-stay uniqueness is unchanged; existing ten-line pool remains.
+  The audit lists every remaining fallthrough and three-line exit-pool repetition.
+  Technical completion is **not** all-trait repetition/comedy approval.
+- **Surprises fixed, no relaxed tests:** initial global-event tie-breaking
+  changed quotes under reversed admission order; narration quote ordinals fixed
+  eight existing regressions. Outcome comparisons canonicalize random starter
+  IDs while preserving references and remove appended quotes from thread logs,
+  not their committed mechanical receipts. No outcomes were retuned.
+- [ ] **Part C - Draft-only pilot:** **Awaiting designer review; not started**.
+  Resume only after review of A/B, proposed family priorities and the
+  [four dedicated pilot voices](lore/content-guidelines/TONE_VOICE.md).
+  Then produce eight candidates/family/trait with committed-field/slot eligibility,
+  fact checks, joke-mode variety, legal/lore checks and approve/edit/reject table.
+  Do not load drafts or add Hub resident references/live AI.
+- **Handoff:** active implementation cleared. No backend restart, commit or push.
+  Final diff/path/raw-acronym checks accompany this checkpoint; balance decisions
+  remain separate and no combined BAL-4 measurement is authorized.
 
 ### BAL-4 independent follow-up arms 4A, 4B and 5 (2026-11-04)
 

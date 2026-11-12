@@ -1,6 +1,6 @@
 # AFK Raiders Online
 
-Documentation entry point: [docs/START_HERE.md](docs/START_HERE.md).
+Documentation entry point: [docs/START-HERE.md](docs/START-HERE.md).
 
 ## Product direction
 
@@ -23,6 +23,19 @@ Field opportunities now have three authored variants at each of Market, Salvage 
 See the [multiplayer rebuild brief](docs/MULTIPLAYER_REBUILD_BRIEF.md) for the product contract, proposed rules, architecture, and milestones.
 
 ## Implementation handoff
+
+**DIARY VARIETY slice 1 (2026-11-12):** Parts A/B change presentation and authored
+line selection only. The continuous diary moves personality deltas, extraction
+odds/greed, travel ETA and activity durations into expandable **Event details**;
+the original full record is retained. AreaDiary's recurring no-effect/co-presence
+suffixes are hidden only in the main sentence. Damage/shield/combat receipts stay
+visible. Event-fit subsets reuse approved lines, and per-Raider narration-only
+least-recently-used selection persists across raids and Hub stays without gameplay
+RNG or timing changes. Narration content is `desperanza-narration-v7`; gameplay
+remains `desperanza-bal-4-arm3-v1`. No new lines or live-AI features were loaded.
+See the [audit and per-trait/pool measurements](docs/DIARY_VARIETY_AUDIT.md).
+Part C draft-only content awaits designer review; repetition targets are not met
+for all traits.
 
 - [Implementation progress](docs/IMPLEMENTATION_PROGRESS.md): authoritative agent handoff checkpoint, marked step checklists, milestone status, verification evidence, and next actions.
 - [Main-game coverage map](docs/IMPLEMENTATION_PROGRESS.md#main-game-design-coverage-map-2026-10-12): implemented/partial/missing original systems, multiplayer adaptations, and proposed G1-G7 delivery beginning with complete Comms and the loot/value/home loop. This is a roadmap, not new runtime behavior.
@@ -304,7 +317,7 @@ dotnet test tests\AFKRaiders.Server.Tests\AFKRaiders.Server.Tests.csproj --filte
 
 ### Editing authored narration and AI cues
 
-[Narration and flavor](server/AFKRaiders.Server/Content/narration-catalog.json) use schema 1. C4 introduced content version `desperanza-narration-v1` with 32 pools and 108 templates; subsequent Hub work added templates. C6 advanced authored content to `desperanza-narration-v2` and added `style.hub`; ECON-1 advanced to `desperanza-narration-v4` and added original Brawler/Gadgeteer voice pools; ECON-2 advances to `desperanza-narration-v5` with truthful trader-substitution, sold-out, and found-weapon templates:
+[Narration and flavor](server/AFKRaiders.Server/Content/narration-catalog.json) use schema 1. C4 introduced content version `desperanza-narration-v1` with 32 pools and 108 templates; subsequent Hub work added templates. C6 advanced authored content to `desperanza-narration-v2` and added `style.hub`; ECON-1 advanced to `desperanza-narration-v4` and added original Brawler/Gadgeteer voice pools; ECON-2 advanced to `desperanza-narration-v5` with truthful trader-substitution, sold-out, and found-weapon templates. Weapon liquidation advanced to v6. DIARY VARIETY advances to **v7** for narration-only route/selection semantics, with no new lines or templates:
 
 - `pools` contain survival lines, residence tasks, rotating Comms voice lines and short `style.*` object cues for the existing guarded AI prompt. Pool order affects deterministic selection. Keep at least two distinct nonblank, single-line entries per pool; duplicates and control characters are rejected.
 - `templates` contain authored narrator messages and simulation presentation, with numbered placeholders such as `{0}`. Keep every declared argument index; do not introduce named tokens, alignment or arbitrary format suffixes. Existing `HH:mm:ss`, `P0` and `F2` formats retain their original argument meaning. The unused `survival.robot-progress` pool alone retains its existing named robot tokens.
@@ -321,7 +334,7 @@ Focused narration validation:
 dotnet test tests\AFKRaiders.Server.Tests\AFKRaiders.Server.Tests.csproj --filter "FullyQualifiedName~NarrationContentTests|FullyQualifiedName~NarrationCompatibilityTests|FullyQualifiedName~NarrativeEnrichmentTests|FullyQualifiedName~CommsAndPacingTests"
 ```
 
-The pre-migration text/simulation fingerprint `20E1569D4BB57C2A4038EC9C38B47074921DA48677763CE5127ED9CDECC5CC69` remains frozen in [NarrationCompatibilityTests.cs](tests/AFKRaiders.Server.Tests/NarrationCompatibilityTests.cs). Its simulations use the explicit original 11-item C3 inputs in [CatalogCompatibilityTests.cs](tests/AFKRaiders.Server.Tests/CatalogCompatibilityTests.cs), so later loot expansion does not redefine those inputs. C6, LOOT-1, and ECON-1 intentionally update the current compatibility fingerprint for authored narration and the selected opportunity/activity/primary-trait projections; current expanded-catalog behavior is covered separately by [ReviewedLootIntakeTests.cs](tests/AFKRaiders.Server.Tests/ReviewedLootIntakeTests.cs). Future intentional wording changes require an explicitly reviewed compatibility update, not blindly replacing the hash.
+The historical pre-migration text/simulation fingerprint was `20E1569D4BB57C2A4038EC9C38B47074921DA48677763CE5127ED9CDECC5CC69`. Current [narration compatibility fixtures](tests/AFKRaiders.Server.Tests/NarrationCompatibilityTests.cs) cover all four experimental balance arms and retain the explicit original 11-item C3 inputs in [CatalogCompatibilityTests.cs](tests/AFKRaiders.Server.Tests/CatalogCompatibilityTests.cs); later loot expansion does not redefine those inputs. DIARY VARIETY updates only the narration-bearing compatibility hashes, explained individually in the [audit](docs/DIARY_VARIETY_AUDIT.md). Separate [pre-slice gameplay outcome gates](tests/AFKRaiders.Server.Tests/DiaryVarietyTests.cs) retain matched clocks, KO/loot/coins/shields/ownership and factual event/thread records. Current expanded-catalog behavior is also covered by [ReviewedLootIntakeTests.cs](tests/AFKRaiders.Server.Tests/ReviewedLootIntakeTests.cs). Future intentional wording changes require an explicitly reviewed compatibility update, not blindly replacing hashes.
 
 See the [implementation progress ledger](docs/IMPLEMENTATION_PROGRESS.md) for C2-C5 status, verification evidence, and limitations. Weights and category mappings are experimental; automated coverage is not human comedy or balance approval.
 

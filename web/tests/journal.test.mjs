@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { enrichmentExplanation, journalCategories, matchesJournalFilter, mergeJournal, narrationLabel } from '../src/journal.ts'
+import { readFileSync } from 'node:fs'
+import { diaryPresentation, enrichmentExplanation, journalCategories, matchesJournalFilter, mergeJournal, narrationLabel } from '../src/journal.ts'
 
 test('narration badges distinguish authored content from accepted AI without treating unrequested entries as failures', () => {
   assert.equal(narrationLabel(), 'Authored')
@@ -62,4 +63,50 @@ test('failure reason updates survive source-id merging without changing facts', 
   const before = { sourceEventId: 'event:1', sequence: 1, text: 'facts', enrichmentStatus: 'Pending' }
   const after = { ...before, enrichmentStatus: 'Fallback', enrichmentReason: 'InferenceDeadlineExceeded' }
   assert.deepEqual(mergeJournal([before], [after]), [after])
+})
+
+test('personality deltas leave the sentence but every committed number stays in the detail record', () => {
+  const text = 'Staying deeper: Greed 9 -> 10; Mood -1 -> 2; resilience 3.\nRaider: My concerns remain provisional.'
+  const event = { kind: 'PersonalityChanged', text }
+  assert.deepEqual(diaryPresentation(event), {
+    main: 'Staying deeper.\nRaider: My concerns remain provisional.', record: text, changed: true,
+  })
+  assert.equal(event.text, text)
+  assert.equal(diaryPresentation({ kind: 'PersonalityChanged', text: 'Future format: 123' }).main, 'Future format: 123')
+})
+
+test('area diary hides only exact recurring boilerplate and retains actual co-presence in details', () => {
+  const text = 'Raider One checking straps at Market. Raider Two is also actually present here. No loot, damage or new actor created.\nRaider: My socks object.'
+  const result = diaryPresentation({ kind: 'AreaDiary', text })
+  assert.equal(result.main, 'Raider One checking straps at Market.\nRaider: My socks object.')
+  assert.equal(result.record, text)
+  const otherKind = { kind: 'Unknown', text }
+  assert.equal(diaryPresentation(otherKind).main, text)
+  assert.equal(diaryPresentation({ kind: 'AreaDiary', text: 'Lost 4 HP. No loot recovered.' }).main, 'Lost 4 HP. No loot recovered.')
+})
+
+test('exit decisions, travel and activity duration keep their numbers available without altering outcomes', () => {
+  for (const [kind, text, main] of [
+    ['ExtractionDecision', 'Greed Check: 12 % exit chance; staying for now. Greed 39.', 'Greed Check: staying for now.'],
+    ['ExtractionDecision', 'Deadline urgency: 100% exit chance; heading for extraction. Greed 99.', 'Deadline urgency: heading for extraction.'],
+    ['Travel', 'One leaves Market for Salvage Yard. ETA 12s. Navigation by questionable instinct.', 'One leaves Market for Salvage Yard. Navigation by questionable instinct.'],
+    ['AreaActivityStarted', 'One begins surveying at Market (65s). Reconnaissance only; no new loot opportunity.', 'One begins surveying at Market. Reconnaissance only; no new loot opportunity.'],
+  ]) {
+    assert.deepEqual(diaryPresentation({ kind, text }), { main, record: text, changed: true })
+  }
+  for (const kind of ['ShieldAbsorbed', 'UnmitigatedDamage', 'RobotRound', 'HandlerAction']) {
+    const text = 'Shield lost 4 charge, 3 HP got through.'
+    assert.deepEqual(diaryPresentation({ kind, text }), { main: text, record: text, changed: false })
+  }
+})
+
+test('the diary uses native expandable records and wraps long populated content', () => {
+  const component = readFileSync(new URL('../src/components/DiaryEntryText.vue', import.meta.url), 'utf8')
+  const app = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
+  const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8')
+  assert.match(component, /<details v-if="presentation.changed"/)
+  assert.match(component, /<summary>Event details<\/summary>/)
+  assert.match(component, /\{\{ presentation.record \}\}/)
+  assert.match(app, /<DiaryEntryText :event="event"\s*\/>/)
+  assert.match(css, /\.diary-entry-text\s*\{[^}]*min-width:\s*0[^}]*overflow-wrap:\s*anywhere/)
 })

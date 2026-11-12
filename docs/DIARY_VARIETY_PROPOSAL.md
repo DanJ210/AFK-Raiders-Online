@@ -1,6 +1,12 @@
 # Diary Variety and Voice — Design Proposal
 
-**Status: Proposal, awaiting designer approval. Documentation and read-only analysis only. No implementation is active.**
+**Status: Original proposal retained for context. Designer authorized slice 1 Parts A/B on 2026-11-11; Part C requires review after Part B. Broader options remain proposals. See the [measured audit](DIARY_VARIETY_AUDIT.md) and [handoff](IMPLEMENTATION_PROGRESS.md#agent-handoff-checkpoint).**
+
+The slice-1 decision supersedes this proposal's original blanket prohibition on
+narration-only content-version/compatibility changes: only those may change, with
+explanation. Gameplay rules, outcome fingerprints, state, timing and balance stay
+frozen. Pilot drafting is approved only after the explicit Part B review stop;
+new runtime content and live AI are not approved by this slice.
 
 This proposal does not authorize runtime content, gameplay or simulation-state changes, balance changes, rules-version or fingerprint changes, or a backend restart. All sample lines below are proposals, not canon or approved runtime content. Numeric results are labelled **Measured**, projections are **Estimate**, and recommendations or thresholds are **Proposed**.
 

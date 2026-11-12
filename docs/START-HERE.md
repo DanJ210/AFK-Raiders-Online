@@ -14,7 +14,8 @@ Reference repo: https://github.com/DanJ210/AFK-Raiders-Online (branch main). Rea
 | [AI_SYSTEMS_DESIGN.md](AI_SYSTEMS_DESIGN.md) | AI architecture decisions and current implementation: local ONNX narration with authored fallback. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/AI_SYSTEMS_DESIGN.md) |
 | [STORY_SYSTEM_PROPOSAL.md](STORY_SYSTEM_PROPOSAL.md) | **Proposal, awaiting approval:** shared moments, Raider memory, story direction, and narration architecture. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/STORY_SYSTEM_PROPOSAL.md) |
 | [WORLD_ACTIVITY_PROPOSAL.md](WORLD_ACTIVITY_PROPOSAL.md) | **Proposal, awaiting approval:** crossing metrics, ambient/solo events, maps, and AI activity options. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/WORLD_ACTIVITY_PROPOSAL.md) |
-| [DIARY_VARIETY_PROPOSAL.md](DIARY_VARIETY_PROPOSAL.md) | **Proposal, awaiting approval:** measured diary repetition, event-fit options, and authored-content workflow. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/DIARY_VARIETY_PROPOSAL.md) |
+| [DIARY_VARIETY_PROPOSAL.md](DIARY_VARIETY_PROPOSAL.md) | Original proposal; slice 1 Parts A/B authorized, Part C gated on designer review. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/DIARY_VARIETY_PROPOSAL.md) |
+| [DIARY_VARIETY_AUDIT.md](DIARY_VARIETY_AUDIT.md) | Slice 1 audit, before/after per-trait/kind/pool measurements, preserved outcomes and Part B review gate. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/DIARY_VARIETY_AUDIT.md) |
 
 ### docs/balance/
 

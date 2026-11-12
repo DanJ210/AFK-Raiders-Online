@@ -11,6 +11,12 @@ public static class RaiderCommsContent
         "RobotRound" or "RobotCombatStarted" or "RobotParticipantJoined" => "Robot",
         "ExtractionStarted" or "Extracted" => "Exit",
         "Travel" or "Search" or "ItemAllocated" or "ConsumableUsed" or "WorldCondition" => kind,
+        "Arrived" => "voice.arrival",
+        "Departure" or "DutyAdmission" => "voice.admission",
+        "PackingStarted" or "PackingCompleted" => "voice.packing",
+        "ExtractionDecision" => "voice.exit-decision",
+        "SharedExtractionCalled" or "ExtractionVehicleArrived" or "ExtractionJoined" => "voice.shared-exit",
+        "RobotDefeated" or "RobotEscaped" => "voice.robot-aftermath",
         _ => "General"
     };
 
@@ -22,8 +28,21 @@ public static class RaiderCommsContent
         _ => NarrationContent.Default.Pool("tasks.general")
     };
 
-    public static string Line(string kind, string? activity, long sequence, string? primaryTrait = null, bool rotate = false)
+    public static IReadOnlyList<string> EligibleLines(string kind, string? activity, string? primaryTrait = null)
     {
+        // Reuse approved lines only; these subsets make no new outcome/actor claims.
+        var reuse = kind switch
+        {
+            "Arrived" => Subset("voice.travel", 6, 7, 10, 12),
+            "Departure" or "DutyAdmission" => Subset("voice.travel", 6, 7, 8, 9, 10, 11, 12),
+            "PackingStarted" or "PackingCompleted" => Subset("voice.allocation", 0, 1, 2, 3, 4, 5),
+            "ExtractionDecision" => Subset("voice.exit", 2, 4, 9),
+            "SharedExtractionCalled" or "ExtractionVehicleArrived" or "ExtractionJoined" =>
+                Subset("voice.exit", 2, 3, 4, 7, 8, 9, 12),
+            "RobotDefeated" or "RobotEscaped" => Subset("voice.robot", 3, 5, 10),
+            _ => null
+        };
+        if (reuse is not null) return reuse;
         IReadOnlyList<string> lines = (kind, activity) switch
         {
             ("AreaDiary", "Surveying") =>
@@ -67,6 +86,15 @@ public static class RaiderCommsContent
             _ =>
                 NarrationContent.Default.Pool("voice.general")
         };
+        return lines;
+    }
+
+    private static IReadOnlyList<string> Subset(string pool, params int[] indices) =>
+        indices.Select(index => NarrationContent.Default.Pool(pool)[index]).ToArray();
+
+    public static string Line(string kind, string? activity, long sequence, string? primaryTrait = null, bool rotate = false)
+    {
+        var lines = EligibleLines(kind, activity, primaryTrait);
         return lines[rotate ? (int)((ulong)sequence % (ulong)lines.Count) : PickIndex(sequence, lines.Count)];
     }
 

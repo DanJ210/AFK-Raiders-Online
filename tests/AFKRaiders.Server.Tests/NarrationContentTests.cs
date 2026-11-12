@@ -193,7 +193,7 @@ public sealed class NarrationContentTests
             new AmbientCommsContext("Desperanza", "reviewing my paperwork"));
         Assert.Contains("tube route maps", hubPrompt);
         Assert.Contains("tube route maps", OnnxGenAiNarrativeGenerator.BuildAmbientPrompt("Desperanza", "Checking"));
-        Assert.Equal("desperanza-narration-v6", NarrationContent.Default.ContentVersion);
+        Assert.Equal("desperanza-narration-v7", NarrationContent.Default.ContentVersion);
         Assert.Null(OnnxGenAiNarrativeGenerator.ValidateAmbient("I recovered legendary loot from a robot."));
         Assert.NotNull(OnnxGenAiNarrativeGenerator.ValidateAmbient("I consider paperwork a defective compass."));
     }

@@ -8,7 +8,8 @@ public sealed record ZoneConditionView(string Id, string Name, string Descriptio
 public sealed record DangerProfile(int MinimumExtractSeconds, double HazardChance, int HazardDamage,
     int RobotHealth, int RobotDamage, int RobotRounds, string RobotId, string RobotName, string RobotFlavor);
 public sealed record RaiderPersonality(int Greed, int Mood);
-public sealed record RaiderVoiceState(IReadOnlyDictionary<string, long> Counts, string? LastLine);
+public sealed record RaiderVoiceState(IReadOnlyDictionary<string, long> Counts, string? LastLine,
+    IReadOnlyDictionary<string, long>? LineUses = null, long QuoteCount = 0);
 public sealed record HazardWarningView(string Location, DateTimeOffset ResolvesAt, int RawDamage);
 
 public static class RaidConditions

@@ -16,13 +16,14 @@ public sealed class NarrationCompatibilityTests(ITestOutputHelper output)
         foreach (var (arm, fingerprint) in fingerprints)
             output.WriteLine($"{arm} ({BalanceExperimentRules.RulesVersion(arm)}): {fingerprint}");
 
-        Assert.Equal("4C3D0A00E28B25D579E8AE72D3EDC2422532088463BC3A87DB1BA3BF386FE4AC",
+        // DIARY VARIETY changes authored routing/selection only; gameplay has a separate matched gate.
+        Assert.Equal("5B1952FBA537B825876C72B31472E6BEC949287B171723F0D3114FAB44E523A4",
             fingerprints[BalanceExperimentArm.Arm3Baseline]);
-        Assert.Equal("6BCECA6CE60AC87DAE8EB5D53FDD3635C1104E0A27F8615AFBEE78CC53F70C87",
+        Assert.Equal("7DF539331C26D1DBD89BCB3C499AD7BFC4DB8C0C322641BDE842EAA6F24880CC",
             fingerprints[BalanceExperimentArm.Arm4A]);
-        Assert.Equal("6285BA484563A01061EFC86D38060166A8AADF646C991D57837858AC8C94F5F5",
+        Assert.Equal("5CC0D89687CD23C9868E213D1E5A84FE680BC31D648CE7C19E18CFE35CE756B9",
             fingerprints[BalanceExperimentArm.Arm4B]);
-        Assert.Equal("A26935F4A799EA192DC3999489C0A6161CF1D1011A1BEF564FDB160D0C8D6744",
+        Assert.Equal("30D651C3F659502A7FBD23177EB75CFA3ED8E761BD934E246E7F7AC0E234B1CE",
             fingerprints[BalanceExperimentArm.Arm5]);
         Assert.Equal(4, fingerprints.Values.Distinct(StringComparer.Ordinal).Count());
 

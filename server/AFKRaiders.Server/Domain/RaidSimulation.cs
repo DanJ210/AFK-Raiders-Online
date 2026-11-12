@@ -161,7 +161,7 @@ public sealed class RaidSimulation
     internal RaiderVoiceState VoiceState(string playerId)
     {
         var raider = raiders.Single(r => r.PlayerId == playerId);
-        return new(new Dictionary<string, long>(raider.VoiceCounts), raider.LastVoice);
+        return raider.NarrationMemory.Snapshot();
     }
     /// <summary>The Raider's equipped shield with its current (worn) durability.</summary>
     internal ShieldLoadout ShieldState(string playerId)
@@ -173,8 +173,7 @@ public sealed class RaidSimulation
     {
         if (state is null) return;
         var raider = raiders.Single(r => r.PlayerId == playerId);
-        foreach (var (key, count) in state.Counts) raider.VoiceCounts[key] = count;
-        raider.LastVoice = state.LastLine;
+        raider.NarrationMemory.Restore(state);
     }
     public int ParticipantCount => raiders.Count;
     public string RobotName => robot.Name;
@@ -1351,19 +1350,12 @@ public sealed class RaidSimulation
         IReadOnlyDictionary<string, string>? details = null;
         if (participant is not null)
         {
-            var key = RaiderCommsContent.PoolKey(kind, activity);
             var recipients = raiders.Where(r => participants.Contains(r.PlayerId)).ToArray();
-            var voiceIndex = recipients.Max(r => r.VoiceCounts.GetValueOrDefault(key));
             var primaryTrait = participants.Length == 1 ? participant.PrimaryTrait : null;
-            var voice = RaiderCommsContent.Line(kind, activity, voiceIndex, primaryTrait, rotate: true);
-            while (recipients.Any(r => r.LastVoice == voice))
-                voice = RaiderCommsContent.Line(kind, activity, ++voiceIndex, primaryTrait, rotate: true);
-            foreach (var recipient in recipients)
-            {
-                recipient.VoiceCounts[key] = voiceIndex + 1;
-                recipient.LastVoice = voice;
-            }
-            details = new Dictionary<string, string> { ["VoiceIndex"] = voiceIndex.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+            var voice = NarrationSelectionMemory.Select(
+                RaiderCommsContent.EligibleLines(kind, activity, primaryTrait),
+                recipients.Select(recipient => recipient.NarrationMemory).ToArray());
+            details = new Dictionary<string, string> { ["SelectedLine"] = voice };
         }
         var evt = new RaidEvent(sequence, at, kind, participants, location, activity, destination,
             durationSeconds, healthDelta, robotDamageDealt, robotDamageTaken, robotRemainingHealth,
@@ -1957,8 +1949,7 @@ public sealed class RaidSimulation
         public DateTimeOffset AdmittedAt { get; set; }
         public DateTimeOffset? NextDiaryAt { get; set; }
         public int DiaryBeat { get; set; }
-        public Dictionary<string, long> VoiceCounts { get; } = [];
-        public string? LastVoice { get; set; }
+        public NarrationSelectionMemory NarrationMemory { get; } = new();
         public int Aptitude { get; } = aptitude;
         public int Initiative { get; } = initiative;
         public Queue<string> Route { get; } = route;

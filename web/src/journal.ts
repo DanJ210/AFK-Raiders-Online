@@ -45,3 +45,29 @@ export function mergeJournal<T extends { sourceEventId: string; sequence: number
   for (const entry of incoming) entries.set(entry.sourceEventId, entry)
   return [...entries.values()].sort((a, b) => a.sequence - b.sequence)
 }
+
+export type DiaryTextEvent = { kind: string; text: string; factsText?: string | null; reason?: string | null }
+
+export function diaryPresentation(event: DiaryTextEvent): { main: string; record: string; changed: boolean } {
+  const marker = '\nRaider: '
+  const asideIndex = event.text.lastIndexOf(marker)
+  const facts = asideIndex < 0 ? event.text : event.text.slice(0, asideIndex)
+  const aside = asideIndex < 0 ? '' : event.text.slice(asideIndex)
+  let main = facts
+  if (event.kind === 'PersonalityChanged') {
+    const delta = facts.match(/^(.+): Greed -?\d+ -> -?\d+; Mood -?\d+ -> -?\d+; resilience -?\d+\.$/)
+    if (delta) main = `${delta[1]}.`
+  } else if (event.kind === 'ExtractionDecision') {
+    const decision = facts.match(/^(.+): .+ exit chance; (heading for extraction|staying for now)\. Greed -?\d+\.$/)
+    if (decision) main = `${decision[1]}: ${decision[2]}.`
+  } else if (event.kind === 'AreaDiary') {
+    main = facts.replace(/ No loot, damage or new actor created\.$/, '')
+      .replace(/ [^.]+ is also actually present here\.$/, '')
+  } else if (event.kind === 'Travel') {
+    main = facts.replace(/ ETA \d+s\./, '')
+  } else if (event.kind === 'AreaActivityStarted') {
+    main = facts.replace(/ \(\d+s\)/, '')
+  }
+  main += aside
+  return { main, record: event.text, changed: main !== event.text }
+}

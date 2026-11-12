@@ -415,4 +415,7 @@ th { color: var(--muted); }
 .comms-text, .thread-log-entry {
   white-space: pre-line;
 }
+.diary-entry-text { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.diary-event-details { margin-top: 4px; }
+.diary-event-details > summary { cursor: pointer; color: #a8b4cc; font-size: 12px; }
 .stats-panel { grid-column: 1 / -1; }

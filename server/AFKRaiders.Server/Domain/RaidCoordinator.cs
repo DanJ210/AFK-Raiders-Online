@@ -1575,7 +1575,10 @@ public sealed class RaidCoordinator
             while (handler.NextHubActivityAt is { } activityAt && activityAt <= at)
             {
                 var lines = Content.NarrationContent.Default.Pool("hub.activities");
-                var flavor = lines[handler.HubActivitySequence % lines.Count];
+                var memory = new Content.NarrationSelectionMemory();
+                if (handler.VoiceState is not null) memory.Restore(handler.VoiceState);
+                var flavor = Content.NarrationSelectionMemory.Select(lines, [memory]);
+                handler.VoiceState = memory.Snapshot();
                 handler.HubActivitySequence++;
                 handler.NextHubActivityAt = activityAt + HubActivityInterval;
                 AddJournalEntry(handler, null, activityAt, "HubActivity", "Hub", flavor,

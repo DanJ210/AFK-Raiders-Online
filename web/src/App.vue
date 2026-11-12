@@ -5,6 +5,7 @@ import { rarityAttributes, rarityName } from './rarity'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { HubConnectionBuilder, type HubConnection } from '@microsoft/signalr'
 import CollapsiblePanel from './components/CollapsiblePanel.vue'
+import DiaryEntryText from './components/DiaryEntryText.vue'
 import RaiderStatsPanel, { type RaiderStatsView } from './components/RaiderStatsPanel.vue'
 
 type PlayerView = {
@@ -1448,7 +1449,7 @@ onBeforeUnmount(() => {
                 </details>
                 <span v-if="event.raidId" class="raid-tag">#{{ event.raidId.slice(0, 6) }}</span>
               </div>
-              <p class="comms-text">{{ event.text }}</p>
+              <DiaryEntryText :event="event" />
               <p v-if="event.flavor" class="comms-text">Optional Raider aside [Generated]: {{ event.flavor }}</p>
             </li>
           </ol>
