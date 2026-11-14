@@ -2,7 +2,7 @@
 
 New here? Start with the documentation index: [START-HERE.md](START-HERE.md).
 
-Last updated: 2026-11-12
+Last updated: 2026-11-13
 
 ## Agent handoff checkpoint
 
@@ -10,27 +10,28 @@ This ledger is the source of truth for implementation progress across agents. Up
 
 | Field | Current value |
 |---|---|
-| Last verified step | DIARY VARIETY slice 1 Parts A/B (2026-11-12) and Part C draft-only document (2026-11-13): Parts A/B outcomes and client/selection checks remain as recorded below; Part C has 352 unique candidate lines and a line-by-line human review table, with documentation structure/link/acronym checks passed. Part C is not runtime approval. Repetition targets are not met for all traits. All earlier verified BAL-4/BAL-2/BAL-1S/BAL-1/BAL-0, COMMS/LOSS/ECON/LOOT/HUB/UI/C-series and bounded G/S work remains as recorded in the dated sections below; balance review is unchanged. |
-| Active implementation | None. DIARY VARIETY Part C drafting is complete; the document-only candidate set awaits human line review. |
+| Last verified step | DIARY VARIETY slice 1 Parts A/B (2026-11-12) and Part C2 draft-only revision (2026-11-13): 592 unique candidates, 24 truthful subfamilies, 96 trait sets; three shapes per set, 448 grounded lines, zero specified hedges, four false-optimism lines, 42 conservative office/record lines, stem maxima two/set and eight/trait. Embedded lexical checks and reported per-set counts verified; four existing presentation tests passed. New documentation links, pilot acronym and diff whitespace checks passed; the unrelated pre-existing ledger anchor issue remains recorded below. Human review and runtime repetition improvement are not approved or proven. All earlier verified BAL-4/BAL-2/BAL-1S/BAL-1/BAL-0, COMMS/LOSS/ECON/LOOT/HUB/UI/C-series and bounded G/S work remains as recorded in the dated sections below; balance review is unchanged. |
+| Active implementation | None. Part C2 draft revision and bounded verification are complete; no catalog/runtime, application code, gameplay, rules-version or fingerprint changes. Human approval remains pending. |
 | Decision authority (DIARY VARIETY, 2026-11-11) | Designer approves a content-only first slice: presentation and selection only, no new event types or gameplay changes. Experimental per-trait representative 8h targets: <=10% exact quotes repeat a previous-20 quote; second proposed target <=20% repeat a previous-50 quote. Pilot size: eight candidate lines per event family per trait, sized after Part A. Keep every mechanical number visible in a concise suffix or expandable detail; hide recurring no-effect/co-presence boilerplate from the main sentence, retaining it in the event record. All four traits require dedicated voices, with Cautious explicitly defined; event fit precedes trait colour. Offline AI drafting with human review is approved; live AI narration and Hub resident references are out of scope. Only narration compatibility fingerprints/content version may change, with explanations. The required Part B review gate was met by the designer's 2026-11-13 instruction “Proceed to Part C”; drafts remain unloaded pending line-by-line review. |
+| Decision authority (DIARY VARIETY C2, 2026-11-13) | Revise the draft only: split incompatible committed outcomes, use at least three shapes, at least 60% grounded concrete-noun lines, at most 15% hedge-word lines, at most one false-optimism line per eight in each set, content stems at most twice/set and eight/trait, and office/record metaphors at most 12% by content. Size high-volume PersonalityChanged at least 16/trait, medium pools eight and rare/unmeasured pools three to four with explicit audit limitations. Retain one human decision/note pair and named sub-family fit per candidate; document reproducible counts and uncovered repeat drivers. This task authorizes no catalog/runtime, code, gameplay, rules-version or fingerprint change. |
 | Decision authority (2026-11-06) | Designer decision: remove the categorical rule that AI cannot decide outcomes, direct systems, or act as agents; future AI participation, including AI-controlled Handlers or Raiders, is allowed subject to approved designs. Remove the offline/zero-cost/no-API-key constraint; cloud-hosted models and paid APIs are allowed. This is permission, not implementation approval. This supersedes the earlier “no AI outcome authority,” “deterministic utility policy,” and “AI voices but never decides” constraints, which remain in the dated ledger history only. Everything else in the frozen list remains unchanged, including trader-only Temptrest, once-per-raid weapon wear, ownership/allocation, once-only settlement, no PvP/theft, no saved opponents as live participants, extraction/KO/pocket semantics, and no Handler economy controls. |
 | Current implementation note (ECON-1/2) | The Raider economy still uses deterministic utility scoring. The superseded rule was that all future decisions must use that policy or that AI could never make decisions. |
 | Decisions still open (AI) | Specific AI roles, designs, model/provider, and deployment remain unselected; these are design choices, not blockers. The former AI-decision and offline/zero-cost constraints are no longer open project rules. |
-| Current phase | DIARY VARIETY Part C: human line review pending. Parts A/B are technically verified and the Part C draft is document-validated only; balance review remains separate and unchanged. Arm 3 remains the matched reference state; no BAL-3/ECON-3 authorization. |
+| Current phase | DIARY VARIETY Part C2: revised draft document-validated, human line review pending. Parts A/B remain technically verified; no draft line is loaded. Balance review remains separate and unchanged. Arm 3 remains the matched reference state; no BAL-3/ECON-3 authorization. |
 | Next proposed step | Review [DIARY_PILOT_LINES.md](DIARY_PILOT_LINES.md) line by line; record approve/edit/reject and reviewer notes in its review table. Do not load any line or begin further runtime work absent separate approval. BAL-4 decisions remain independent. |
 | Prerequisites satisfied | S1-S5 bounded slice, G1 Comms journal, G2 loot catalog & opportunity tables, G3 cumulative home stash & coins, AI-1 async AI spine with Post-Raid AAR debriefs, G4/AI-3 equipment, shop, repair, staging, item appraisal, G5/AI-4 survival lifecycle, secret pocket, Handler support & combat comms, ECON-1 autonomous preparation, HUB-3 residence, HUB-4 Ready Up and HUB-5 paced errands |
-| Next action | Human-review the 352-line draft in [DIARY_PILOT_LINES.md](DIARY_PILOT_LINES.md), confirming event eligibility, slots/facts, voice, tone/legal fit and approve/edit/reject status per line. Keep all draft lines unloaded unless separately approved for implementation. |
+| Next action | Human-review the revised 592-line draft in [DIARY_PILOT_LINES.md](DIARY_PILOT_LINES.md), confirming subfamily eligibility, committed slots/facts, voice, mode, tone/legal fit and approve/edit/reject status per line. Outcome-split frequencies, positive-charge-loss eligibility share and actual post-load repeat risk remain unmeasured. Keep all draft lines unloaded unless separately approved for implementation. |
 | Additional proposal (2026-11-07) | [World activity proposal](WORLD_ACTIVITY_PROPOSAL.md) drafted for designer review; **proposed, awaiting approval**. Documentation only. No implementation is active or authorized, and the current balance-review checkpoint is unchanged. |
 | Additional proposal (2026-11-08; decision 2026-11-11) | [Diary variety proposal](DIARY_VARIETY_PROPOSAL.md): slice 1 A/B authorized and technically verified; broader options remain proposals. Part C is gated on review and will be draft-only. No balance scope was expanded. |
 | Decision authority (BAL-4, 2026-11-04) | Designer decisions: (1) accept 25% overflow sell-back as standing experimental value; a no-cash sink is a possible later arm, not this task; (2) keep High robot HP/raw/rounds 45/18/4 and cap four; (3) mature High KO about 24-25% counts as in band even when the interval straddles the 25% floor; do not tune mature High risk and do not chase differences under ~2 percentage points; (4) [0,8) High KO 55-61% is unacceptable; test the Arm 5 early-High block; (5) run the Arm 4 jackpot re-check as one lever, in independent candidates 4A and 4B; (6) Medium stats, shields and Arm 3 kit gate stay unchanged except Arm 5's explicit age rule; Medium hazard work remains BAL-3; (7) each arm is a separate delta from Arm 3, not stacked. Frozen: trader-only Temptrest, once-per-raid weapon wear, deterministic ownership/allocation, once-only settlement, two shared defeat-reward slots/world, 12% single-weapon slot chance and weapon rules, no Handler economy controls, no PvP/theft, no AI outcome authority, and extraction/KO/pocket semantics. |
 | Decision authority | **2026-11-03: designer set the BAL-4 follow-up contract**: (1) KO targets use two experimental bands — mature play (settlement time 48h+): Low <=10%, Medium 15-25%, High 25-40%; onboarding (first 24h, softer): High <=45%, Medium <=30%, Low <=10%; a 20-30% High participant-fight defeat rate over 96h is the accepted provisional target. (2) Medical ranges stay Low 0-1, Medium 1-2, High 2-4 per raid in the mature window. (3) "Value order" means secured loot value per raid (High > Medium > Low) in the mature window, with a report-only guardrail that High mean net asset change must not stay negative in the mature window (report, do not tune to it yet). (4) Medium robot stats are not staged or retuned in BAL-4; Medium's hazard-driven early/late conflict is deferred to BAL-3; Medium stays 22/12/3. (5) Shields held (price 300, 60% curve, wear x1/x1.5/x2). (6) Keep the four-weapon cap and deterministic ranking. (7) Keep High reward weights 25/25/15/35 and re-measure after Arm 1 before judging them. (8) One lever per experiment arm; no bundling. Earlier: **2026-11-01: user approved the revised BAL-2 proposal**: experimental robot profiles, two shared defeat rewards replacing Depot loot, contribution-ranked round-robin allocation, existing extraction/pocket/KO semantics, removal of the Depot search delay/personality gain, preserved weapon inventory (caps and liquidation deferred to BAL-4), and the "best healing only" solo-High reading as a **balance aspiration** (lesser-loadout wins remain legal; no equipment gate or nonlethal floor). BAL-1/BAL-1S values, trader-only Temptrest, once-per-raid weapon wear, deterministic ownership/allocation and once-only settlement remain frozen. Earlier: 2026-10-17 user confirmed the autonomous Raider economy (Godville-style; Raider sells/buys/equips/repairs/departs; Handler acts only via Signal; deterministic utility policy; AI voices but never decides) as game direction, not an experiment. Exact numbers remain unvalidated balance. Prior HUB-3/HUB-4 choices remain as recorded below. Timing and Signal cost remain experimental; S6 remains design-only |
 | Decisions still open | BAL-4: select Arm 3 weights, 4A, or 4B (or defer the jackpot decision); decide whether Arm 5 replaces Arm 3's under-24h behavior; separately authorize or decline a combined 4B+5 confirmation. No combined arm is authorized. The no-cash sink remains a possible later arm. All balance remains experimental. Medium hazards remain deferred to BAL-3; Medium staging/shared-world clock and shield price/repair/wear changes remain deferred. See [BAL-4 arms](balance/BAL-4-arms.md) and the [BAL-4 proposal](balance/BAL-4-proposal.md). Shield display names remain placeholders; shield and Raider persistence is in-memory only. Robot damage is per round, per active Raider. BAL-1S values remain experimental; other open product decisions remain as recorded below. |
 | Known technical blockers | No known blocker. Balance acceptance choices remain unresolved; persistence/accounts and restart recovery remain prerequisites for external release. Do not restart a user-managed backend for verification |
-| Latest evidence | DIARY VARIETY (2026-11-12): 83/83 focused, 535/535 full server tests (Release, `DOTNET_PROCESSOR_COUNT=2`), 28/28 web tests/build, eight populated viewport/panel checks plus keyboard expansion; 24 matched trait/seed/horizon outcome fingerprints unchanged against `e1dfa85`. Full per-trait/kind/pool denominators, top ten quotes and per-stay Hub counts in [audit](DIARY_VARIETY_AUDIT.md). Diff/local Markdown path/raw-acronym checks passed; no tracked bin/obj. No new runtime lines, live-AI feature, backend restart, commit or push. Earlier balance evidence remains in [BAL-4 arms](balance/BAL-4-arms.md). |
+| Latest evidence | C2 (2026-11-13): [before/after and 96-set report](DIARY_PILOT_LINES.md#automated-review-checks), embedded standard-library procedure matched the executed checker and passed strict screening; all reported per-set numbers matched independently. Grounded 75.68%, hedge 0%, false optimism 0.68%, conservative office/record union 7.09%; maxima two/set and eight/trait. Four existing diary-presentation tests passed. Only two documentation files changed; no runtime load, code/version/fingerprint change, backend operation, commit or push. New links/acronym/diff checks passed; historical ledger anchor issue is unchanged. Prior A/B (2026-11-12): 83/83 focused, 535/535 full server tests (Release, `DOTNET_PROCESSOR_COUNT=2`), 28/28 web tests/build, eight populated viewport/panel checks plus keyboard expansion; 24 matched trait/seed/horizon outcome fingerprints unchanged against `e1dfa85`. Full denominators remain in [audit](DIARY_VARIETY_AUDIT.md); earlier balance evidence remains in [BAL-4 arms](balance/BAL-4-arms.md). |
 
 **Story-system proposal:** [STORY_SYSTEM_PROPOSAL.md](STORY_SYSTEM_PROPOSAL.md) — proposed, awaiting approval. No story-system implementation is active.
 
-### DIARY VARIETY slice 1 - Parts A/B/C (2026-11-13)
+### DIARY VARIETY slice 1 - Parts A/B/C/C2 (2026-11-13)
 
 - [x] **Part A - Measure/audit:** [utility](../tools/DiaryVarietyReadOnlyAnalysis/Program.cs)
   now reports independent seeds 101/202/303 per trait at 8h/24h, previous-20/50
@@ -77,9 +78,9 @@ This ledger is the source of truth for implementation progress across agents. Up
   eight existing regressions. Outcome comparisons canonicalize random starter
   IDs while preserving references and remove appended quotes from thread logs,
   not their committed mechanical receipts. No outcomes were retuned.
-- [x] **Part C - Draft-only pilot:** Designer authorized continuation with
+- [x] **Part C - Initial draft-only pilot (superseded by C2 below):** Designer authorized continuation with
   “Proceed to Part C” (2026-11-13). [DIARY_PILOT_LINES.md](DIARY_PILOT_LINES.md)
-  contains 352 unique candidates: eight lines for each of the 11 audit families
+  initially contained 352 unique candidates: eight lines for each of the 11 audit families
   and four traits, with family-specific committed fields/slots, common rarity,
   per-line fact checks, and an individual approve/edit/reject plus reviewer-note
   row for every line. Cautious voice follows
@@ -89,10 +90,38 @@ This ledger is the source of truth for implementation progress across agents. Up
   candidate/review table cells, pilot-local Markdown links, diff whitespace and
   raw `ARC` acronym checks passed. A whole-ledger link scan also found a
   pre-existing unrelated `#product-direction` anchor mismatch.
-- **Handoff:** active drafting complete, pending human line review. Documentation
+- **Initial Part C handoff:** drafting complete, pending human line review. Documentation
   checks only; no gameplay test rerun was applicable. No backend restart, commit
   or push. Part C is a proposal, not runtime approval; no combined BAL-4
   measurement is authorized.
+- [x] **Part C2 - Designer-requested draft revision (2026-11-13):** Draft-only
+  revision and verification complete. The [pilot](DIARY_PILOT_LINES.md) has
+  592 unique candidates in 24 outcome-specific subfamilies and 96 trait sets:
+  PC 16/trait, measured medium pools eight, rare/provisional pools four.
+  Part B retains the factual consequence before the aside; numeric personality
+  deltas and exit odds/Greed remain accessible in Event details. Revised asides
+  therefore add voice rather than repeat the receipt.
+  - **Before -> after:** one -> three shapes; explicit old literal grounding
+    lower bound 34/352 -> annotated committed grounding 448/592 (75.68%);
+    hedge hits 114 -> zero; false optimism 66 -> four; conservative office/record
+    union 61/352 -> 42/592 (7.09%). Stem maxima 3 -> 2/set and
+    B/C/G/H 12/12/14/12 -> 8/8/8/8. All sets meet the lexical thresholds.
+  - **Verification:** embedded Python procedure matched the executed checker;
+    strict checks passed and all 96 reported set counters matched independently.
+    Mode recount, readable office inventory, blank review cells, unique IDs/text,
+    committed slot/shape and author fit/lore checks completed. Four selected
+    existing [presentation tests](../web/tests/journal.test.mjs) passed.
+    Pilot/local new links, undotted acronym and `git diff --check` passed.
+    The pre-existing unrelated ledger anchor mismatch remains unchanged.
+  - **Limitations/handoff:** author fit and lexical screens are not designer
+    approval. Search/extraction outcome splits and positive-charge eligibility
+    are unmeasured; zero observations do not establish rarity. Pool spacing is
+    a drafting hypothesis, not an achieved runtime repeat rate. Uncovered area,
+    activity and fallback repeat drivers are recorded in the pilot.
+    Next action is human approve/edit/reject plus one reviewer note per line.
+    No catalog/runtime, application code, gameplay, rules-version or fingerprint
+    changes; no backend operation, commit or push. No broader milestone or
+    balance approval is implied.
 
 ### BAL-4 independent follow-up arms 4A, 4B and 5 (2026-11-04)
 
