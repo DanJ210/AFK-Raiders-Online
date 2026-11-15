@@ -2,7 +2,7 @@
 
 New here? Start with the documentation index: [START-HERE.md](START-HERE.md).
 
-Last updated: 2026-11-14
+Last updated: 2026-11-15
 
 ## Agent handoff checkpoint
 
@@ -11,24 +11,178 @@ This ledger is the source of truth for implementation progress across agents. Up
 | Field | Current value |
 |---|---|
 | Last verified step | DIARY VARIETY Part C3 draft-only revision (2026-11-14): 624 unique candidates, 25 subfamilies, 100 trait sets; all 64 PersonalityChanged lines rewritten, 32 ActivityInterrupted lines added, seven keep rows unchanged, 152 ordered review-priority IDs. Comparable strict grounding 358/592 -> 519/624 (60.47% -> 83.17%); sets below 60% 44/96 -> 0/100. C3 synonym, opener, mode, hedge and trait-office screens pass; legacy ordinary-stem and per-set office screens remain explicitly unresolved, not passed. C2's 448 grounding annotation count is superseded, not strict evidence. Parts A/B and all earlier verified BAL/COMMS/LOSS/ECON/LOOT/HUB/UI/C/G/S work remain unchanged. Human approval and runtime repetition improvement are not established. |
-| Active implementation | None. C3 draft revision and document validation are complete; human review and legacy drafting-screen decisions remain pending. No catalog/runtime, code, gameplay, rules-version or fingerprint changes. Only pilot and ledger are authorized for this task's commit/push. |
+| Active implementation | **DIARY VARIETY Part C4 in progress (2026-11-15):** draft-only edits in [pilot](DIARY_PILOT_LINES.md) and this ledger. At start C3 was verified, no other agent session was active in this workspace, and the worktree was clean. Six hundred twenty-three candidate rows differ from C3, including fact-check cell edits; the per-set office screen is retired by designer decision. A 152-line review queue has been reselected and dependency-marked. Full event-specific and lore-gate audits, rewrites and the acceptance checker remain incomplete. Do not load, commit, or push this partial revision as completed C4. No catalog/runtime, code, gameplay, rules-version or fingerprint changes. |
 | Decision authority (DIARY VARIETY, 2026-11-11) | Designer approves a content-only first slice: presentation and selection only, no new event types or gameplay changes. Experimental per-trait representative 8h targets: <=10% exact quotes repeat a previous-20 quote; second proposed target <=20% repeat a previous-50 quote. Pilot size: eight candidate lines per event family per trait, sized after Part A. Keep every mechanical number visible in a concise suffix or expandable detail; hide recurring no-effect/co-presence boilerplate from the main sentence, retaining it in the event record. All four traits require dedicated voices, with Cautious explicitly defined; event fit precedes trait colour. Offline AI drafting with human review is approved; live AI narration and Hub resident references are out of scope. Only narration compatibility fingerprints/content version may change, with explanations. The required Part B review gate was met by the designer's 2026-11-13 instruction “Proceed to Part C”; drafts remain unloaded pending line-by-line review. |
 | Decision authority (DIARY VARIETY C2, 2026-11-13) | Revise the draft only: split incompatible committed outcomes, use at least three shapes, at least 60% grounded concrete-noun lines, at most 15% hedge-word lines, at most one false-optimism line per eight in each set, content stems at most twice/set and eight/trait, and office/record metaphors at most 12% by content. Size high-volume PersonalityChanged at least 16/trait, medium pools eight and rare/unmeasured pools three to four with explicit audit limitations. Retain one human decision/note pair and named sub-family fit per candidate; document reproducible counts and uncovered repeat drivers. This task authorizes no catalog/runtime, code, gameplay, rules-version or fingerprint change. |
 | Decision authority (DIARY VARIETY C3, 2026-11-14) | Draft-only revision: location alone is not concrete; physical objects, fact-supported canon names and actually used committed non-location slots qualify. Target at least 60% strict grounding; rewrite PersonalityChanged and screen change synonyms together (at most three per trait/family set). My and I openers each at most 12% per trait; each of six actual modes 6%-22% per trait; office/record at most 12%. Preserve named strongest lines, add ActivityInterrupted, prioritize about 150 lines for human review and report all before/after set checks. Commit/push only pilot and ledger to main after documentation validation. No loading or runtime authorization. |
 | Decision authority (2026-11-06) | Designer decision: remove the categorical rule that AI cannot decide outcomes, direct systems, or act as agents; future AI participation, including AI-controlled Handlers or Raiders, is allowed subject to approved designs. Remove the offline/zero-cost/no-API-key constraint; cloud-hosted models and paid APIs are allowed. This is permission, not implementation approval. This supersedes the earlier “no AI outcome authority,” “deterministic utility policy,” and “AI voices but never decides” constraints, which remain in the dated ledger history only. Everything else in the frozen list remains unchanged, including trader-only Temptrest, once-per-raid weapon wear, ownership/allocation, once-only settlement, no PvP/theft, no saved opponents as live participants, extraction/KO/pocket semantics, and no Handler economy controls. |
 | Current implementation note (ECON-1/2) | The Raider economy still uses deterministic utility scoring. The superseded rule was that all future decisions must use that policy or that AI could never make decisions. |
 | Decisions still open (AI) | Specific AI roles, designs, model/provider, and deployment remain unselected; these are design choices, not blockers. The former AI-decision and offline/zero-cost constraints are no longer open project rules. |
-| Current phase | DIARY VARIETY Part C3: revised draft checked against C3 screens; review-first batch and legacy-screen conflicts await designer review. Parts A/B remain technically verified; no draft line is loaded. Balance review is separate and unchanged; no BAL-3/ECON-3 authorization. |
-| Next proposed step | Review the 152 IDs marked REVIEW THESE FIRST in [DIARY_PILOT_LINES.md](DIARY_PILOT_LINES.md), then backlog. Record approve/edit/reject and notes; resolve ordinary repetition and per-set office screens before a separately authorized load. BAL-4 decisions remain independent. |
+| Current phase | DIARY VARIETY Part C4: partial draft edits only; C4 acceptance and designer review remain pending. Parts A/B remain technically verified; no draft line is loaded. Balance review is separate and unchanged; no BAL-3/ECON-3 authorization. |
+| Next proposed step | Finish C4's per-line event-specific rewrite and evidence, committed lore-gate coverage, reproducible before/after checks and reselected review batch in [DIARY_PILOT_LINES.md](DIARY_PILOT_LINES.md). Then human-review; any load requires separate authorization. BAL-4 decisions remain independent. |
 | Prerequisites satisfied | S1-S5 bounded slice, G1 Comms journal, G2 loot catalog & opportunity tables, G3 cumulative home stash & coins, AI-1 async AI spine with Post-Raid AAR debriefs, G4/AI-3 equipment, shop, repair, staging, item appraisal, G5/AI-4 survival lifecycle, secret pocket, Handler support & combat comms, ECON-1 autonomous preparation, HUB-3 residence, HUB-4 Ready Up and HUB-5 paced errands |
-| Next action | Human-review the 152-line first proposed batch in [DIARY_PILOT_LINES.md](DIARY_PILOT_LINES.md), including keep jokes and repeat-heavy interruption candidates; 472 IDs remain backlog. Confirm actual event/recipient facts, sign and lore gates, voice, mode and tone. Slot extraction is unimplemented; outcome splits and post-load repeat risk remain unmeasured. Keep all lines unloaded. |
+| Next action | Continue C4 by reviewing all 624 rows for event fit and voice: remove repeated appetite/personification and props, address or explicitly plan the retained stem failures, substantiate strict grounding without counting directions or unrelated props, and resolve empty-search reachability. Downed and KnockedOut source variants depend on extraction from the exact receipt's Reason, whose knockout form may be a whole sentence. Finish meaningful per-line event-specific checks and committed lore/brand gates. Complete a same-definition C3/C4 semantic comparison alongside the embedded lexical probes; meet all requested caps and report retained screens. Recheck the 152-ID review queue and its dependency markers after the full triage. Re-run documentation links, raw acronym and whitespace checks, then commit and push only these two files if C4 is actually complete. Keep all lines unloaded. |
 | Additional proposal (2026-11-07) | [World activity proposal](WORLD_ACTIVITY_PROPOSAL.md) drafted for designer review; **proposed, awaiting approval**. Documentation only. No implementation is active or authorized, and the current balance-review checkpoint is unchanged. |
 | Additional proposal (2026-11-08; decision 2026-11-11) | [Diary variety proposal](DIARY_VARIETY_PROPOSAL.md): slice 1 A/B authorized and technically verified; broader options remain proposals. Part C is gated on review and will be draft-only. No balance scope was expanded. |
 | Decision authority (BAL-4, 2026-11-04) | Designer decisions: (1) accept 25% overflow sell-back as standing experimental value; a no-cash sink is a possible later arm, not this task; (2) keep High robot HP/raw/rounds 45/18/4 and cap four; (3) mature High KO about 24-25% counts as in band even when the interval straddles the 25% floor; do not tune mature High risk and do not chase differences under ~2 percentage points; (4) [0,8) High KO 55-61% is unacceptable; test the Arm 5 early-High block; (5) run the Arm 4 jackpot re-check as one lever, in independent candidates 4A and 4B; (6) Medium stats, shields and Arm 3 kit gate stay unchanged except Arm 5's explicit age rule; Medium hazard work remains BAL-3; (7) each arm is a separate delta from Arm 3, not stacked. Frozen: trader-only Temptrest, once-per-raid weapon wear, deterministic ownership/allocation, once-only settlement, two shared defeat-reward slots/world, 12% single-weapon slot chance and weapon rules, no Handler economy controls, no PvP/theft, no AI outcome authority, and extraction/KO/pocket semantics. |
 | Decision authority | **2026-11-03: designer set the BAL-4 follow-up contract**: (1) KO targets use two experimental bands — mature play (settlement time 48h+): Low <=10%, Medium 15-25%, High 25-40%; onboarding (first 24h, softer): High <=45%, Medium <=30%, Low <=10%; a 20-30% High participant-fight defeat rate over 96h is the accepted provisional target. (2) Medical ranges stay Low 0-1, Medium 1-2, High 2-4 per raid in the mature window. (3) "Value order" means secured loot value per raid (High > Medium > Low) in the mature window, with a report-only guardrail that High mean net asset change must not stay negative in the mature window (report, do not tune to it yet). (4) Medium robot stats are not staged or retuned in BAL-4; Medium's hazard-driven early/late conflict is deferred to BAL-3; Medium stays 22/12/3. (5) Shields held (price 300, 60% curve, wear x1/x1.5/x2). (6) Keep the four-weapon cap and deterministic ranking. (7) Keep High reward weights 25/25/15/35 and re-measure after Arm 1 before judging them. (8) One lever per experiment arm; no bundling. Earlier: **2026-11-01: user approved the revised BAL-2 proposal**: experimental robot profiles, two shared defeat rewards replacing Depot loot, contribution-ranked round-robin allocation, existing extraction/pocket/KO semantics, removal of the Depot search delay/personality gain, preserved weapon inventory (caps and liquidation deferred to BAL-4), and the "best healing only" solo-High reading as a **balance aspiration** (lesser-loadout wins remain legal; no equipment gate or nonlethal floor). BAL-1/BAL-1S values, trader-only Temptrest, once-per-raid weapon wear, deterministic ownership/allocation and once-only settlement remain frozen. Earlier: 2026-10-17 user confirmed the autonomous Raider economy (Godville-style; Raider sells/buys/equips/repairs/departs; Handler acts only via Signal; deterministic utility policy; AI voices but never decides) as game direction, not an experiment. Exact numbers remain unvalidated balance. Prior HUB-3/HUB-4 choices remain as recorded below. Timing and Signal cost remain experimental; S6 remains design-only |
 | Decisions still open | BAL-4: select Arm 3 weights, 4A, or 4B (or defer the jackpot decision); decide whether Arm 5 replaces Arm 3's under-24h behavior; separately authorize or decline a combined 4B+5 confirmation. No combined arm is authorized. The no-cash sink remains a possible later arm. All balance remains experimental. Medium hazards remain deferred to BAL-3; Medium staging/shared-world clock and shield price/repair/wear changes remain deferred. See [BAL-4 arms](balance/BAL-4-arms.md) and the [BAL-4 proposal](balance/BAL-4-proposal.md). Shield display names remain placeholders; shield and Raider persistence is in-memory only. Robot damage is per round, per active Raider. BAL-1S values remain experimental; other open product decisions remain as recorded below. |
 | Known technical blockers | No known blocker. Balance acceptance choices remain unresolved; persistence/accounts and restart recovery remain prerequisites for external release. Do not restart a user-managed backend for verification |
-| Latest evidence | C3 (2026-11-14): [strict before/after and 100-set report](DIARY_PILOT_LINES.md#automated-review-checks); embedded stdlib checker passes C3, with legacy screens separately reported. Strict concrete 83.17%, hedge 0.64%, office union 7.69%; every trait's six modes 6.41%-21.79%. Whole-word My/I 6.89%/6.57%; contraction-inclusive I 8.65%. PC change-synonym lines 54/64 -> 1/64. Documentation-only verification; no application build or backend operation. Historical ledger anchor mismatch remains excluded from new-link acceptance. Prior A/B verification and gameplay fingerprints remain unchanged; see [audit](DIARY_VARIETY_AUDIT.md) and [BAL-4 arms](balance/BAL-4-arms.md). |
+| Latest evidence | C3 (2026-11-14): [strict before/after and 100-set report](DIARY_PILOT_LINES.md#automated-review-checks); embedded stdlib checker passes C3, with legacy screens separately reported. Strict concrete 83.17%, hedge 0.64%, office union 7.69%; every trait's six modes 6.41%-21.79%. Whole-word My/I 6.89%/6.57%; contraction-inclusive I 8.65%. PC change-synonym lines 54/64 -> 1/64. Documentation-only verification; no application build or backend operation. The historical ledger anchor mismatch was excluded from C3 acceptance and corrected during C4. Prior A/B verification and gameplay fingerprints remain unchanged; see [audit](DIARY_VARIETY_AUDIT.md) and [BAL-4 arms](balance/BAL-4-arms.md). |
+
+**C4 latest recount (2026-11-15):** Compared candidate rows by ID with
+`2123251b75b9a2e02e40b97964cfefdbbe6af202`: 624 retained and 623 changed,
+156/155/156/156 by Brawler/Cautious/Gadgeteer/Hoarder. This counts any
+cell, including explanatory checks, not just candidate wording. The [interim
+table](DIARY_PILOT_LINES.md) records before/after pattern and opener counts.
+All five specified lexical pattern counts and My/I openers are within their
+per-trait ceilings, but the complete hope family remains unaudited. An
+all-token prop-word screen now normalizes possessives and common plurals and
+finds no individual prop or material above four per trait; ambiguous semantic
+classifications still need review. Appetite appears in 8/5/7/5 candidate texts;
+its voice and repetition still need substantive review.
+The broader hope-family keyword screen is 54/624 -> 14/624 (2.24%); it
+includes some non-hope uses and does not prove all implicit forms were found.
+Office keyword/flag union is 17/18/18/18 before completion of the manual metaphor audit.
+Labeled modes and shapes meet the numeric targets, but actual modes, grounding
+and event-specificity have not been adjudicated. These lexical counts are not
+C4 acceptance evidence. The historical checker reports 75 retained
+ordinary-stem screens (71 per-set and four per-trait), plus 48 retired
+per-set office screens. Its C3 per-set three-stem, hedge, shape and opener
+checks currently report no failures; its old concrete classification does
+not recognize the new opportunity slot and is not valid for C4. All 14
+designer-designated keep texts and modes match C3.
+
+Named empty-search variants depend on an exact committed completion-text
+prefix and an empty award; `SearchCompleted` appends award text and another
+period, so the prefix is not the whole original message. Empty-award selection
+is unimplemented, and missing private allocation messages do not prove an
+empty shared award. Normal resolution appears to allocate positive draws
+whenever a participant is present, so reachability is unverified and likely absent.
+Do not count them as reachable lore coverage without evidence. Downed source
+variants require that exact event's damage-source Reason; knockout Reason can
+instead contain an entire deadline sentence. Both extraction and selection are
+unimplemented, as are PersonalityChanged sign gates.
+
+The SX candidates now include event-bound `OpportunityId` and exact-ID
+locker/crate variants; their extraction and selectors are unimplemented.
+RX lines require the escape-after-rounds original text: the same
+`RobotEscaped` kind can describe overrunning all fighters or no remaining
+fighters without reporting a departure. The text gate is unimplemented.
+Robot-defeat cargo asides now refer to the cargo resolution following defeat,
+not cargo owned by the robot. Six RX candidates were further rewritten to
+express their assigned gear, confidence or bureaucracy mode without assuming
+an inspection or destination. Re-audit all three changes for event truth, grounding, actual
+mode and the individual-prop limit. Three Hoarder cargo lines were also revised
+to express their labeled modes while still fitting both cargo outcomes.
+Arrival, admission, downed, deadline and empty-pocket candidates were further
+revised toward event-related anchors. A reproducible lexical probe now finds
+478/624 such candidate anchors across all 100 trait/subfamily sets; this is
+not yet a semantic grounding or event-specificity acceptance result. A further
+voice pass reduced whole-word Gadgeteer theory/theories from 26 to four lines,
+matching C3's four; it also strengthened several slotless event references.
+
+Recent editorial passes strengthened selected search-award and robot-defeat
+lines so the asides themselves refer to their committed outcomes, clarified
+several packing and recovery lines, and revised some mislabeled optimism and
+gear-obsession candidates. The [pattern probe](DIARY_PILOT_LINES.md#diary-variety-candidate-asides-for-human-review)
+now reproduces the lexical before/after counts, including both `trophy` and
+`trophies`; it does not replace semantic adjudication. The Cautious,
+Gadgeteer and Hoarder office keyword/flag unions are each exactly at their
+18-line limit. Avoid adding another matching line to those groups; initial My
+for Gadgeteer is 17 and initial I for Cautious is 16.
+
+The latest survival and arrival pass found additional interchangeable protected
+lines and strengthened several unprotected shield, damage and resilience
+asides. A broader office-metaphor search prompted further wording changes and
+one added office flag; its remaining ambiguous results still need judgment.
+The [all-word prop probe](DIARY_PILOT_LINES.md#diary-variety-candidate-asides-for-human-review)
+was rerun, including `trophies`, possessives and common plural forms.
+An independent partial semantic baseline audit examined C3 AI, PC, HW, HI and
+HS: event-specific 75 pass, 100 fail and 449 unknown; event-related concrete
+86 pass, 90 fail and 448 unknown. Those are provisional adjudications, not a
+baseline pass rate. The other 20 subfamilies and the comparable full C4 audit
+remain open; examples and trait totals are recorded in the pilot.
+Further recovery, downed, knockout and deadline rewrites explicitly identify
+their event; their actual modes and complete semantic grounding still need
+review. Resume with the other 20 C3 subfamilies, then independently adjudicate
+all C4 rows and reconcile the twelve protected failures before claiming rates.
+
+The 32 ActivityInterrupted rows received a further event/voice and mode pass,
+but that is not a full semantic C4 audit. The expanded 152-ID review queue
+identifies slot and selector dependencies, including PC sign gates on
+slotless lines, and flags unverified empty-search gates. Protected RS-C-06,
+EL-G-03, EL-B-03, SH-C-06, EL-C-03, EL-G-06, RS-H-03, RS-G-06, RS-H-05,
+SI-G-04, SH-B-03 and SH-B-06 fail the new event-specific screen as standalone
+asides, but cannot be rewritten without violating the designer's explicit
+keep instruction; the conflict remains open and those twelve are marked
+ineligible for selection. The
+empty-search named examples remain excluded from the declared lore-gate count
+until their reachability is established.
+
+Latest partial documentation checks: 367 relative Markdown links and fragments
+resolved, both embedded pattern and anchor probes ran, all 14 protected texts
+and modes matched C3, and `git diff --check` passed before this ledger update.
+A direct search found the pre-existing raw undotted acronym in this ledger's
+historical C3 verification; the validation helper's zero-match claim was
+incorrect. A corrected diff scan found no added standalone occurrence. Only the two
+authorized documentation files were modified. These checks do not establish
+editorial acceptance; repeat them after the unfinished work.
+
+**Earlier C4 partial handoff (2026-11-15; counts superseded above):** Changed
+[DIARY_PILOT_LINES.md](DIARY_PILOT_LINES.md) and
+[IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md) only. Changed
+candidates: 143 Brawler, 137 Cautious, 142 Gadgeteer and 143 Hoarder.
+The PC generic outlook/temperament rewrites and the new packing and arrival
+imagery remain repetitive and require further editing and semantic review.
+Packing starts for every participant, including empty backpacks; its completion
+does not prove contents or extraction. An unsafe draft assuming cargo was
+discarded and the 64 packing rows were rewritten with that constraint.
+SN now explicitly requires SearchCompleted: empty EncounterResolved still
+needs separate candidates or existing narration, rather than passing a search
+joke as an encounter. The exact medical-supply reason variants in PC
+require the same recipient's committed reason and Mood increase; their
+selector and sign extraction are not implemented. All 14 designer-designated
+keep texts and modes remain unchanged. The prior 91 legacy failures comprised
+37 retired per-set office failures and 54 ordinary-stem failures; the latter
+require a fresh recount, not an assumed pass.
+
+Preliminary lexical counts on 624 lines, C3 -> current: A/An openers 174 ->
+34; whole-word would/hypothetical/imaginary 137 -> 14;
+crown/trophy/medal/diamond/jewel/velvet/gold prefixes 77 -> 2;
+curtain/drum/trumpet/brass/fanfare/ovation/fireworks/gong/megaphone/whistle
+prefixes 45 -> 2; `At {location},` 111 -> 11;
+`here's hoping`/`with luck` 37 -> 0. The stricter stem grouping gives 79,
+not the designer's 77, for the earlier preliminary first prop-family count;
+the current counts above use case-insensitive word-prefix matches consistently
+on both revisions. Per trait B/C/G/H the five current counts are
+6/10/9/9, 2/6/3/3, 1/0/1/0, 1/0/0/1, and 3/1/2/5;
+the 8% cap is 12 per trait. These counts do not establish the broader
+hope-family total, single-prop caps or event fit. Current My openers are
+31/23/31/25 and contraction-inclusive I openers are 12/21/10/14; each has
+a cap of 18 per trait. Annotated office counts are 15/16/15/20, before the
+required keyword-plus-manual union audit. Current mode labels also breach the
+6%-22% trait targets, so relabeling alone cannot establish compliance. Shape
+counts J/M/O are 63/49/44, 62/51/43, 60/52/44 and 59/53/44 respectively;
+all 100 sets contain each shape, but grammar and actual mode still require
+review.
+Completed checks so far: 624 unique IDs retained, all 14 designated keep
+texts and modes unchanged, `git diff --check` passed, and no raw undotted
+acronym was added. The full ledger contains one historical raw-acronym
+reference predating C4; the historical brief link's missing fragment was
+corrected to the existing numbered heading. A subsequent local-link check
+found 365 links and no broken targets. Pending:
+all semantic and per-set C4 counts, gate/recipient verification, full link
+check, final whitespace check, commit and push. The historical C3 checker
+does not implement the new grounding rule and must not be used to claim C4
+success. An informational run against the partial work reported many C3
+failures, including repeated stems, several concrete-set counts, trait mode
+shares and trait opener shares; its C3 concrete classification is not valid
+for C4. The retained ordinary-stem screen then had 71 per-set plus four
+per-trait failures, before subsequent edits; those need a fresh count and a
+plan rather than being hidden by the replacement checker. Its legacy output
+still includes the now-retired per-set office screen and is not the final C4
+failure count.
 
 **Story-system proposal:** [STORY_SYSTEM_PROPOSAL.md](STORY_SYSTEM_PROPOSAL.md) — proposed, awaiting approval. No story-system implementation is active.
 
@@ -642,7 +796,7 @@ The rebuild's product target is a persistent Desperanza home hub, autonomous rep
 - **Prerequisites:** S5 Development-only autonomous admission/home loop and G6 risk/reward simulation are implemented. This change must preserve actual-player-only participation, independent extraction, finite loot ownership, no-Handler progress, and exactly-once settlement.
 - **Operational assumptions:** The 60 seconds applies to the initial Hub-to-surface deployment leg, not every in-zone path. Vehicle arrival is 60 seconds after the Raider reaches/calls extraction; a Handler may confirm departure then, otherwise the Raider autonomously departs at the end of the 30-second window. Thus the vehicle phase is 60-90 seconds and never waits indefinitely for a Handler. The existing connected route to the extraction platform remains in place, so travel to that platform is additional. These are experimental timing rules, not validated balance.
 - **Unresolved decisions:** None for this bounded implementation. Population, public matching, durable accounts, recovery, and broader Handler controls remain out of scope.
-- **Implemented files:** [RaidSimulation.cs](../server/AFKRaiders.Server/Domain/RaidSimulation.cs) owns the 60-second initial pod trip, 60-second vehicle arrival, 30-second Handler boarding window with autonomous departure, and extraction reserve including the decision interval. Shared-search close times remain scheduled even after all participants interrupt, preventing a late Raider from joining an expired opportunity. [RaidCoordinator.cs](../server/AFKRaiders.Server/Domain/RaidCoordinator.cs) validates the explicit departure action. [App.vue](../web/src/App.vue), [NarrationContracts.cs](../server/AFKRaiders.Server/Content/NarrationContracts.cs), and [narration-catalog.json](../server/AFKRaiders.Server/Content/narration-catalog.json) expose the updated controls and truthful travel/extraction narration. [README](../README.md#current-implementation-desperanza-duty-and-shared-autonomous-raids) and the [G6 brief](MULTIPLAYER_REBUILD_BRIEF.md#product-direction) record the experimental behavior.
+- **Implemented files:** [RaidSimulation.cs](../server/AFKRaiders.Server/Domain/RaidSimulation.cs) owns the 60-second initial pod trip, 60-second vehicle arrival, 30-second Handler boarding window with autonomous departure, and extraction reserve including the decision interval. Shared-search close times remain scheduled even after all participants interrupt, preventing a late Raider from joining an expired opportunity. [RaidCoordinator.cs](../server/AFKRaiders.Server/Domain/RaidCoordinator.cs) validates the explicit departure action. [App.vue](../web/src/App.vue), [NarrationContracts.cs](../server/AFKRaiders.Server/Content/NarrationContracts.cs), and [narration-catalog.json](../server/AFKRaiders.Server/Content/narration-catalog.json) expose the updated controls and truthful travel/extraction narration. [README](../README.md#current-implementation-desperanza-duty-and-shared-autonomous-raids) and the [G6 brief](MULTIPLAYER_REBUILD_BRIEF.md#1-product-direction) record the experimental behavior.
 - **Verification (2026-10-15):** `dotnet test tests\AFKRaiders.Server.Tests\AFKRaiders.Server.Tests.csproj --no-restore -p:BaseOutputPath=artifacts\hub1\bin\` passed **293/293**. The isolated output path avoids the still-running server's locked build outputs. `npm run build` from `web` passed (vue-tsc + Vite). The frozen first-raid cohort, urgency/fallibility, and eight-hour recurring cohort tests all passed with the existing acceptance bounds; the narration fingerprint pins the new deterministic behavior.
 - **Acceptance:** [x] 60-second pod trip; [x] four-sided train/service-elevator arrival and up-to-90-second vehicle phase; [x] Handler departure action plus autonomous fallback; [x] no-Handler progress and independent settlement; [x] expired shared searches resolve after early interruption; [x] existing G6 timing thresholds and missed-deadline fallibility retained; [x] server suite and frontend build.
 - **Limitations/next action:** Timings remain experimental and the extraction-platform route is additional. High-risk outcomes remain severe/unvalidated; human comedy/pacing review is still required. The running Development server must be restarted manually to load this version. HUB-1 is complete, not a broader milestone.
