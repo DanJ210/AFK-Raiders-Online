@@ -1,16 +1,149 @@
 # DIARY VARIETY: candidate asides for human review
 
-**C4 draft: 624 candidates in 25 subfamilies; human review pending.**
+**C5 draft: 624 candidates in 25 subfamilies; human review pending.**
 No candidate is approved, catalogued, or loaded.
 
-**C4 drafting checkpoint:** the designer's generic-line and screen rulings are
+## C5 polish and factual review
+
+C5 changes 107 candidate texts, preserves the 14 KEEP texts and modes, and
+leaves every decision and reviewer note blank. The 12 generic-by-design lines
+remain unchanged and subject to their existing gates. **Human review is
+pending for all 624 lines.**
+
+| Screen | C4 | C5 |
+|---|---:|---:|
+| Lines ending in colon + slot + punctuation | 54/624 (8.65%) | 22/624 (3.53%; limit 24) |
+| `appetite` by B/C/G/H | 8/5/7/8 | 0/0/0/2 |
+| Lines containing `exit` or `route` by B/C/G/H | 12/14/14/13 | 11/14/14/13 (each <= 23/156) |
+| `After that/the ... , my ...` frame | 6 | 0 |
+| Three-word opening-frame groups above three | 13; largest 6 | 0; largest 3 |
+| Cross-trait vocabulary flags | 31 | 0 |
+
+These are reproducible lexical screens, not a proof that every semantic
+sentence frame is distinct. A human must still review rephrased or synonymous
+frames, voice, factual fit and comedy. The retained per-set and per-trait stem
+ceilings, shapes and trait office keyword/flag ceilings were also rechecked;
+the office metaphor and actual-mode judgments still need a human.
+
+**Factual audit:** searched the text of all 624 candidates for contest,
+competition, wounds/injury, find/found, share, fights/victory, inspection,
+repair, acquisition and award/action terms against their row gates. Changed
+RV-B-01 through RV-B-04, RV-C-01 through RV-C-04, RV-G-01, RV-G-02,
+RV-G-04 and RV-H-01 through RV-H-04 to remove an uncommitted contest;
+RV-G-03 did not assert one. RC-C-03 no longer asserts a lack of allocation;
+SX-C-01 no longer asserts an arrival; SI-H-05 describes an award and requires
+the speaker's visible receipt. SI-C-07 no longer implies an inspection;
+HW-G-04 and HI-G-06 no longer imply an interrupted earlier daydream. Item-slot
+rows always require the actual speaker to be the committed recipient, even
+when their individual historical fact note does not repeat that global gate.
+Figurative fights, imagined objects and negative claims require human review;
+this lexical search is not proof that no unsupported implication remains.
+
+**Unclear lines revised:** AI-B-03 (ambiguous argument), AI-B-08 (vague pause),
+AI-C-03 (flat boast), AI-G-08 (unclear improvement), PC-B-15 (generic outlook),
+AD-B-02 (unmotivated bootlace argument), AD-G-02 (flat checklist), and PF-H-06
+(unclear consultation). The eleven designer-identified voice leaks were also
+rewritten; the probe reports any additional cross-trait term, not just those
+eleven IDs. Other text changes address the recorded repetition screens or
+preserve the retained stem and opener limits.
+
+### C5 lexical checks
+
+Run this standard-library probe from the repository root with the C4 commit
+available. Trait-word flags are conservative: inflections are matched and a
+match needs contextual review. The prefix screen treats the first three words
+after replacing slots with `slot` as a deliberately broad frame; it cannot
+detect every paraphrase. Slot ID lists are the grammar-dependent row markers.
+
+```python c5-checker
+import collections, pathlib, re, subprocess
+
+path = pathlib.Path(r"docs\DIARY_PILOT_LINES.md")
+before = subprocess.check_output(
+    ["git", "show", "00894ad03f12e760b86ddcf2372e5eccbb2f98b0:docs/DIARY_PILOT_LINES.md"],
+    encoding="utf-8")
+after = path.read_text(encoding="utf-8")
+
+def parse(text):
+    rows = []
+    for line in text.splitlines():
+        parts = [p.strip() for p in line.strip().strip("|").split("|")]
+        if len(parts) == 10 and re.fullmatch(r"[A-Z]{2}-[BCGH]-\d{2}", parts[0]):
+            rows.append(dict(zip(("id", "mode", "shape", "slots", "text",
+                                  "concrete", "office", "fit", "decision", "note"), parts)))
+    return rows
+
+terms = {
+    "collector": ("H", r"\bcollectors?\b"),
+    "hoarder": ("H", r"\bhoarders?\b"),
+    "keepsake": ("H", r"\bkeepsakes?\b"),
+    "appetite": ("H", r"\bappetites?\b"),
+    "glare": ("B", r"\bglar(?:e|es|ed|ing)\b"),
+    "squint": ("B", r"\bsquint\w*\b"),
+    "mechanic": ("G", r"\bmechanic\w*\b"),
+    "engineer": ("G", r"\bengineer\w*\b"),
+    "algorithm": ("G", r"\balgorithm\w*\b"),
+    "diagnose": ("G", r"\bdiagnos\w*\b"),
+}
+old, new = parse(before), parse(after)
+protected = """SH-B-03 SH-B-06 SH-C-06 RS-C-03 RS-C-06 EL-G-03 EL-B-03
+EL-C-03 EL-G-06 RS-B-06 RS-H-05 RS-H-03 RS-G-06 SI-G-04""".split()
+old_by_id = {r["id"]: r for r in old}
+new_by_id = {r["id"]: r for r in new}
+failures = []
+if len(new) != 624 or len(new_by_id) != 624 or len({r["text"] for r in new}) != 624:
+    failures.append("candidate count or duplicate")
+for key in protected:
+    if any(old_by_id[key][field] != new_by_id[key][field] for field in ("text", "mode")):
+        failures.append("protected " + key)
+for label, rows in (("C4", old), ("C5", new)):
+    flags = []
+    prefixes = collections.defaultdict(list)
+    for row in rows:
+        for word, (owner, pattern) in terms.items():
+            if row["id"].split("-")[1] != owner and re.search(pattern, row["text"], re.I):
+                flags.append((row["id"], word))
+        text = re.sub(r"\{[^}]+\}", "slot", row["text"].lower().strip('"'))
+        words = re.findall(r"[a-z]+(?:'[a-z]+)?", text)
+        if len(words) >= 3:
+            prefixes[" ".join(words[:3])].append(row["id"])
+    colon = [r["id"] for r in rows if re.search(r':\s*\{\w+\}[.!?]["”]?$', r["text"])]
+    after_that = [r["id"] for r in rows if re.search(
+        r'^"?after (?:that|the) [^,]+, (?:even )?my\b', r["text"], re.I)]
+    print(label, "colon", len(colon), "cross-trait flags", len(flags),
+          "after-that frame", len(after_that),
+          "prefix groups over three", sum(len(ids) > 3 for ids in prefixes.values()))
+    print("  cross-trait IDs:", flags)
+    for trait in "BCGH":
+        group = [r for r in rows if r["id"].split("-")[1] == trait]
+        appetite = sum(bool(re.search(r"\bappetite\b", r["text"], re.I)) for r in group)
+        exit_route = sum(bool(re.search(r"\b(?:exit|route)\b", r["text"], re.I)) for r in group)
+        print(" ", trait, "appetite", appetite, "exit-or-route", exit_route, "/", len(group))
+        if label == "C5" and (appetite > 3 or exit_route > .15 * len(group)):
+            failures.append(trait + " repetition cap")
+    if label == "C5" and (len(colon) > .04 * len(rows) or flags
+                          or any(len(ids) > 3 for ids in prefixes.values())):
+        failures.append("lexical frame or voice cap")
+
+slots = collections.defaultdict(list)
+for row in new:
+    for slot in sorted(set(re.findall(r"\{[^}]+\}", row["text"]))):
+        slots[slot].append(row["id"])
+for slot, ids in sorted(slots.items()):
+    print("GRAMMAR", slot, len(ids), ", ".join(ids))
+print("FAILURES", failures)
+if failures:
+    raise SystemExit(1)
+```
+
+**C4 historical checkpoint:** the designer's generic-line and screen rulings are
 applied; lexical recounts are recorded below. Event-specificity, actual modes,
 grounding and reachability still need human verification. The C3 checker and
 report are historical evidence, not a semantic C4 pass. Do not load or select
 these candidates without individual human approval and separate authorization.
 
-**Lexical recount, not acceptance:** comparing the 624 current candidate
-rows against C3 commit `2123251b75b9a2e02e40b97964cfefdbbe6af202`, the values
+**Historical C4 lexical recount, not acceptance:** comparing the C4 candidate
+rows at commit `00894ad03f12e760b86ddcf2372e5eccbb2f98b0` against C3 commit `2123251b75b9a2e02e40b97964cfefdbbe6af202`, the values
 below count lines containing the specified pattern in the candidate text.
 Traits are Brawler, Cautious, Gadgeteer, Hoarder, each with 156 lines.
 
@@ -73,7 +206,9 @@ import collections, pathlib, re, subprocess
 before = subprocess.check_output(
     ["git", "show", "2123251b75b9a2e02e40b97964cfefdbbe6af202:docs/DIARY_PILOT_LINES.md"],
     encoding="utf-8")
-after = pathlib.Path(r"docs\DIARY_PILOT_LINES.md").read_text(encoding="utf-8")
+after = subprocess.check_output(
+    ["git", "show", "00894ad03f12e760b86ddcf2372e5eccbb2f98b0:docs/DIARY_PILOT_LINES.md"],
+    encoding="utf-8")
 aliases = {
     "boots": "boot", "bootlaces": "bootlace", "shoelaces": "shoelace",
     "boxes": "box", "pouches": "pouch", "pockets": "pocket",
@@ -127,7 +262,9 @@ import collections, pathlib, re, subprocess
 before = subprocess.check_output(
     ["git", "show", "2123251b75b9a2e02e40b97964cfefdbbe6af202:docs/DIARY_PILOT_LINES.md"],
     encoding="utf-8")
-after = pathlib.Path(r"docs\DIARY_PILOT_LINES.md").read_text(encoding="utf-8")
+after = subprocess.check_output(
+    ["git", "show", "00894ad03f12e760b86ddcf2372e5eccbb2f98b0:docs/DIARY_PILOT_LINES.md"],
+    encoding="utf-8")
 
 def parse(text):
     rows = []
@@ -184,7 +321,7 @@ for label, text in (("C3", before), ("C4", after)):
 
 **Event-related anchor probe, not a strict-concrete acceptance result:** the
 same family-specific lexical screen finds 256/624 (41.03%) in C3 and
-478/624 (76.60%) in this draft; by trait the counts are
+478/624 (76.60%) in the historical C4 draft; by trait the counts are
 71/65/63/57 -> 121/119/120/118. It ignores location-only slots, decorative
 props outside each event's candidate vocabulary, and C3's unrelated empty
 search display shelves. It counts used committed non-location slots, candidate
@@ -234,7 +371,9 @@ import collections, pathlib, re, subprocess
 before = subprocess.check_output(
     ["git", "show", "2123251b75b9a2e02e40b97964cfefdbbe6af202:docs/DIARY_PILOT_LINES.md"],
     encoding="utf-8")
-after = pathlib.Path(r"docs\DIARY_PILOT_LINES.md").read_text(encoding="utf-8")
+after = subprocess.check_output(
+    ["git", "show", "00894ad03f12e760b86ddcf2372e5eccbb2f98b0:docs/DIARY_PILOT_LINES.md"],
+    encoding="utf-8")
 
 def parse(text):
     rows = []
@@ -321,7 +460,7 @@ needs manual metaphor review. No event-specific pass rate has been established;
 all 624 candidates need human review, including the twelve generic-by-design
 exceptions. A check sentence is not approval.
 
-The historical checker reported 71 C2 two-per-set ordinary-stem screens and
+At the C4 checkpoint the historical checker reported 71 C2 two-per-set ordinary-stem screens and
 48 per-set office screens; both screens are now retired. A recount using that
 checker's `stems` and `sets` functions finds **zero** sets above three and
 **zero** trait/stem pairs above eight, including the combined change-synonym
@@ -387,11 +526,36 @@ committed text/thread, never an opponent inferred later.
 `{item}` requires an exact item **and recipient** in committed shared awards
 for SI: SearchCompleted and EncounterResolved do not directly supply ItemName.
 HS instead uses its directly committed preserved ItemName/instance receipt.
-For SX, `{opportunity}` is the exact `OpportunityId` on that exhausted
-opportunity's event, not a later lookup from world state. Its substitution and
-the exact-ID gates below are not implemented.
+For SX, `{opportunity}` is a human-readable display name for the exact
+exhausted opportunity, not its raw `OpportunityId` and not a guess. A selector
+must establish an exact committed ID-to-name correspondence; if no trustworthy
+display name is available from the event or an approved mapping, the slot is
+missing. Display-name substitution and the exact-ID gates below are not
+implemented.
 Shared awards are not automatically the speaker's. `{weapon}` is not a generally
 committed pilot field and is not authorized by these rules.
+
+### Slot forms and grammar-dependent rows
+
+Every candidate whose **Slots** cell lists a slot is marked as depending on
+that slot's grammar; this includes all occurrences, not only the review queue.
+The [C5 probe](#c5-lexical-checks) prints the IDs by slot. Substitution remains
+unimplemented, and a missing, incompatible, ambiguous or non-visible value
+makes a candidate ineligible; never guess or modify a gameplay payload.
+
+| Slot | Required form |
+|---|---|
+| `{activity}` | Lowercase gerund naming the exact committed activity, such as `rummaging`; for a personality receipt use only its exact committed completed-activity reason. |
+| `{opportunity}` | Human-readable display name corresponding to the exact committed opportunity ID, never the raw ID such as `market-locker`; unavailable mapping means missing. |
+| `{item}` | Exact committed item name; SI additionally requires the visible recipient to be the speaking Raider. HS requires the speaking Raider's committed preserved item. |
+| `{source}` | Exact committed source text, with no guessed actor or cause. A whole-sentence Reason is not automatically a grammatical name; if it cannot fit a row without changing its meaning, the row is ineligible. |
+| `{robot}`, `{condition}` | Exact name in the committed text or thread, visible to the recipient; no inferred opponent or condition. |
+| `{location}` | Exact committed location name; no inferred setting. |
+| `{greedDirection}`, `{moodDirection}` | Direction derived only from unequal old/new values in the exact personality receipt. No candidate currently uses these tokens; no inference from the reason or an attempted pre-clamp change. |
+
+Names may contain apostrophes or punctuation. Future rendering must preserve
+the committed value safely and avoid doubled terminal punctuation; these
+drafting notes do not authorize a fabricated normalization or selector.
 
 Shapes: **J** places the joke before a contextual noun slot near the end; **M**
 integrates the slot into a grammatical clause; **O** uses no slot and makes an
@@ -625,12 +789,13 @@ prerequisites. No candidate is loaded by this draft.
 **All 624 IDs in the candidate tables below need a human read**, including
 the 152-ID priority queue and the generic-by-design exceptions. No human
 event-specific pass count or pass rate is claimed. The reproducible anchor
-probe above flags **146 of 624** IDs without one of its lexical anchors; the
-other 478 are also unverified. This is a conservative prompt for human
+probe above flagged **146 of 624 in C4** without one of its lexical anchors;
+that historical list is not a current C5 result. Every current line remains
+unverified. This is a conservative prompt for human
 review, not an event-specificity classifier: a flagged line can be sound, and
 a matching word can be misleading or unrelated to the event.
 
-Flagged IDs, grouped by family:
+C4 flagged IDs, grouped by family:
 
 - AI: AI-B-03, AI-B-08, AI-C-03, AI-C-08, AI-G-03, AI-G-08, AI-H-03, AI-H-08.
 - PC: PC-B-01, PC-B-02, PC-B-07, PC-B-10, PC-B-15, PC-B-16, PC-C-01, PC-C-04, PC-C-10, PC-C-14, PC-C-15, PC-C-16, PC-G-01, PC-G-04, PC-G-10, PC-G-14, PC-G-15, PC-G-16, PC-H-01, PC-H-04, PC-H-13, PC-H-14, PC-H-15, PC-H-16.
@@ -742,12 +907,12 @@ The activity slot extractor and this selection pool are not implemented.
 |---|---|---|---|---|---|---|---|---|---|
 | AI-B-01 | Overconfidence | J | `{activity}` | "Even departure has to hear my opinion on interrupting {activity}." | `{activity}` | no | AI: The boast protests the exit-driven interruption of this unfinished activity. |  |  |
 | AI-B-02 | Genre tension | M | `{activity}` | "Exit cut {activity} off before my enthusiasm reached the heroic part." | `{activity}` | no | AI: The imagined heroic scene is cut short with this activity, not completed. |  |  |
-| AI-B-03 | Overconfidence | O | - | "Fine, leave it unfinished. I was winning the argument with it anyway." | - | no | AI: The imagined argument concerns the activity left unfinished for exit, not an actual opponent. |  |  |
+| AI-B-03 | Overconfidence | O | - | "That interruption can call itself a victory; I call it a postponement." | - | no | AI: The imagined dispute concerns the interrupted activity, not an actual opponent. |  |  |
 | AI-B-04 | Loot greed | J | `{activity}` | "My loot-hunting ambitions were cut short along with {activity}." | `{activity}` | no | AI: The interruption ends this activity before the Raider's imagined loot hunt can continue, without claiming a find. |  |  |
 | AI-B-05 | Genre tension | M | `{activity}` | "Departure cut {activity} short of the ending I expected." | `{activity}` | no | AI: The exit interruption is treated as an unsatisfying ending, not an activity result. |  |  |
 | AI-B-06 | Overconfidence | J | `{activity}` | "I refuse to be intimidated by unfinished {activity}." | `{activity}` | no | AI: The boast addresses this activity's unfinished state after the interruption. |  |  |
 | AI-B-07 | Genre tension | M | `{activity}` | "Apparently {activity} ends mid-sentence. Rude." | `{activity}` | no | AI: The interrupted activity, rather than a conversation, is likened to a cut-off sentence. |  |  |
-| AI-B-08 | False optimism | O | - | "An unfinished activity is practically a dramatic pause, right?" | - | no | AI: The Raider optimistically reframes this interrupted activity without promising completion. |  |  |
+| AI-B-08 | False optimism | O | - | "An interruption is just a dramatic timeout, surely." | - | no | AI: The Raider optimistically reframes this interrupted activity without promising completion. |  |  |
 
 ### Cautious
 
@@ -755,7 +920,7 @@ The activity slot extractor and this selection pool are not implemented.
 |---|---|---|---|---|---|---|---|---|---|
 | AI-C-01 | Genre tension | J | `{activity}` | "The exit gives an untidy ending to {activity}." | `{activity}` | no | AI: The imagined untidy ending accepts the exit interrupting this unfinished activity. |  |  |
 | AI-C-02 | Gear obsession | M | `{activity}` | "My internal status display shows {activity} interrupted, not done." | `{activity}` | no | AI: The imagined display marks this interrupted activity as unfinished, not completed. |  |  |
-| AI-C-03 | Overconfidence | O | - | "I can abandon an unfinished task without pretending I like it." | - | no | AI: The understated boast accepts the interruption while acknowledging the unfinished task. |  |  |
+| AI-C-03 | Overconfidence | O | - | "Leaving a task unfinished takes restraint. I have almost enough." | - | no | AI: The understated boast accepts the interruption while acknowledging the unfinished task. |  |  |
 | AI-C-04 | Loot greed | J | `{activity}` | "No time to seek anything worth keeping during {activity}." | `{activity}` | no | AI: The collector laments time lost to the interruption without claiming a find. |  |  |
 | AI-C-05 | Loot greed | M | `{activity}` | "The exit interrupted {activity}; I wasn't done imagining the spoils." | `{activity}` | no | AI: The Raider imagines spoils from the interrupted activity without claiming a find or later attempt. |  |  |
 | AI-C-06 | Gear obsession | J | `{activity}` | "My internal task gauge reads unfinished beside {activity}." | `{activity}` | no | AI: The imagined gauge marks this activity's unfinished status, not a successful result. |  |  |
@@ -773,18 +938,18 @@ The activity slot extractor and this selection pool are not implemented.
 | AI-G-05 | Gear obsession | M | `{activity}` | "Exit has interrupted {activity}; status reads unfinished." | `{activity}` | no | AI: The status refers to this exit-interrupted activity, not equipment or a completed result. |  |  |
 | AI-G-06 | Genre tension | J | `{activity}` | "The exit rewrote the finale I had planned for {activity}." | `{activity}` | no | AI: The imaginary finale describes the exit interrupting this activity, not a completed observation. |  |  |
 | AI-G-07 | Overconfidence | M | `{activity}` | "I was fully prepared to overthink {activity}, but heading out dared interrupt." | `{activity}` | no | AI: The aside contrasts intended overthinking with this activity's exit interruption. |  |  |
-| AI-G-08 | False optimism | O | - | "Stopping this task is obviously the ideal first step toward improving it." | - | no | AI: The optimistic opinion reframes this interrupted activity without promising its completion. |  |  |
+| AI-G-08 | False optimism | O | - | "A cut-short task is practically a prototype with an early stop button." | - | no | AI: The optimistic analogy reframes this interruption without claiming a device or later completion. |  |  |
 
 ### Hoarder
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
-| AI-H-01 | Bureaucracy | J | `{activity}` | "The exit owes my unfinished-business department one explanation: {activity}." | `{activity}` | yes | AI: The imagined department protests the activity interrupted for exit, not a completed result. |  |  |
+| AI-H-01 | Bureaucracy | J | `{activity}` | "The exit owes my unfinished-business department an explanation for cutting short {activity}." | `{activity}` | yes | AI: The imagined department protests the activity interrupted for exit, not a completed result. |  |  |
 | AI-H-02 | Genre tension | M | `{activity}` | "Exit interrupted {activity} before it could earn a proper finale." | `{activity}` | no | AI: The missing finale concerns this interrupted activity, not an item left behind. |  |  |
 | AI-H-03 | Overconfidence | O | - | "My interrupted task can't outbid my talent for being offended." | - | no | AI: The figurative bid expresses offense at the interrupted activity, not a transaction. |  |  |
 | AI-H-04 | Overconfidence | J | `{activity}` | "I'll dignify the interruption by complaining about {activity}." | `{activity}` | no | AI: The complaint concerns the unfinished activity interrupted for exit. |  |  |
 | AI-H-05 | Overconfidence | M | `{activity}` | "Even {activity} can't compete with the size of my offended sigh." | `{activity}` | no | AI: The offended sigh reacts to this interrupted activity without claiming completion. |  |  |
-| AI-H-06 | Genre tension | J | `{activity}` | "Heading out cut the collector's favorite scene short: {activity}." | `{activity}` | no | AI: The imagined scene refers to this interrupted activity, not a packed item. |  |  |
+| AI-H-06 | Genre tension | J | `{activity}` | "Heading out cut my favorite scene short during {activity}." | `{activity}` | no | AI: The imagined scene refers to this interrupted activity, not a packed item. |  |  |
 | AI-H-07 | Gear obsession | M | `{activity}` | "Departure interrupted {activity}; my inventory-minded habits object to abandoning the attempt." | `{activity}` | no | AI: Storage-minded wording refers to the activity left unfinished for exit, not owned cargo. |  |  |
 | AI-H-08 | False optimism | O | - | "The unfinished task will be grateful I chose to head home." | - | no | AI: The imagined gratitude gives an optimistic spin to the activity interrupted for the exit. |  |  |
 
@@ -818,11 +983,11 @@ extraction is implemented. Catalog availability alone is not eligibility.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
-| PC-B-01 | Overconfidence | O | - | "Appetite has found a higher gear." | - | no | PC: Greed up only; the boast concerns the increase recorded in the exact receipt. |  |  |
+| PC-B-01 | Overconfidence | O | - | "Loot hunger just picked a louder fight." | - | no | PC: Greed up only; the imagined fight concerns the increase recorded in the exact receipt. |  |  |
 | PC-B-02 | Genre tension | O | - | "Good mood has temporarily misplaced its fighting words." | - | no | PC: Mood down only; the joke addresses the recorded decrease, not a fight. |  |  |
 | PC-B-03 | Gear obsession | O | - | "White Bandage has done a surprisingly tidy job on my temper." | White Bandage | no | PC: Applied White Bandage and Mood up only; its use and the improved mood are the same committed change. |  |  |
 | PC-B-04 | Overconfidence | J | `{activity}` | "Apparently my attitude has plenty to say about finishing {activity}." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the boast responds to that activity's committed personality change. |  |  |
-| PC-B-05 | Genre tension | M | `{activity}` | "The end of {activity} has given my priorities a new argument." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the argument describes the resulting personality change, not a fight. |  |  |
+| PC-B-05 | Genre tension | M | `{activity}` | "Finishing {activity} handed my priorities a new argument." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the argument describes the resulting personality change, not a fight. |  |  |
 | PC-B-06 | Loot greed | O | - | "Using Blue Bandage improved my mood enough to make spending it seem reasonable." | Blue Bandage | no | PC: Applied Blue Bandage and Mood up only; the used supply earns praise, not a new acquisition. |  |  |
 | PC-B-07 | Overconfidence | O | - | "Even I can want less, it seems." | - | no | PC: Greed down only; the boast acknowledges the recorded reduction in desire. |  |  |
 | PC-B-08 | Genre tension | M | `{activity}` | "After {activity}, even my temperament wants the last word." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the imagined last word responds to the committed change. |  |  |
@@ -832,7 +997,7 @@ extraction is implemented. Catalog availability alone is not eligibility.
 | PC-B-12 | False optimism | O | - | "Purple Bandage: apparently confidence comes in adhesive form." | Purple Bandage | no | PC: Applied Purple Bandage and Mood up only; the Raider overcredits the used bandage for the better mood. |  |  |
 | PC-B-13 | Loot greed | J | `{activity}` | "Even my notion of enough has a new angle after {activity}." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the changed perspective follows the personality change without claiming loot or its direction. |  |  |
 | PC-B-14 | Gear obsession | M | `{activity}` | "The end of {activity} has given my gear-checking instincts something to consider." | `{activity}` | no | PC: When the exact completed-activity reason is committed, gear-checking instincts react to the personality change without claiming an inspection. |  |  |
-| PC-B-15 | Genre tension | O | - | "Apparently my outlook has shifted without consulting me." | - | no | PC: The complaint concerns the committed personality change, not a future outcome. |  |  |
+| PC-B-15 | Genre tension | O | - | "My outlook changed sides without announcing the match." | - | no | PC: The imagined match concerns the committed personality change, not a fight. |  |  |
 | PC-B-16 | Bureaucracy | J | `{location}` | "An unexpected amendment has appeared in my attitude at {location}." | - | yes | PC: The imaginary amendment represents the committed personality change, not a real document. |  |  |
 
 ### Cautious
@@ -844,14 +1009,14 @@ extraction is implemented. Catalog availability alone is not eligibility.
 | PC-C-03 | Genre tension | O | - | "White Bandage has done more for my mood than a pep talk." | White Bandage | no | PC: Applied White Bandage and Mood up only; the joke compares the committed improvement with encouragement, not a real speaker. |  |  |
 | PC-C-04 | Loot greed | O | - | "For once, wanting less feels like enough." | - | no | PC: Greed down only; the reaction follows the recorded decrease in Greed. |  |  |
 | PC-C-05 | Loot greed | M | `{activity}` | "Finishing {activity} has my idea of enough reconsidering itself." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the change prompts reflection about enough without assuming a sign or dimension. |  |  |
-| PC-C-06 | Loot greed | O | - | "Blue Bandage improved my mood, even if my appetite dislikes spending it." | Blue Bandage | no | PC: Applied Blue Bandage and Mood up only; the used item is valued without inventing a replacement. |  |  |
+| PC-C-06 | Loot greed | O | - | "Blue Bandage improved my mood, despite the cost of using it." | Blue Bandage | no | PC: Applied Blue Bandage and Mood up only; the used item is valued without inventing a replacement. |  |  |
 | PC-C-07 | Overconfidence | J | `{activity}` | "I can reconsider my priorities without a ceremony after {activity}." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the understatement responds to its personality change, not a battle. |  |  |
 | PC-C-08 | Gear obsession | M | `{activity}` | "The conclusion of {activity} has my equipment-minded instincts reconsidering things." | `{activity}` | no | PC: When the exact completed-activity reason is committed, equipment-minded instincts reflect its personality change without claiming an inspection. |  |  |
 | PC-C-09 | Gear obsession | O | - | "Panic Paddles are a persuasive argument for checking the medical kit." | Panic Paddles | no | PC: Used Panic Paddles and Mood up only; the device prompts an opinion, not another supply check. |  |  |
 | PC-C-10 | False optimism | O | - | "With spirits lifted, the whole raid looks suspiciously manageable." | - | no | PC: Mood up only; the qualified optimism reflects the increase without promising safety. |  |  |
 | PC-C-11 | Overconfidence | M | `{activity}` | "After {activity}, I can handle a new perspective without an announcement." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the understatement reacts to the resulting personality change. |  |  |
 | PC-C-12 | False optimism | O | - | "Purple Bandage has optimism sounding almost practical." | Purple Bandage | no | PC: Applied Purple Bandage and Mood up only; the improvement gives cautious optimism, not a safety guarantee. |  |  |
-| PC-C-13 | Loot greed | J | `{activity}` | "A cautious collector needs time to consider that new perspective after {activity}." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the collector considers the personality change without claiming a find. |  |  |
+| PC-C-13 | Loot greed | J | `{activity}` | "A careful pause seems sensible for my new perspective after {activity}." | `{activity}` | no | PC: When the exact completed-activity reason is committed, caution colors the personality change without claiming a find. |  |  |
 | PC-C-14 | Genre tension | M | `{location}` | "The change in my outlook at {location} has earned a cautious pause." | - | no | PC: The pause reacts to the committed change, with no direction or outcome inferred. |  |  |
 | PC-C-15 | Overconfidence | O | - | "I can handle a change of outlook without demanding an explanation." | - | no | PC: The understated boast responds to a Greed or Mood change in either direction. |  |  |
 | PC-C-16 | Bureaucracy | J | `{location}` | "An understated revision has arrived in my temperament at {location}." | - | yes | PC: The imaginary revision refers to the committed personality change, not an actual filing. |  |  |
@@ -888,13 +1053,13 @@ extraction is implemented. Catalog availability alone is not eligibility.
 | PC-H-05 | Loot greed | M | `{activity}` | "After {activity}, even my priorities have acquired sentimental value." | `{activity}` | no | PC: When the exact completed-activity reason is committed, sentimental value describes its personality change, not an appraisal. |  |  |
 | PC-H-06 | Loot greed | O | - | "Blue Bandage made my mood better; spending it still feels extravagant." | Blue Bandage | no | PC: Applied Blue Bandage and Mood up only; the joke weighs the used supply against the committed improvement. |  |  |
 | PC-H-07 | Gear obsession | J | `{activity}` | "Equipment-minded instincts have a fresh opinion after {activity}." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the equipment-minded opinion reflects its personality change without claiming cargo. |  |  |
-| PC-H-08 | Bureaucracy | M | `{activity}` | "The end of {activity} calls for another entry in my inventory of opinions." | `{activity}` | yes | PC: When the exact completed-activity reason is committed, the figurative inventory concerns its personality change, not possessions. |  |  |
+| PC-H-08 | Bureaucracy | M | `{activity}` | "Completing {activity} calls for another entry in my inventory of opinions." | `{activity}` | yes | PC: When the exact completed-activity reason is committed, the figurative inventory concerns its personality change, not possessions. |  |  |
 | PC-H-09 | Gear obsession | O | - | "Panic Paddles are the rare equipment I won't begrudge using." | Panic Paddles | no | PC: Used Panic Paddles and Mood up only; the Raider approves of the used device without claiming another copy. |  |  |
 | PC-H-10 | Overconfidence | J | `{activity}` | "This new perspective obviously deserves pride of place after {activity}." | `{activity}` | no | PC: When the exact completed-activity reason is committed, the boast values its personality change, not an item. |  |  |
 | PC-H-11 | Loot greed | M | `{activity}` | "After {activity}, I plan to hold onto this new way of thinking." | `{activity}` | no | PC: When the exact completed-activity reason is committed, keeping a perspective describes its personality change without a physical item. |  |  |
 | PC-H-12 | False optimism | O | - | "Purple Bandage has convinced me spending supplies is the secret to getting rich." | Purple Bandage | no | PC: Applied Purple Bandage and Mood up only; the upbeat belief is not a claim of actual wealth or future returns. |  |  |
 | PC-H-13 | Loot greed | O | - | "Appetite has relaxed its demands, just a little." | - | no | PC: Greed down only; the line describes the recorded decrease without claiming a decision. |  |  |
-| PC-H-14 | Genre tension | M | `{location}` | "At {location}, my priorities rearranged themselves without asking." | - | no | PC: The imagined rearrangement reacts to the committed change without identifying its direction. |  |  |
+| PC-H-14 | Genre tension | M | `{location}` | "My priorities at {location} rearranged themselves without asking." | - | no | PC: The imagined rearrangement reacts to the committed change without identifying its direction. |  |  |
 | PC-H-15 | Overconfidence | O | - | "I'll treasure this fresh outlook; it clearly has excellent taste in hoarders." | - | no | PC: The collecting metaphor refers to a committed personality change, not an object. |  |  |
 | PC-H-16 | Loot greed | O | - | "That darker mood is not a keeper." | - | no | PC: Mood down only; the reaction to the recorded decrease does not imply item loss. |  |  |
 
@@ -943,7 +1108,7 @@ source is supplied by this event.
 | SH-G-04 | Bureaucracy | J | `{location}` | "I classify that barrier expense as mandatory research at {location}." | barrier | yes | SH: The mock classification follows the barrier's expenditure without claiming a test or remaining charge. |  |  |
 | SH-G-05 | False optimism | M | `{location}` | "The shield's drain on that hit at {location} surely means my power settings are perfect." | shield | no | SH: The optimistic opinion follows charge spent on this hit, not a balance or protection guarantee. |  |  |
 | SH-G-06 | Genre tension | O | - | "Apparently defensive charge prefers an expensive entrance." | charge | yes | SH: The dramatic entrance is the charge expenditure, not an extra hit or actor. |  |  |
-| SH-G-07 | Loot greed | J | `{location}` | "A hoarder hates seeing power leave the barrier at {location}." | barrier | no | SH: The reaction concerns the barrier's spent charge without claiming a collectible item. |  |  |
+| SH-G-07 | Loot greed | J | `{location}` | "A power drain is an inefficient barrier feature at {location}." | barrier | no | SH: The reaction concerns the barrier's spent charge without claiming a collectible item. |  |  |
 | SH-G-08 | Genre tension | M | `{location}` | "That defensive expenditure at {location} has given my power budget a dramatic pause." | - | yes | SH: The mock budget reacts to charge expenditure, not a remaining balance. |  |  |
 
 ### Hoarder
@@ -972,13 +1137,13 @@ damage to zero: no line assumes an HP wound or a later outcome.
 | UD-B-01 | Overconfidence | J | `{source}` | "Skipping the barrier is a bold introduction from {source}." | `{source}` | no | UD: The boast responds to damage from this source taking the unshielded path, without asserting equipment or injury. |  |  |
 | UD-B-02 | Genre tension | M | `{source}` | "That hit from {source} bypassed the polite layer." | `{source}` | no | UD: The shield-bypass metaphor describes this source's damage without assuming a wound or actor. |  |  |
 | UD-B-03 | Genre tension | O | - | "No protective layer joined that particular argument." | - | no | UD: The unshielded damage is an imaginary argument, not a reported HP loss. |  |  |
-| UD-B-04 | Bureaucracy | J | `{source}` | "The unshielded-damage complaint form names its suspect: {source}." | `{source}`, form | yes | UD: The imagined form records which source bypassed the shield without claiming an injury. |  |  |
+| UD-B-04 | Bureaucracy | J | `{source}` | "An accusing finger on my unshielded-damage complaint points at {source}." | `{source}`, form | yes | UD: The imagined complaint names the source without claiming an injury. |  |  |
 
 ### Cautious
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
-| UD-C-01 | Bureaucracy | J | `{source}` | "The unshielded-damage form has an unwelcome entry: {source}." | `{source}`, form | yes | UD: The imagined form names the exact source whose damage bypassed the shield, not an injury. |  |  |
+| UD-C-01 | Bureaucracy | J | `{source}` | "My unshielded-damage notes include an unwelcome entry for {source}." | `{source}`, form | yes | UD: The imagined notes name the exact source whose damage bypassed the shield, not an injury. |  |  |
 | UD-C-02 | Genre tension | M | `{source}` | "The defenses had no part in the damage from {source}; that's worth remembering." | `{source}` | no | UD: This source's damage used the unshielded path without establishing remaining charge or injury. |  |  |
 | UD-C-03 | Gear obsession | O | - | "That unshielded hit makes an imaginary barrier sound sensible." | barrier | no | UD: The hypothetical barrier addresses the unshielded damage without claiming equipment or an HP outcome. |  |  |
 | UD-C-04 | Overconfidence | J | `{source}` | "I won't mistake an uncovered hit for a warning from {source}." | `{source}` | no | UD: The understatement distinguishes this source's unshielded damage from a warning, not an injury. |  |  |
@@ -987,16 +1152,16 @@ damage to zero: no line assumes an HP wound or a later outcome.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
-| UD-G-01 | Bureaucracy | J | `{source}` | "The bypass form has an unwelcome entry: {source}." | `{source}`, form | yes | UD: The imagined form names the source of the unshielded damage without claiming injury or charge level. |  |  |
+| UD-G-01 | Bureaucracy | J | `{source}` | "The imagined bypass diagram flags {source}." | `{source}`, form | yes | UD: The imagined diagram names the source of the unshielded damage without claiming injury or charge level. |  |  |
 | UD-G-02 | Gear obsession | M | `{source}` | "The unshielded delivery from {source} skipped the whole protective-layer calculation." | `{source}` | no | UD: This source's damage took the unshielded path; no equipment, health or charge level is inferred. |  |  |
 | UD-G-03 | Genre tension | O | - | "The damage skipped the shield step as though it wasn't in the design." | shield | no | UD: The design joke concerns the unshielded damage path, not equipment or an actual design change. |  |  |
-| UD-G-04 | Overconfidence | J | `{source}` | "The unshielded hit earns my strongest technical glare, courtesy of {source}." | `{source}` | no | UD: The boast reacts to this source's unshielded damage without claiming an HP loss. |  |  |
+| UD-G-04 | Overconfidence | J | `{source}` | "My shield-bypass theory owes an explanation to {source}." | `{source}` | no | UD: The boast reacts to this source's unshielded damage without claiming an HP loss. |  |  |
 
 ### Hoarder
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| UD-H-01 | Bureaucracy | J | `{source}` | "My shield-bypass complaint names an unwelcome source: {source}." | `{source}` | yes | UD: The imagined complaint concerns this source's unshielded damage, not a wound. |  |  |
+| UD-H-01 | Bureaucracy | J | `{source}` | "My shield-bypass complaint reserves its least flattering words for {source}." | `{source}` | yes | UD: The imagined complaint concerns this source's unshielded damage, not a wound. |  |  |
 | UD-H-02 | Genre tension | M | `{source}` | "Even {source} shouldn't get free passage for that hit past my defenses." | `{source}` | no | UD: This source's damage took the unshielded path without a claimed HP outcome. |  |  |
 | UD-H-03 | Gear obsession | O | - | "That hit skipped the protective step, which seems like a poor bargain." | - | yes | UD: The unshielded damage path is called a poor bargain without inferring equipment or injury. |  |  |
 | UD-H-04 | Loot greed | J | `{source}` | "My appetite objects to the unshielded hit from {source}." | `{source}` | no | UD: Appetite objects to this source's unshielded damage, not a transfer of property. |  |  |
@@ -1041,7 +1206,7 @@ guarantee a wound, healing, or survival.
 | RS-G-02 | False optimism | M | `{source}` | "The smaller hit from {source} has my damping theory looking promising." | `{source}` | no | RS: The optimistic theory follows reduced damage from this source, without guaranteeing future protection. |  |  |
 | RS-G-03 | Gear obsession | O | - | "Resilience is a shock absorber for damage, not an off switch." | - | no | RS: The engineering analogy distinguishes damage reduction from a guarantee of zero damage. |  |  |
 | RS-G-04 | Bureaucracy | J | `{source}` | "The damage report earns a correction for reduced input from {source}." | `{source}` | yes | RS: A mock report correction reflects this source's reduced damage without asserting actual paperwork. |  |  |
-| RS-G-05 | Genre tension | M | `{source}` | "The impact from {source} got a softer landing than its drama suggested." | `{source}` | no | RS: The theatrical metaphor refers to reduced damage from this source, not a recovery. |  |  |
+| RS-G-05 | Genre tension | M | `{source}` | "The blow from {source} got a softer landing than its drama suggested." | `{source}` | no | RS: The theatrical metaphor refers to reduced damage from this source, not a recovery. |  |  |
 | RS-G-06 | Gear obsession | O | - | "The damage curve just met a stubborn bend." | - | no | RS: The bend represents the committed damage reduction, not a measured curve. |  |  |
 | RS-G-07 | Gear obsession | J | `{source}` | "The resilience buffer took a bite out of the hit from {source}." | `{source}` | no | RS: The imagined buffer describes resilience reducing this source's damage without claiming equipment. |  |  |
 | RS-G-08 | Overconfidence | M | `{source}` | "The reduced hit from {source} gives my tolerance engineering ambitions." | `{source}` | no | RS: The boast treats the reduction of this source's damage as an engineering success, not immunity. |  |  |
@@ -1057,7 +1222,7 @@ guarantee a wound, healing, or survival.
 | RS-H-05 | Overconfidence | M | `{source}` | "My toughness charges {source} an outrageous entrance fee." | `{source}` | yes | RS: The fee metaphor describes resilience reducing damage from this source, not a transaction. |  |  |
 | RS-H-06 | Overconfidence | O | - | "Even damage gets a smaller portion when my toughness is involved." | - | no | RS: The boast follows resilience reducing damage and does not guarantee a health outcome. |  |  |
 | RS-H-07 | Genre tension | J | `{source}` | "I prize the smaller portion of damage from {source}." | `{source}` | no | RS: The Raider appreciates the reduction of this source's damage, not an acquired item. |  |  |
-| RS-H-08 | Gear obsession | M | `{source}` | "The impact from {source} found the imaginary padding in my resolve." | `{source}` | no | RS: The padding analogy means this source's damage was reduced, not that equipment was used. |  |  |
+| RS-H-08 | Gear obsession | M | `{source}` | "A blow from {source} found the imaginary padding in my resolve." | `{source}` | no | RS: The padding analogy means this source's damage was reduced, not that equipment was used. |  |  |
 
 ## EL — ExtractionDecision, heading
 
@@ -1070,11 +1235,11 @@ success follows from the decision.
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
 | EL-B-01 | False optimism | J | `{location}` | "The easy part must be heading for the exit from {location}." | exit | no | EL: The optimistic expectation concerns the decision to head out, not an arrival or guaranteed safe journey. |  |  |
-| EL-B-02 | Loot greed | M | `{location}` | "Choosing the way home from {location} gives my appetite a direction it didn't ask for." | way home | no | EL: The heading decision conflicts with the appetite for more loot, without asserting a find. |  |  |
+| EL-B-02 | Loot greed | M | `{location}` | "Choosing the way home from {location} picks a fight with my greed." | way home | no | EL: The heading decision conflicts with desire for more loot, without asserting a find. |  |  |
 | EL-B-03 | Gear obsession | O | - | "My boots know a dramatic direction when they hear one." | boots | no | EL: The boots personify the decision to head out, not an arrival. |  |  |
 | EL-B-04 | Gear obsession | J | `{location}` | "Even my equipment-checking instincts agree to head for the exit from {location}." | exit | no | EL: Gear-checking instincts give way to the decision to head out, without a completed journey or inspection. |  |  |
 | EL-B-05 | Genre tension | M | `{location}` | "The way out of {location} is less dramatic than my reasons for taking it." | way out | no | EL: The aside reacts to the chosen exit direction without asserting arrival. |  |  |
-| EL-B-06 | Loot greed | O | - | "My appetite and the route home are having a serious disagreement." | route | no | EL: The decision to head out conflicts with the appetite for loot, without asserting cargo. |  |  |
+| EL-B-06 | Loot greed | O | - | "Going home has an argument with my desire for more." | route | no | EL: The decision to head out conflicts with desire for loot, without asserting cargo. |  |  |
 | EL-B-07 | Bureaucracy | J | `{location}` | "The exit plan has one entry: leave {location}." | exit | yes | EL: The committed decision is to head out from this location, not stay or arrive. |  |  |
 | EL-B-08 | Genre tension | M | `{location}` | "Heading out from {location} is a plot twist my pride didn't rehearse." | exit | no | EL: The plot twist is choosing to head out, not completing extraction. |  |  |
 
@@ -1112,10 +1277,10 @@ success follows from the decision.
 | EL-H-02 | Gear obsession | M | `{location}` | "The exit from {location} has my packing habit asking for an extension." | exit | no | EL: The request is a thought about heading out, not a change to any deadline. |  |  |
 | EL-H-03 | Gear obsession | O | - | "Choosing to head out has my acquisitive streak in revolt." | - | no | EL: Storage-minded reluctance responds to heading for extraction, not a transfer or loss. |  |  |
 | EL-H-04 | Overconfidence | J | `{location}` | "A strategic retreat, not surrender: that's the way home from {location}." | way home | no | EL: The Raider has chosen the exit, not completed the journey. |  |  |
-| EL-H-05 | Genre tension | M | `{location}` | "The route out of {location} is the ending my appetite tried to rewrite." | route | no | EL: The imagined ending concerns the chosen route out, not a completed trip or abandoned find. |  |  |
+| EL-H-05 | Genre tension | M | `{location}` | "The route out of {location} is the ending my greed tried to rewrite." | route | no | EL: The imagined ending concerns the chosen route out, not a completed trip or abandoned find. |  |  |
 | EL-H-06 | Overconfidence | O | - | "The way out won that argument; I reserve the right to miss the possibilities." | - | no | EL: The decision is to head out despite reluctance, not proof of extraction. |  |  |
 | EL-H-07 | Loot greed | J | `{location}` | "The decision to leave means giving up the possibility of finding more at {location}." | - | no | EL: The decision trades future search possibilities for an exit; no find or arrival is claimed. |  |  |
-| EL-H-08 | Gear obsession | M | `{location}` | "At {location}, my acquisitive streak has lost the argument with heading home." | - | no | EL: Storage-minded reluctance responds to heading out, not a transfer or completed departure. |  |  |
+| EL-H-08 | Gear obsession | M | `{location}` | "The decision at {location} defeats my acquisitive streak's argument for staying." | - | no | EL: Storage-minded reluctance responds to heading out, not a transfer or completed departure. |  |  |
 
 ## ES — ExtractionDecision, staying
 
@@ -1155,8 +1320,8 @@ means now, not a permanent refusal to extract or a promise of future loot.
 | ES-G-01 | Genre tension | J | `{location}` | "The idea of another experiment has put my return route on hold at {location}." | return route | no | ES: An imagined experiment colors staying now, without changing the deadline or guaranteeing an experiment. |  |  |
 | ES-G-02 | False optimism | M | `{location}` | "The exit route from {location} can wait; my curiosity insists that's a sound plan." | exit route | no | ES: The optimistic opinion justifies staying for now without claiming a discovery or later outcome. |  |  |
 | ES-G-03 | Genre tension | O | - | "The exit can wait while my curiosity edits the ending." | exit | no | ES: The imagined edit refers to staying now, not an actual change to a later outcome. |  |  |
-| ES-G-04 | Bureaucracy | J | `{location}` | "The route home has acquired a provisional pause at {location}." | route home | yes | ES: The provisional plan captures the decision to stay without promising how long. |  |  |
-| ES-G-05 | Overconfidence | M | `{location}` | "Staying at {location} is obviously the elegant solution. For now." | - | no | ES: The boast applies only to the present decision to stay, not its eventual result. |  |  |
+| ES-G-04 | Bureaucracy | J | `{location}` | "A provisional pause delays the route home at {location}." | route home | yes | ES: The provisional plan captures the decision to stay without promising how long. |  |  |
+| ES-G-05 | Overconfidence | M | `{location}` | "Choosing to stay at {location} is obviously elegant. For now." | - | no | ES: The boast applies only to the present decision to stay, not its eventual result. |  |  |
 | ES-G-06 | Gear obsession | O | - | "The exit algorithm just paused instead of heading home." | exit | no | ES: The algorithm metaphor describes choosing not to extract now, not a real mechanism. |  |  |
 | ES-G-07 | Loot greed | J | `{location}` | "The possibility of useful scrap leaves staying preferable to leaving {location}." | - | no | ES: Speculation about scrap colors the stay without asserting any item or award. |  |  |
 | ES-G-08 | Overconfidence | M | `{location}` | "At {location}, I confidently calculate that leaving can wait." | - | no | ES: The confident calculation expresses this stay, not a guarantee of later reconsideration. |  |  |
@@ -1172,7 +1337,7 @@ means now, not a permanent refusal to extract or a promise of future loot.
 | ES-H-05 | Overconfidence | M | `{location}` | "Staying at {location} is an excellent decision. Probably." | - | no | ES: The boast concerns staying now and does not invent the decision's actual reason. |  |  |
 | ES-H-06 | Bureaucracy | O | - | "The exit plan has a space for further reconsideration." | exit | yes | ES: The mock plan makes the stay provisional rather than permanent. |  |  |
 | ES-H-07 | Genre tension | J | `{location}` | "The exit can wait; there are possibilities worth exploring at {location}." | exit | no | ES: The current decision to stay preserves possibilities without asserting a find. |  |  |
-| ES-H-08 | Gear obsession | M | `{location}` | "My appetite at {location} has voted against the exit." | exit | no | ES: Storage-minded reluctance reflects staying now without claiming any actual contents. |  |  |
+| ES-H-08 | Gear obsession | M | `{location}` | "My desire for more at {location} has voted against the exit." | exit | no | ES: Storage-minded reluctance reflects staying now without claiming any actual contents. |  |  |
 
 ## SI — Search or encounter, recovered
 
@@ -1186,10 +1351,10 @@ requires that exact `{item}`; O candidates use no item slot and assert no owner.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
-| SI-B-01 | Loot greed | J | `{item}` | "Now that's a find with attitude: {item}." | `{item}` | no | SI: This names the awarded find, without claiming it belongs to the speaker. |  |  |
-| SI-B-02 | Loot greed | J | `{item}` | "An awarded half-pair has my full attention: {item}." | `{item}` | no | SI: Single Sock only; the awarded name inspires a pairing joke without claiming another sock or ownership. |  |  |
+| SI-B-01 | Loot greed | J | `{item}` | "That prize comes with attitude, especially {item}." | `{item}` | no | SI: The speaking Raider must be the visible recipient of this exact awarded item. |  |  |
+| SI-B-02 | Loot greed | J | `{item}` | "An awarded half-pair earns my full attention in {item}." | `{item}` | no | SI: Single Sock only and speaker is the visible recipient; no second sock is claimed. |  |  |
 | SI-B-03 | Genre tension | O | - | "A recovered prize deserves an entrance worthy of a champion." | - | no | SI: The imagined entrance celebrates an awarded find without identifying its owner or value. |  |  |
-| SI-B-04 | Loot greed | J | `{item}` | "My restraint looks ready to brawl over this award: {item}." | `{item}` | no | SI: The visible award provokes figurative conflict with restraint, not a fight or transfer to the speaker. |  |  |
+| SI-B-04 | Loot greed | J | `{item}` | "My restraint looks ready to brawl over the award of {item}." | `{item}` | no | SI: The speaking Raider must be the visible recipient; the brawl is figurative. |  |  |
 | SI-B-05 | Loot greed | M | `{item}` | "The award of {item} is one small step for my bragging." | `{item}` | no | SI: Robot Toe only; the awarded mechanical toe inspires a footstep pun without implying ownership. |  |  |
 | SI-B-06 | Overconfidence | O | - | "Even the loot gets to look tough after a find." | - | no | SI: The awarded object's imagined toughness reacts to the find, not a combat result. |  |  |
 | SI-B-07 | Gear obsession | J | `{item}` | "This find raises practical-use questions about {item}." | `{item}` | no | SI: This questions the awarded item's uses without claiming ownership or testing it. |  |  |
@@ -1199,13 +1364,13 @@ requires that exact `{item}`; O candidates use no item slot and assert no owner.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
-| SI-C-01 | Loot greed | J | `{item}` | "A find worth a quiet nod: {item}." | `{item}` | no | SI: The nod values this visible awarded item without implying its recipient. |  |  |
-| SI-C-02 | False optimism | M | `{item}` | "The award of {item} makes me optimistic about unfinished stories." | `{item}` | no | SI: Lost Diary Page only; its name suggests a story without asserting its contents or the speaker's ownership. |  |  |
+| SI-C-01 | Loot greed | J | `{item}` | "A quiet nod seems appropriate for {item}." | `{item}` | no | SI: The speaking Raider must be the visible recipient of this exact awarded item. |  |  |
+| SI-C-02 | False optimism | M | `{item}` | "Receiving {item} makes me optimistic about unfinished stories." | `{item}` | no | SI: Lost Diary Page and speaking Raider as recipient only; its name suggests a story without asserting its contents. |  |  |
 | SI-C-03 | Loot greed | O | - | "Even a recovered treasure is no substitute for an exit." | treasure | no | SI: The awarded find prompts a reminder that recovery is not extraction, without naming an owner. |  |  |
-| SI-C-04 | Overconfidence | J | `{item}` | "A measured cheer for this discovery: {item}." | `{item}` | no | SI: The restrained cheer responds to this visible awarded item, not an extraction outcome. |  |  |
+| SI-C-04 | Overconfidence | J | `{item}` | "A measured cheer is enough for {item}." | `{item}` | no | SI: The speaking Raider must be the visible recipient; no extraction outcome is implied. |  |  |
 | SI-C-05 | Loot greed | M | `{item}` | "Seeing {item} awarded, I'll resist announcing a whole pair." | `{item}` | no | SI: Left Boot only; the restraint concerns one visible award without claiming another boot exists or is absent. |  |  |
 | SI-C-06 | Gear obsession | O | - | "An awarded find raises equipment questions, not a need for a victory dance." | - | no | SI: The awarded item prompts equipment questions without asserting its usefulness or ownership. |  |  |
-| SI-C-07 | Loot greed | J | `{item}` | "I'll value this find after a closer look at {item}." | `{item}` | no | SI: The awarded item prompts caution about its value; no appraisal or ownership is claimed. |  |  |
+| SI-C-07 | Loot greed | J | `{item}` | "A cautious opinion beats an instant price for {item}." | `{item}` | no | SI: The speaker must be the visible recipient; no inspection or appraisal is claimed. |  |  |
 | SI-C-08 | Overconfidence | M | `{item}` | "My enthusiasm for the discovery of {item} has learned to use its indoor voice." | `{item}` | no | SI: The imagined quiet voice tempers enthusiasm for this visible award, not the surroundings. |  |  |
 
 ### Gadgeteer
@@ -1216,22 +1381,22 @@ requires that exact `{item}`; O candidates use no item slot and assert no owner.
 | SI-G-02 | False optimism | M | `{item}` | "The award of {item} makes my optimism exactly half full." | `{item}` | no | SI: Half-Full Battery only; the name inspires the joke without claiming charge measurements or ownership. |  |  |
 | SI-G-03 | Genre tension | O | - | "Engineering is calling that recovered object a cliffhanger." | - | no | SI: The awarded object's imagined engineering mystery implies no further experiment. |  |  |
 | SI-G-04 | Overconfidence | J | `{item}` | "I already have three incompatible theories about {item}." | `{item}` | no | SI: The visible awarded item prompts incompatible theories, not an inspection or ownership claim. |  |  |
-| SI-G-05 | Gear obsession | M | `{item}` | "The award of {item} has me wondering why it broke." | `{item}` | no | SI: Broken Servo only; the item's name prompts speculation, not an actual repair or ownership. |  |  |
+| SI-G-05 | Gear obsession | M | `{item}` | "Receiving {item} has me wondering why it broke." | `{item}` | no | SI: Broken Servo and speaking Raider as recipient only; the name prompts speculation, not an actual repair. |  |  |
 | SI-G-06 | Loot greed | O | - | "Every recovered object deserves a technical biography." | - | no | SI: The imagined biography responds to an awarded find without inventing its recipient or value. |  |  |
-| SI-G-07 | Genre tension | J | `{item}` | "That find deserves a more dramatic origin story than I can invent: {item}." | `{item}` | no | SI: The awarded item prompts an imagined story, not a use or transfer. |  |  |
+| SI-G-07 | Genre tension | J | `{item}` | "Even my best imaginary origin story undersells {item}." | `{item}` | no | SI: The speaking Raider must be the visible recipient; the story asserts no use or transfer. |  |  |
 | SI-G-08 | Loot greed | M | `{item}` | "Seeing {item} awarded makes me wonder what else might be worth examining." | `{item}` | no | SI: The visible awarded item inspires speculation without claiming its ownership or contents. |  |  |
 
 ### Hoarder
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| SI-H-01 | Loot greed | J | `{item}` | "Not every find gets such an appreciative sigh: {item}." | `{item}` | no | SI: The awarded item is admired without assigning it to the speaker. |  |  |
+| SI-H-01 | Loot greed | J | `{item}` | "An appreciative sigh seems appropriate for {item}." | `{item}` | no | SI: The speaking Raider must be the visible recipient of this exact awarded item. |  |  |
 | SI-H-02 | False optimism | M | `{item}` | "The award of {item} convinces me every hoarder's story ends happily." | `{item}` | no | SI: Vintage Comic Book only; the imagined happy ending claims neither ownership nor story details. |  |  |
 | SI-H-03 | Loot greed | O | - | "A recovered object is my favorite argument against moderation." | - | no | SI: The collector uses an awarded find to argue against moderation without claiming its identity or owner. |  |  |
 | SI-H-04 | Gear obsession | M | `{item}` | "Even seeing {item} awarded makes my packing instincts sit up and pay attention." | `{item}` | no | SI: The awarded item triggers a packing-minded reaction, not a transfer or ownership claim. |  |  |
-| SI-H-05 | Loot greed | M | `{item}` | "Finding {item} means my appetite can argue with a fork and spoon at once." | `{item}` | no | SI: Rusted Spork only; the comparison admires its combined utensils without claiming ownership. |  |  |
+| SI-H-05 | Loot greed | M | `{item}` | "An award of {item} leaves me debating its fork and spoon merits." | `{item}` | no | SI: Rusted Spork only; the visible recipient must be the speaker; the comparison admires its combined utensils. |  |  |
 | SI-H-06 | Loot greed | O | - | "Beside that find, restraint looks terribly underdressed." | - | no | SI: The clothing metaphor describes the collector's reaction to an awarded find, not a transfer. |  |  |
-| SI-H-07 | Genre tension | J | `{item}` | "Restraint is looking nervous over this award: {item}." | `{item}` | no | SI: The visible award tempts the Raider without implying a transfer to the speaker. |  |  |
+| SI-H-07 | Genre tension | J | `{item}` | "Restraint looks nervous about {item}." | `{item}` | no | SI: The speaking Raider must be the visible recipient of this exact awarded item. |  |  |
 | SI-H-08 | Overconfidence | M | `{item}` | "Even newly recovered {item} cannot compete with my talent for admiration." | `{item}` | no | SI: The boast admires this visible awarded item without asserting ownership. |  |  |
 
 ## SN — Search or encounter, nothing recovered
@@ -1272,14 +1437,14 @@ search, or item loss.
 | SN-G-01 | Genre tension | J | `{location}` | "Even my curiosity has nothing to take apart after that search at {location}." | - | no | SN: The empty search gives the Raider no object to examine or disassemble. |  |  |
 | SN-G-02 | Gear obsession | M | `{location}` | "That retail shelf at {location} gives my imagined workbench nothing to inspect." | shelf | no | SN: The imagined bench has nothing from the empty search of the exact committed retail shelf. |  |  |
 | SN-G-03 | Bureaucracy | O | - | "The Staycation locker supplied exactly zero for my mental search report." | Staycation locker | yes | SN: The imagined report records the exact committed locker's empty search, not an actual document. |  |  |
-| SN-G-04 | Loot greed | J | `{location}` | "The tool cage left my collector's imagination zero specimens to analyze at {location}." | tool cage | no | SN: The exact committed tool-cage search yielded nothing to analyze, not a tool or actual test. |  |  |
+| SN-G-04 | Loot greed | J | `{location}` | "The tool cage yielded zero specimens for analysis at {location}." | tool cage | no | SN: The exact committed empty-award tool-cage search yielded nothing to analyze, not a tool or actual test. |  |  |
 
 ### Hoarder
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
 | SN-H-01 | Overconfidence | J | `{location}` | "The Staycation locker failed to intimidate me with an empty result at {location}." | Staycation locker | no | SN: The boast reacts to the exact committed locker's empty search without claiming a find or later attempt. |  |  |
-| SN-H-02 | Genre tension | M | `{location}` | "The tool cage at {location} yielded nothing to tempt my appetite." | tool cage | no | SN: The exact committed tool-cage search yielded nothing without claiming a tool or ownership. |  |  |
+| SN-H-02 | Genre tension | M | `{location}` | "The tool cage at {location} yielded nothing to tempt my greed." | tool cage | no | SN: The exact committed tool-cage search yielded nothing without claiming a tool or ownership. |  |  |
 | SN-H-03 | Gear obsession | O | - | "An empty search gives a pouch nothing to celebrate." | pouch | no | SN: The hypothetical pouch emphasizes that the search added no item. |  |  |
 | SN-H-04 | Loot greed | J | `{location}` | "The retail shelf left my counting skills embarrassingly unemployed at {location}." | retail shelf | no | SN: The exact committed retail-shelf search yielded nothing to count, not a claim of ownership. |  |  |
 
@@ -1287,8 +1452,9 @@ search, or item loss.
 
 **Required:** kind and location. The opportunity is exhausted; no finding,
 award, owner, or subsequent opportunity follows from this event. J rows
-using `{opportunity}` also require this receipt's nonempty `OpportunityId`;
-its exact-ID substitution and the locker/crate selectors are not implemented.
+using `{opportunity}` also require this receipt's nonempty `OpportunityId`
+and an exact corresponding human-readable display name. No raw ID substitution;
+the display-name mapping and locker/crate selectors are not implemented.
 Named locker/crate rows require the exact matching ID and location, not a
 container inferred from the node or an earlier event.
 
@@ -1296,16 +1462,16 @@ container inferred from the node or an earlier event.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
-| SX-B-01 | Overconfidence | J | `{opportunity}` | "That spent chance isn't afraid of my glare: {opportunity}." | `{opportunity}` | no | SX: The committed opportunity ID names the chance already exhausted, not a successful retry. |  |  |
+| SX-B-01 | Overconfidence | J | `{opportunity}` | "A spent chance won't yield to my glare at {opportunity}." | `{opportunity}` | no | SX: The display name must correspond to this exact exhausted opportunity, not a successful retry. |  |  |
 | SX-B-02 | Bureaucracy | M | `{location}` | "The locker at {location} has filed its last chance to impress me." | locker | yes | SX: `market-locker` at Market only; the imagined filing refers to its exhausted opportunity, not a document or award. |  |  |
-| SX-B-03 | Loot greed | O | - | "The humming crate's chance ran out before my appetite did." | crate | no | SX: `humming-crate` at Salvage Yard only; the exhausted chance disappoints without implying an item or ongoing sound. |  |  |
+| SX-B-03 | Loot greed | O | - | "That humming crate's chance quit before I did." | crate | no | SX: `humming-crate` at Salvage Yard only; the exhausted chance disappoints without implying an item or ongoing sound. |  |  |
 | SX-B-04 | Overconfidence | J | `{location}` | "Even my best entrance can't rewind that opportunity at {location}." | - | no | SX: The boast acknowledges that the opportunity was already exhausted. |  |  |
 
 ### Cautious
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
-| SX-C-01 | Loot greed | J | `{opportunity}` | "The cautious collector arrived too late for this chance: {opportunity}." | `{opportunity}` | no | SX: The committed opportunity ID identifies the already-exhausted chance, not an item or owner. |  |  |
+| SX-C-01 | Loot greed | J | `{opportunity}` | "A spent chance deserves a careful sigh at {opportunity}." | `{opportunity}` | no | SX: The display name must correspond to this exact exhausted opportunity; no arrival or item is implied. |  |  |
 | SX-C-02 | Genre tension | M | `{location}` | "That locker at {location} is past the point of being worth a search." | locker | no | SX: `market-locker` at Market only; the spent opportunity discourages a search without asserting an item. |  |  |
 | SX-C-03 | Bureaucracy | O | - | "The humming crate's chance belongs under finished, not postponed." | crate | yes | SX: `humming-crate` at Salvage Yard only; the imagined classification distinguishes exhaustion from delay, not actual paperwork. |  |  |
 | SX-C-04 | Overconfidence | J | `{location}` | "I can accept that the door has closed on this opportunity at {location}." | door | no | SX: The closed door represents the spent chance, not an actual door or another attempt. |  |  |
@@ -1314,7 +1480,7 @@ container inferred from the node or an earlier event.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| SX-G-01 | Bureaucracy | J | `{opportunity}` | "My imaginary status report says this chance is exhausted: {opportunity}." | `{opportunity}` | yes | SX: The committed opportunity ID identifies the exhausted chance; the report is imaginary. |  |  |
+| SX-G-01 | Bureaucracy | J | `{opportunity}` | "My imaginary status report marks the spent chance at {opportunity}." | `{opportunity}` | yes | SX: The display name must correspond to this exact exhausted opportunity; the report is imaginary. |  |  |
 | SX-G-02 | Gear obsession | M | `{location}` | "The locker at {location} is past troubleshooting; its opportunity is spent." | locker | no | SX: `market-locker` at Market only; the technical reaction concerns its exhausted opportunity, not a device failure. |  |  |
 | SX-G-03 | Overconfidence | O | - | "The humming crate's chance is exhausted; my brilliant curiosity isn't." | crate | no | SX: `humming-crate` at Salvage Yard only; the boast concerns its exhausted chance, not a machine or discovery. |  |  |
 | SX-G-04 | Loot greed | J | `{location}` | "Even my curiosity can't restart that spent opportunity at {location}." | - | no | SX: Curiosity meets an already-exhausted chance without claiming a component. |  |  |
@@ -1323,7 +1489,7 @@ container inferred from the node or an earlier event.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| SX-H-01 | Loot greed | J | `{opportunity}` | "I can't pocket another chance from this exhausted opportunity: {opportunity}." | `{opportunity}` | no | SX: The committed opportunity ID identifies the spent chance; the collecting metaphor claims no item. |  |  |
+| SX-H-01 | Loot greed | J | `{opportunity}` | "I can't pocket another chance at {opportunity}." | `{opportunity}` | no | SX: The display name must correspond to this exact exhausted opportunity; no item is claimed. |  |  |
 | SX-H-02 | Genre tension | M | `{location}` | "The locker at {location} has no more opportunity to offer me." | locker | no | SX: `market-locker` at Market only; its exhausted opportunity offers no inference about an item or recipient. |  |  |
 | SX-H-03 | Bureaucracy | O | - | "The humming crate's chance is filed under things I didn't get to keep." | crate | yes | SX: `humming-crate` at Salvage Yard only; the imagined filing concerns its exhausted chance, not an owned item. |  |  |
 | SX-H-04 | Overconfidence | J | `{location}` | "Even persistence won't reopen that opportunity at {location}." | - | no | SX: The boast meets an exhausted chance, without implying another attempt succeeded. |  |  |
@@ -1338,12 +1504,12 @@ subsequent travel, a search, a find, or an encounter.
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
 | AR-B-01 | False optimism | J | `{location}` | "The Market must be ready for my bargaining now that the route delivered me to {location}." | route | no | AR: Market only; arrival inspires an optimistic expectation, not a transaction or an identified trader. |  |  |
-| AR-B-02 | Loot greed | M | `{location}` | "The path to {location} has left my salvage instincts with unreasonable expectations." | path | no | AR: Salvage Yard only; the completed journey excites appetite without asserting a find. |  |  |
+| AR-B-02 | Loot greed | M | `{location}` | "Arriving at {location} leaves my salvage instincts with unreasonable expectations." | path | no | AR: Salvage Yard only; the completed journey excites desire without asserting a find. |  |  |
 | AR-B-03 | Gear obsession | O | - | "Those boots consider arriving a personal triumph." | boots | no | AR: Personified boots celebrate reaching a location, not a subsequent action. |  |  |
-| AR-B-04 | Gear obsession | J | `{location}` | "My navigation theory wants credit for the path ending at the depot: {location}." | path | no | AR: Service Depot only; the theory claims credit for the completed journey, not a repair. |  |  |
+| AR-B-04 | Gear obsession | J | `{location}` | "My navigation theory wants credit for reaching {location}." | path | no | AR: Service Depot only; the theory claims credit for the completed journey, not a repair. |  |  |
 | AR-B-05 | Genre tension | M | `{location}` | "Reaching {location} is an entrance, not a boarding pass." | boarding pass | yes | AR: Extraction Platform only; the figurative pass distinguishes arrival from boarding or extraction. |  |  |
 | AR-B-06 | Loot greed | O | - | "Arrival has me counting treasures I haven't seen." | - | no | AR: Imagined treasures respond to reaching the location without claiming a find. |  |  |
-| AR-B-07 | Loot greed | J | `{location}` | "My appetite followed the route all the way to {location}." | route | no | AR: Appetite accompanies the completed route without claiming a search or find. |  |  |
+| AR-B-07 | Loot greed | J | `{location}` | "Loot ambitions marched the whole route to {location}." | route | no | AR: Desire accompanies the completed route without claiming a search or find. |  |  |
 | AR-B-08 | Genre tension | M | `{location}` | "Arriving at {location} has given my confidence a change of scenery." | - | no | AR: The scenery change is the arrival itself, not evidence of another event. |  |  |
 
 ### Cautious
@@ -1353,9 +1519,9 @@ subsequent travel, a search, a find, or an encounter.
 | AR-C-01 | False optimism | J | `{location}` | "This Market visit is bound to be uneventful after my route to {location}." | route | no | AR: Market only; the completed journey sparks an optimistic expectation without asserting a purchase. |  |  |
 | AR-C-02 | Loot greed | M | `{location}` | "The path to {location} has me wondering what, if anything, is worth keeping." | path | no | AR: Salvage Yard only; curiosity about possible salvage follows the journey without claiming a find. |  |  |
 | AR-C-03 | Overconfidence | O | - | "Those boots arrived without demanding a celebration." | boots | no | AR: The understated boast personifies footwear after arrival, not a later action. |  |  |
-| AR-C-04 | Gear obsession | J | `{location}` | "My mental map marks where these feet arrived at the depot: {location}." | feet | no | AR: Service Depot only; the completed journey reaches the depot, not a repair. |  |  |
+| AR-C-04 | Gear obsession | J | `{location}` | "My mental map marks these feet's arrival at {location}." | feet | no | AR: Service Depot only; the completed journey reaches the depot, not a repair. |  |  |
 | AR-C-05 | Genre tension | M | `{location}` | "Reaching {location} isn't a boarding pass." | boarding pass | yes | AR: Extraction Platform only; the figurative pass distinguishes arrival from boarding. |  |  |
-| AR-C-06 | Loot greed | O | - | "Arrival puts bearings before my appetite for once." | - | no | AR: The Raider puts orientation before appetite after arriving, without claiming a subsequent find. |  |  |
+| AR-C-06 | Loot greed | O | - | "Arrival puts bearings before ambitions for once." | - | no | AR: The Raider puts orientation before desire after arriving, without claiming a subsequent find. |  |  |
 | AR-C-07 | Overconfidence | J | `{location}` | "No speech required for a route ending at {location}." | route | no | AR: The understatement concerns the completed route to this location, not a search. |  |  |
 | AR-C-08 | Bureaucracy | M | `{location}` | "Arrival at {location} is the entire entry in today's travel log." | - | yes | AR: The figurative log records only arrival, without inventing a further event. |  |  |
 
@@ -1363,10 +1529,10 @@ subsequent travel, a search, a find, or an encounter.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| AR-G-01 | Genre tension | J | `{location}` | "The path delivered me to the opening scene of a shopping episode: {location}." | path | no | AR: Market only; arrival begins an imagined episode without claiming a purchase. |  |  |
+| AR-G-01 | Genre tension | J | `{location}` | "An imagined shopping episode opens upon reaching {location}." | path | no | AR: Market only; arrival begins an imagined episode without claiming a purchase. |  |  |
 | AR-G-02 | Gear obsession | M | `{location}` | "The path to {location} brought my engineering curiosity ahead of my judgment." | path | no | AR: Salvage Yard only; curiosity follows the completed journey without claiming a find. |  |  |
 | AR-G-03 | Overconfidence | O | - | "Arrival confirms my theory that the route leads somewhere." | route | no | AR: The deliberately modest theory follows the completed journey, not another discovery. |  |  |
-| AR-G-04 | False optimism | J | `{location}` | "These feet reached the depot, which my mental map calls promising: {location}." | feet | no | AR: Service Depot only; optimism follows the completed journey without implying a repair. |  |  |
+| AR-G-04 | False optimism | J | `{location}` | "My mental map calls these feet's arrival promising at {location}." | feet | no | AR: Service Depot only; optimism follows the completed journey without implying a repair. |  |  |
 | AR-G-05 | Bureaucracy | M | `{location}` | "The route to {location} is complete; boarding needs a separate entry." | route | yes | AR: Extraction Platform only; the mock entry distinguishes arrival from boarding. |  |  |
 | AR-G-06 | Loot greed | O | - | "Arrival has my imagination rummaging before the rest of me starts." | - | no | AR: Imagined rummaging reacts to arrival without claiming an actual search or find. |  |  |
 | AR-G-07 | Loot greed | J | `{location}` | "The trip has given my acquisitive streak new equations to solve at {location}." | - | no | AR: Imagined equations respond to the journey without claiming a find. |  |  |
@@ -1379,7 +1545,7 @@ subsequent travel, a search, a find, or an encounter.
 | AR-H-01 | False optimism | J | `{location}` | "My acquisitive streak predicts excellent possibilities at the end of the route to {location}." | route | no | AR: Market only; the completed route inspires an optimistic prediction without asserting a purchase. |  |  |
 | AR-H-02 | Genre tension | M | `{location}` | "The path to {location} has inflated my expectations beyond the evidence." | path | no | AR: Salvage Yard only; expectations follow the completed journey without asserting a find. |  |  |
 | AR-H-03 | Loot greed | O | - | "My boots have brought my souvenir instincts to a fresh arrival." | boots | no | AR: The personified journey inspires souvenir instincts without claiming an acquisition. |  |  |
-| AR-H-04 | Gear obsession | J | `{location}` | "The path's end earns a place on the map in my head: {location}." | path | no | AR: Service Depot only; the completed journey reaches the depot, not a service or item. |  |  |
+| AR-H-04 | Gear obsession | J | `{location}` | "My mental map prizes the path's end at {location}." | path | no | AR: Service Depot only; the completed journey reaches the depot, not a service or item. |  |  |
 | AR-H-05 | Overconfidence | M | `{location}` | "Reaching {location} deserves a boarding pass for my confidence, if not for me." | boarding pass | yes | AR: Extraction Platform only; the imaginary pass celebrates arrival without claiming boarding. |  |  |
 | AR-H-06 | Loot greed | O | - | "At a fresh arrival, my hunger unwraps the prospects." | - | no | AR: The appetite responds to arrival without asserting a find. |  |  |
 | AR-H-07 | Genre tension | J | `{location}` | "The route is behind me, but the story doesn't end upon reaching {location}." | route | no | AR: The completed journey is framed as an arrival rather than a later outcome or extraction. |  |  |
@@ -1399,7 +1565,7 @@ can cover all three. No line promises boarding, arrival elsewhere, or extraction
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
 | AD-B-01 | Overconfidence | J | `{location}` | "Even my boots are making an entrance by leaving {location}." | boots | no | AD: Departure from Entry Tunnel only; the boot metaphor celebrates leaving, not arrival. |  |  |
-| AD-B-02 | Gear obsession | M | `{location}` | "Leaving {location} is the first round in my argument with my bootlaces." | bootlaces | no | AD: Departure from Entry Tunnel only; the imagined laces turn departure into a gear joke, not a fight. |  |  |
+| AD-B-02 | Gear obsession | M | `{location}` | "Leaving {location}, my boots had better keep up with my confidence." | boots | no | AD: Departure from Entry Tunnel only; the boast personifies footwear without claiming a fight. |  |  |
 | AD-B-03 | Gear obsession | O | - | "Even my interest in equipment is ready for the start of duty." | - | no | AD: Gear-minded enthusiasm responds to beginning duty without implying equipment ownership. |  |  |
 | AD-B-04 | Overconfidence | M | `{location}` | "My feet are leaving {location}; my confidence has already arrived." | feet | no | AD: Departure from Entry Tunnel only; the imagined arrival is confidence, not the Raider. |  |  |
 
@@ -1410,16 +1576,16 @@ can cover all three. No line promises boarding, arrival elsewhere, or extraction
 | AD-C-01 | Bureaucracy | J | `{location}` | "The checklist in my head says my feet can leave {location}." | feet | yes | AD: Departure from Entry Tunnel only; the imaginary list concerns leaving, not a later arrival. |  |  |
 | AD-C-02 | Overconfidence | M | `{location}` | "Leaving {location} is a job for careful feet, not a victory parade." | feet | no | AD: Departure from Entry Tunnel only; the understatement concerns the start of travel, not success. |  |  |
 | AD-C-03 | Gear obsession | O | - | "Beginning duty is easier when my shoelaces don't receive emergency status." | shoelaces | no | AD: Imagined preparation suits admission or departure without claiming a particular equipment action. |  |  |
-| AD-C-04 | Loot greed | M | `{location}` | "The boots leaving {location} have my appetite's cautious approval." | boots | no | AD: Departure from Entry Tunnel only; appetite approves leaving without claiming a find. |  |  |
+| AD-C-04 | Loot greed | M | `{location}` | "The boots leaving {location} have my cautious approval." | boots | no | AD: Departure from Entry Tunnel only; the Raider approves leaving without claiming a find. |  |  |
 
 ### Gadgeteer
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
 | AD-G-01 | Gear obsession | J | `{location}` | "My feet and my calculations agree on one thing: leaving {location}." | feet | no | AD: Departure from Entry Tunnel only; the imagined agreement concerns leaving, not arrival. |  |  |
-| AD-G-02 | Bureaucracy | M | `{location}` | "Those boots leaving {location} get the first entry on my mental travel checklist." | boots | yes | AD: Departure from Entry Tunnel only; the imaginary checklist concerns leaving, not a completed trip. |  |  |
+| AD-G-02 | Bureaucracy | M | `{location}` | "Departure from {location} passes my imaginary boot-readiness test." | boots | yes | AD: Departure from Entry Tunnel only; the imagined test concerns leaving, not an actual inspection. |  |  |
 | AD-G-03 | Overconfidence | O | - | "My feet can begin duty without consulting my calculations." | feet | no | AD: The boast concerns admission or departure without implying equipment or a later result. |  |  |
-| AD-G-04 | Loot greed | J | `{location}` | "My appetite for experiments wants to come along from {location}." | - | no | AD: Departure from Entry Tunnel only; curiosity accompanies leaving without claiming a find or experiment. |  |  |
+| AD-G-04 | Loot greed | J | `{location}` | "Speculative ideas come along from {location}." | - | no | AD: Departure from Entry Tunnel only; curiosity accompanies leaving without claiming a find or experiment. |  |  |
 
 ### Hoarder
 
@@ -1459,7 +1625,7 @@ secured extraction. Existing candidate rows still need this factual audit.
 | PS-C-03 | Genre tension | O | - | "Packing rewards patience more reliably than a heroic speech." | - | no | PS: The comparison responds to packing beginning, not an outcome or item. |  |  |
 | PS-C-04 | Overconfidence | J | `{location}` | "Beginning to stow a bag is no reason to challenge physics at {location}." | bag | no | PS: The understatement concerns beginning to pack, not a filled bag or a completed result. |  |  |
 | PS-C-05 | Loot greed | M | `{location}` | "Organizing the bag at {location} starts before greed gets a vote." | bag | no | PS: The imagined vote concerns packing beginning without claiming any contents. |  |  |
-| PS-C-06 | Loot greed | O | - | "Beginning to stow is a reminder that space isn't the same as wanting more." | - | no | PS: The collector compares desire with packing space without asserting a filled bag or added capacity. |  |  |
+| PS-C-06 | Loot greed | O | - | "Starting to stow reminds me that space isn't the same as wanting more." | - | no | PS: The Raider compares desire with packing space without asserting a filled bag or added capacity. |  |  |
 | PS-C-07 | Gear obsession | J | `{location}` | "My bag-organizing plans give the zipper a moment to breathe at {location}." | zipper | no | PS: The personified fastener concerns the start of packing, not its condition or the bag's contents. |  |  |
 | PS-C-08 | Bureaucracy | M | `{location}` | "Packing at {location} has inspired my greed to file an imaginary request for room." | - | yes | PS: The imaginary request responds to packing starting, not a capacity change or added item. |  |  |
 
@@ -1469,11 +1635,11 @@ secured extraction. Existing candidate rows still need this factual audit.
 |---|---|---|---|---|---|---|---|---|
 | PS-G-01 | Genre tension | J | `{location}` | "The backpack stars in the experiment I imagine while beginning to pack at {location}." | backpack | no | PS: The imagined experiment reacts to packing beginning without claiming a completed arrangement. |  |  |
 | PS-G-02 | Genre tension | M | `{location}` | "Arranging the bag at {location} feels like a puzzle before anyone has shown me the picture." | bag | no | PS: The puzzle analogy concerns starting to pack, not a real puzzle or an item award. |  |  |
-| PS-G-03 | Loot greed | O | - | "Stowing brings out my appetite for one more pouch." | pouch | no | PS: The desired pouch reflects packing beginning, not added capacity or an item. |  |  |
+| PS-G-03 | Loot greed | O | - | "Stowing inspires a plan for one more pouch." | pouch | no | PS: The imagined plan reflects packing beginning, not added capacity or an item. |  |  |
 | PS-G-04 | Overconfidence | J | `{location}` | "My first effort arranging the backpack deserves an elaborate design at {location}." | backpack | no | PS: The boast concerns an imagined design at the start of packing, not bag contents. |  |  |
 | PS-G-05 | False optimism | M | `{location}` | "Starting to organize at {location} makes flawless packing look like a solved engineering problem." | - | no | PS: The optimistic assessment concerns packing just begun, not a completed arrangement. |  |  |
 | PS-G-06 | Loot greed | O | - | "Starting to stow makes another compartment sound like a brilliant idea." | compartment | no | PS: The desired compartment reflects the activity beginning, not added capacity. |  |  |
-| PS-G-07 | Loot greed | J | `{location}` | "An ideal pouch has my appetite dreaming as the stowing begins at {location}." | pouch | no | PS: The imagined pouch concerns packing starting without claiming a part or pouch exists. |  |  |
+| PS-G-07 | Loot greed | J | `{location}` | "An ideal pouch enters my engineering thoughts as stowing begins at {location}." | pouch | no | PS: The imagined pouch concerns packing starting without claiming a part or pouch exists. |  |  |
 | PS-G-08 | Overconfidence | M | `{location}` | "Packing plans at {location} have ambitions far beyond ordinary geometry." | - | no | PS: The boast concerns a plan at the start of packing, not a measured result. |  |  |
 
 ### Hoarder
@@ -1526,12 +1692,12 @@ Existing candidate rows still need this factual audit.
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
 | PF-G-01 | Genre tension | J | `{location}` | "That backpack has survived my elaborate packing methodology at {location}." | backpack | no | PF: The joke follows the completed packing activity without claiming its contents or condition. |  |  |
-| PF-G-02 | Loot greed | M | `{location}` | "The stowing at {location} is over; my appetite wants a spare compartment already." | compartment | no | PF: The imagined compartment is desired after completed packing, not claimed as added capacity. |  |  |
+| PF-G-02 | Loot greed | M | `{location}` | "The stowing at {location} is over; my theory calls for a spare compartment." | compartment | no | PF: The imagined compartment is desired after completed packing, not claimed as added capacity. |  |  |
 | PF-G-03 | Overconfidence | O | - | "My backpack and I have finished a very technical organizing conversation." | backpack | no | PF: The conversation metaphor marks packing's completion without asserting an item. |  |  |
 | PF-G-04 | Loot greed | J | `{location}` | "The completed pouch procedure earns my acquisitive applause at {location}." | pouch | no | PF: The imagined procedure celebrates completed packing, not an acquired part. |  |  |
 | PF-G-05 | False optimism | M | `{location}` | "Stowing complete at {location}; my imaginary zipper design is obviously flawless." | zipper | no | PF: The optimistic opinion concerns an imaginary fastener design, not the actual fastener's condition. |  |  |
 | PF-G-06 | Loot greed | O | - | "A completed packing job makes a spare compartment sound even more appealing." | compartment | no | PF: The imagined compartment is desired after packing, not claimed as added capacity. |  |  |
-| PF-G-07 | Loot greed | J | `{location}` | "Pockets have my appetite's applause now stowing is finished at {location}." | pockets | no | PF: The imaginary victory marks completed packing without asserting items in the pockets. |  |  |
+| PF-G-07 | Loot greed | J | `{location}` | "Pocket architecture earns my praise now stowing is finished at {location}." | pockets | no | PF: The imagined assessment marks completed packing without asserting items in the pockets. |  |  |
 | PF-G-08 | Overconfidence | M | `{location}` | "My packing design at {location} is quietly smug about reaching the end." | - | no | PF: The boast concerns the activity finishing, not a measured layout or secured exit. |  |  |
 
 ### Hoarder
@@ -1543,7 +1709,7 @@ Existing candidate rows still need this factual audit.
 | PF-H-03 | Gear obsession | O | - | "The pouch can stop listening to my packing advice now." | pouch | no | PF: The imagined pouch hears the end of the packing activity, not a claimed inventory. |  |  |
 | PF-H-04 | Overconfidence | J | `{location}` | "Even the zipper must admire my completed organizing at {location}." | zipper | no | PF: The personified fastener celebrates packing's completion, not its own condition. |  |  |
 | PF-H-05 | Bureaucracy | M | `{location}` | "The packing at {location} goes in my mental ledger under 'properly cherished.'" | - | yes | PF: The imagined filing describes the completed activity, not a real document or added item. |  |  |
-| PF-H-06 | Genre tension | O | - | "Stowing the bag is complete, along with our deeply emotional consultation." | bag | no | PF: The imagined consultation marks the end of packing without asserting the bag contains anything. |  |  |
+| PF-H-06 | Genre tension | O | - | "Stowing is complete; the bag and my ambitions remain on speaking terms." | bag | no | PF: The imagined relationship follows completed packing without asserting any contents. |  |  |
 | PF-H-07 | Gear obsession | J | `{location}` | "Even the zipper deserves a quiet moment when stowing ends at {location}." | zipper | no | PF: The personified fastener marks the finished packing activity, not its condition or contents. |  |  |
 | PF-H-08 | Overconfidence | M | `{location}` | "The completed packing at {location} has met its most devoted organizer." | - | no | PF: The boast follows the activity's completion without claiming ownership or extraction. |  |  |
 
@@ -1556,10 +1722,10 @@ forecast, not evidence that the hazard has already struck or will cause HP loss.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|---|
-| HW-B-01 | Overconfidence | J | `{condition}` | "I'll give that fog warning my most intimidating squint: {condition}." | `{condition}` | no | HW: Light Fog only; the squint answers its warning rather than reporting fog or an impact. |  |  |
+| HW-B-01 | Overconfidence | J | `{condition}` | "An intimidating squint answers the warning for {condition}." | `{condition}` | no | HW: Light Fog only; the squint answers its warning rather than reporting fog or an impact. |  |  |
 | HW-B-02 | Genre tension | M | `{condition}` | "The warning for {condition} sounds like the end of a shift nobody wants to finish." | `{condition}` | no | HW: Overtime Red only; the closing-time comparison reacts to the forecast, not an actual closing. |  |  |
 | HW-B-03 | Overconfidence | O | - | "The forecast can wait while I finish looking unimpressed." | - | no | HW: The boast responds to a warning without claiming the hazard has struck. |  |  |
-| HW-B-04 | Genre tension | J | `{condition}` | "That forecast has terrible timing for my bravest face: {condition}." | `{condition}` | no | HW: The Raider reacts to this condition's forecast, not an impact. |  |  |
+| HW-B-04 | Genre tension | J | `{condition}` | "My bravest face objects to the forecast for {condition}." | `{condition}` | no | HW: The Raider reacts to this condition's forecast, not an impact. |  |  |
 | HW-B-05 | Overconfidence | M | `{condition}` | "Tell {condition} I don't accept advance apologies from weather." | `{condition}` | no | HW: Apology Weather only; the Raider rejects the forecast's implied apology without claiming it has struck. |  |  |
 | HW-B-06 | Loot greed | O | - | "That condition alert has offended my ambitions for loot." | - | no | HW: The ambitions object to the condition warning without claiming an item or impact. |  |  |
 | HW-B-07 | False optimism | J | `{location}` | "I'm certain that environmental warning is the worst my glare will face at {location}." | - | no | HW: The optimistic belief reframes the condition warning without guaranteeing safety or an impact. |  |  |
@@ -1569,7 +1735,7 @@ forecast, not evidence that the hazard has already struck or will cause HP loss.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| HW-C-01 | False optimism | J | `{condition}` | "That warning must be all the fog has planned for me: {condition}." | `{condition}` | no | HW: Light Fog only; the optimistic belief follows its warning without guaranteeing an outcome. |  |  |
+| HW-C-01 | False optimism | J | `{condition}` | "Surely a warning is all the fog has planned under {condition}." | `{condition}` | no | HW: Light Fog only; the optimistic belief follows its warning without guaranteeing an outcome. |  |  |
 | HW-C-02 | Gear obsession | M | `{condition}` | "For {condition}, an umbrella sounds more useful than accepting the apology." | `{condition}`, umbrella | no | HW: Apology Weather only; the umbrella fits its drizzle, without claiming protection or impact. |  |  |
 | HW-C-03 | Overconfidence | O | - | "I can take a forecast seriously without applauding it." | - | no | HW: The Raider treats the condition forecast seriously without claiming the hazard occurred. |  |  |
 | HW-C-04 | Loot greed | J | `{condition}` | "Loot can wait until I've considered the forecast for {condition}." | `{condition}` | no | HW: This condition's warning tempers enthusiasm for loot without asserting a find. |  |  |
@@ -1582,10 +1748,10 @@ forecast, not evidence that the hazard has already struck or will cause HP loss.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| HW-G-01 | Genre tension | J | `{condition}` | "My visibility calculations dislike this fog forecast: {condition}." | `{condition}` | no | HW: Light Fog only; imagined calculations respond to the forecast, not measured visibility. |  |  |
+| HW-G-01 | Genre tension | J | `{condition}` | "My visibility model dislikes the forecast for {condition}." | `{condition}` | no | HW: Light Fog only; the imagined model responds to the forecast, not measured visibility. |  |  |
 | HW-G-02 | False optimism | M | `{condition}` | "If {condition} is apologizing in advance, perhaps its forecast appreciates feedback." | `{condition}` | no | HW: Apology Weather only; the optimistic complaint concerns its warning and claims no impact. |  |  |
 | HW-G-03 | Overconfidence | O | - | "Even I respect an environmental alert with its eyebrows raised." | - | no | HW: The boast gives this condition's forecast imaginary eyebrows without claiming an actual reading. |  |  |
-| HW-G-04 | Loot greed | J | `{condition}` | "The alert has postponed my daydream about finding parts: {condition}." | `{condition}` | no | HW: This condition's warning interrupts imagined interest in parts without claiming a find. |  |  |
+| HW-G-04 | Loot greed | J | `{condition}` | "Even my theoretical parts list distrusts the warning for {condition}." | `{condition}` | no | HW: This condition's warning concerns imagined interest in parts, not a prior activity or find. |  |  |
 | HW-G-05 | Gear obsession | M | `{condition}` | "The forecast for {condition} makes waterproofing sound worth considering." | `{condition}` | no | HW: Apology Weather only; the drizzle forecast inspires caution, not a claim of equipment or protection. |  |  |
 | HW-G-06 | Genre tension | O | - | "The condition warning interrupted my theory's most dramatic chapter." | - | yes | HW: The imagined chapter concerns the condition forecast, not an actual book or impact. |  |  |
 | HW-G-07 | Overconfidence | J | `{location}` | "I can overengineer a response to this warning at {location}." | - | no | HW: The boast concerns a possible response to this warning, not a completed action. |  |  |
@@ -1596,8 +1762,8 @@ forecast, not evidence that the hazard has already struck or will cause HP loss.
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
 | HW-H-01 | False optimism | J | `{condition}` | "This warning must keep me one step ahead of {condition}." | `{condition}` | no | HW: Light Fog only; the optimistic expectation follows its warning without claiming the fog has struck. |  |  |
-| HW-H-02 | Genre tension | M | `{condition}` | "The forecast for {condition} leaves even my ambition feeling overworked." | `{condition}` | no | HW: Overtime Red only; the collector's reaction to the warning echoes overtime, not a real closing. |  |  |
-| HW-H-03 | Loot greed | O | - | "An advance condition alert asks my appetite to exercise caution." | - | no | HW: The condition warning tempers the collector's desires, not an item loss or impact. |  |  |
+| HW-H-02 | Genre tension | M | `{condition}` | "An alert about {condition} leaves even my ambition feeling overworked." | `{condition}` | no | HW: Overtime Red only; the collector's reaction to the warning echoes overtime, not a real closing. |  |  |
+| HW-H-03 | Loot greed | O | - | "An advance condition alert asks my greed to exercise caution." | - | no | HW: The condition warning tempers the collector's desires, not an item loss or impact. |  |  |
 | HW-H-04 | Overconfidence | J | `{condition}` | "Even my ambitions can pause for the warning about {condition}." | `{condition}` | no | HW: The boast responds to this condition's warning without claiming an item or safety. |  |  |
 | HW-H-05 | Loot greed | M | `{condition}` | "The advance apology of {condition} is competing with my hunger for more." | `{condition}` | no | HW: Apology Weather only; the warning competes with the collector's desires, not an asserted impact. |  |  |
 | HW-H-06 | Genre tension | O | - | "A forecast is a poor souvenir, but the notice is worth keeping in mind." | - | no | HW: The warning is remembered as information, not an actual hazard or physical souvenir. |  |  |
@@ -1614,7 +1780,7 @@ injury, attacker, or future outcome.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| HI-B-01 | Overconfidence | J | `{condition}` | "That fog's blow has earned my loudest glare: {condition}." | `{condition}` | no | HI: Light Fog only; the boast reacts to its impact without implying injury. |  |  |
+| HI-B-01 | Overconfidence | J | `{condition}` | "My loudest glare answers the blow from {condition}." | `{condition}` | no | HI: Light Fog only; the boast reacts to its impact without implying injury. |  |  |
 | HI-B-02 | Overconfidence | M | `{condition}` | "That impact from {condition} has earned my loudest disapproval." | `{condition}` | no | HI: The complaint responds to this condition's raw impact, not an HP loss. |  |  |
 | HI-B-03 | Gear obsession | O | - | "My pride wants armor after that jolt from the environment." | armor | no | HI: Imagined armor reacts to the condition's impact without claiming protection or injury. |  |  |
 | HI-B-04 | Loot greed | J | `{condition}` | "I'd rather collect anything other than that jolt from {condition}." | `{condition}` | no | HI: The collector rejects this condition's impact without claiming an item loss. |  |  |
@@ -1627,10 +1793,10 @@ injury, attacker, or future outcome.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| HI-C-01 | Genre tension | J | `{condition}` | "That fog made its presence felt rather directly: {condition}." | `{condition}` | no | HI: Light Fog only; the understatement responds to its raw impact without claiming injury. |  |  |
+| HI-C-01 | Genre tension | J | `{condition}` | "That jolt was a rather direct introduction to {condition}." | `{condition}` | no | HI: Light Fog only; the understatement responds to its raw impact without claiming injury. |  |  |
 | HI-C-02 | Gear obsession | M | `{condition}` | "The impact from {condition} has my imagined shock absorber reconsidering its career." | `{condition}` | no | HI: The imagined absorber comments on the raw impact without claiming equipment or mitigation. |  |  |
 | HI-C-03 | Overconfidence | O | - | "That jolt from the conditions doesn't need a speech to earn my objection." | - | no | HI: The understatement responds to the condition's impact without describing injury. |  |  |
-| HI-C-04 | Genre tension | J | `{condition}` | "The environment has made its point with that jolt: {condition}." | `{condition}` | no | HI: The figurative point refers to this condition's impact, not an HP outcome. |  |  |
+| HI-C-04 | Genre tension | J | `{condition}` | "That jolt makes a persuasive point about {condition}." | `{condition}` | no | HI: The figurative point refers to this condition's impact, not an HP outcome. |  |  |
 | HI-C-05 | Gear obsession | M | `{condition}` | "After that impact, {condition} owes my imaginary raincoat an explanation." | `{condition}`, raincoat | no | HI: Apology Weather only; the raincoat suits its drizzle but is not claimed as worn or protective. |  |  |
 | HI-C-06 | Loot greed | O | - | "The condition's strike interrupted my thoughts about loot." | - | no | HI: The condition's impact interrupts imagined thoughts without claiming a lost item or stopped activity. |  |  |
 | HI-C-07 | Overconfidence | J | `{location}` | "I can take that environmental hit seriously without applauding it at {location}." | - | no | HI: The understatement addresses the condition's impact here without claiming it was harmless. |  |  |
@@ -1645,7 +1811,7 @@ injury, attacker, or future outcome.
 | HI-G-03 | Overconfidence | O | - | "The environment's hit makes an excellent calibration point for caution." | - | no | HI: The calibration metaphor responds to the condition's impact without claiming equipment or a measurement. |  |  |
 | HI-G-04 | Gear obsession | J | `{condition}` | "My imaginary shock absorber objects to the jolt from {condition}." | `{condition}` | no | HI: The imagined absorber reacts to this condition's impact without claiming actual equipment or mitigation. |  |  |
 | HI-G-05 | Genre tension | M | `{condition}` | "The apology from {condition} has failed its impact test." | `{condition}` | no | HI: Apology Weather only; an imaginary test jokes about the condition's name after its impact. |  |  |
-| HI-G-06 | Loot greed | O | - | "That jolt from the surroundings interrupted an excellent daydream about finding something useful." | - | no | HI: The condition's impact interrupts a daydream without asserting an acquisition or loss. |  |  |
+| HI-G-06 | Loot greed | O | - | "That environmental jolt puts useful parts into the category of distant theoretical problems." | - | no | HI: The condition's impact prompts a technical opinion without asserting a prior daydream or acquisition. |  |  |
 | HI-G-07 | Overconfidence | J | `{location}` | "I can call that environmental hit a data point at {location}." | - | no | HI: The technical metaphor describes the condition's impact here without claiming a measured value. |  |  |
 | HI-G-08 | Gear obsession | M | `{condition}` | "My imaginary time clock logged that impact from {condition} as overtime." | `{condition}` | yes | HI: Overtime Red only; the imaginary clock plays on the impact's condition name, not an actual shift. |  |  |
 
@@ -1701,7 +1867,7 @@ any reward or that the Raider avoided injury.
 |---|---|---|---|---|---|---|---|---|
 | RD-H-01 | Gear obsession | J | `{robot}` | "That defeated worry machine has me pondering its mechanisms: {robot}." | `{robot}` | no | RD: Anxietick only; interest follows defeat without claiming it or its parts. |  |  |
 | RD-H-02 | Genre tension | M | `{robot}` | "The defeated {robot} has finally retired from aggressive housekeeping." | `{robot}` | no | RD: Roomba Prime only; retirement describes its defeat, not ownership or a later action. |  |  |
-| RD-H-03 | Gear obsession | O | - | "Passive-Aggressor Drone's defeated chassis looks disapproving to my inner mechanic." | Passive-Aggressor Drone | no | RD: Passive-Aggressor Drone only; the imagined disapproval follows its defeat without implying disassembly. |  |  |
+| RD-H-03 | Gear obsession | O | - | "Passive-Aggressor Drone's defeated chassis looks disapproving of my acquisitive interest." | Passive-Aggressor Drone | no | RD: Passive-Aggressor Drone only; imagined disapproval follows defeat without implying disassembly. |  |  |
 | RD-H-04 | Overconfidence | J | `{location}` | "That beaten chassis should admire my composure at {location}." | chassis | no | RD: The boast addresses the defeated chassis without asserting a cargo award. |  |  |
 
 ## RX — RobotEscaped
@@ -1728,7 +1894,7 @@ that it departed. Do not imply that the Raider escaped or the robot was defeated
 | RX-C-01 | Gear obsession | J | `{robot}` | "My curiosity about the cleaning mechanism just lost its subject: {robot}." | `{robot}` | no | RX: Roomba Prime only; interest in its mechanism follows the robot's escape, not a salvage or inspection. |  |  |
 | RX-C-02 | Overconfidence | M | `{robot}` | "I can handle {robot} leaving without adding to its worries." | `{robot}` | no | RX: Anxietick only; the boast reacts to its escape without asserting an actual conversation. |  |  |
 | RX-C-03 | Genre tension | O | - | "Passive-Aggressor Drone has taken its silent judgment elsewhere." | Passive-Aggressor Drone | no | RX: Passive-Aggressor Drone only; the figurative judgment departs with the robot. |  |  |
-| RX-C-04 | Loot greed | J | `{location}` | "There goes a machine my collector's instincts wanted to inspect for parts at {location}." | machine | no | RX: The machine escapes before an imagined inspection, without acquiring or losing parts. |  |  |
+| RX-C-04 | Loot greed | J | `{location}` | "An escaping machine is not an invitation to linger at {location}." | machine | no | RX: The exact escape-after-rounds receipt reports departure; no inspection or parts are asserted. |  |  |
 
 ### Gadgeteer
 
@@ -1769,14 +1935,14 @@ recipient, or award.
 |---|---|---|---|---|---|---|---|---|
 | RC-C-01 | Bureaucracy | J | `{location}` | "The loot report after that robot's defeat deserves a calm reading at {location}." | robot, report | yes | RC: Service Depot only; the imagined report fits either cargo outcome and identifies no recipient. |  |  |
 | RC-C-02 | Gear obsession | M | `{location}` | "The salvage resolution after that machine went down at {location} calls for caution, not dismantling." | machine | no | RC: Service Depot only; the response fits either outcome without claiming an inspection or salvage. |  |  |
-| RC-C-03 | Overconfidence | O | - | "My composure can handle the cargo verdict after that chassis fell without claiming a share." | chassis | no | RC: Service Depot only; the restraint fits both outcomes without asserting a personal award. |  |  |
-| RC-C-04 | Loot greed | J | `{location}` | "The robot is down; my collector's patience is listening to the salvage outcome at {location}." | robot | no | RC: Service Depot only; the collector reacts to either resolution without claiming a particular award. |  |  |
+| RC-C-03 | Overconfidence | O | - | "My composure can handle the cargo verdict after that chassis fell." | chassis | no | RC: Service Depot only; the reaction fits either cargo outcome without asserting a personal award. |  |  |
+| RC-C-04 | Loot greed | J | `{location}` | "I can consider the salvage result calmly after that robot fell at {location}." | robot | no | RC: Service Depot only; the Raider reacts to either resolution without claiming a particular award. |  |  |
 
 ### Gadgeteer
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| RC-G-01 | Loot greed | J | `{location}` | "The cargo verdict after that robot's defeat has my collector's instincts calculating at {location}." | robot | no | RC: Service Depot only; curiosity responds to either resolution without inventing a component. |  |  |
+| RC-G-01 | Loot greed | J | `{location}` | "The cargo verdict after that robot's defeat gets my technical attention at {location}." | robot | no | RC: Service Depot only; curiosity responds to either resolution without inventing a component. |  |  |
 | RC-G-02 | Genre tension | M | `{location}` | "The cargo conclusion after that machine's defeat at {location} deserves a more dramatic explanation." | machine | no | RC: Service Depot only; the dramatic reaction fits either outcome, not a particular award. |  |  |
 | RC-G-03 | Gear obsession | O | - | "The salvage verdict after that chassis went down gives my inner engineer plenty to overthink." | chassis | no | RC: Service Depot only; the verdict concerns either cargo outcome, not a claimed component. |  |  |
 | RC-G-04 | Overconfidence | J | `{location}` | "I can give the cargo resolution after that robot's defeat a technical salute at {location}." | robot | no | RC: Service Depot only; the boast reacts to either cargo outcome without naming an award. |  |  |
@@ -1800,37 +1966,37 @@ claiming recovery has completed or begun anew.
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| RV-B-01 | Loot greed | J | `{location}` | "After that contest, my lungs demand the time my greed wanted at {location}." | lungs | no | RV: Catching breath after the contest takes time from greed, without claiming healing or a prize. |  |  |
-| RV-B-02 | Gear obsession | M | `{location}` | "At {location}, my lungs require a quieter operating mode after that contest." | lungs | no | RV: The technical metaphor describes catching breath, not a device, HP change or victory. |  |  |
-| RV-B-03 | Gear obsession | O | - | "Lungs are stubborn machinery; they want a pause after competing." | lungs | no | RV: Imagined machinery describes catching breath after the contest, not physical repair or healing. |  |  |
-| RV-B-04 | Overconfidence | J | `{location}` | "Catching my breath after the contest earns my ribs a stern look at {location}." | ribs | no | RV: The imagined stern look accompanies recovery, not an injury or restored HP. |  |  |
+| RV-B-01 | Loot greed | J | `{location}` | "My lungs can argue with ambition over this recovery at {location}." | lungs | no | RV: The imagined argument concerns recovery, not its cause, healing or a prize. |  |  |
+| RV-B-02 | Gear obsession | M | `{location}` | "Recovery at {location} has my lungs demanding a timeout." | lungs | no | RV: The demand describes recovery, not its cause, a device or HP change. |  |  |
+| RV-B-03 | Gear obsession | O | - | "Lungs are stubborn machinery; breath-catching is their favorite argument." | lungs | no | RV: Imagined machinery describes recovery, not its cause, repair or healing. |  |  |
+| RV-B-04 | Overconfidence | J | `{location}` | "Recovery earns my ribs a stern look at {location}." | ribs | no | RV: The imagined stern look accompanies recovery, not its cause, injury or restored HP. |  |  |
 
 ### Cautious
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| RV-C-01 | Loot greed | J | `{location}` | "After that contest, my lungs get priority over my appetite at {location}." | lungs | no | RV: Breathing after the contest takes precedence over imagined appetite, not a find or HP change. |  |  |
-| RV-C-02 | Gear obsession | M | `{location}` | "Breathing room at {location} gives my nerves a lower operating setting after competing." | - | no | RV: The imagined setting describes a pause after the contest, not medical treatment. |  |  |
-| RV-C-03 | Overconfidence | O | - | "These lungs deserve a pause after that contest, without an announcement." | lungs | no | RV: The understated boast concerns catching breath after the contest, not healing or a completed journey. |  |  |
-| RV-C-04 | Genre tension | J | `{location}` | "A quiet moment for my chest after that contest at {location}." | chest | no | RV: The pause follows the contest without asserting a victory, injury or HP change. |  |  |
+| RV-C-01 | Loot greed | J | `{location}` | "Recovery gives my lungs priority over further ambitions at {location}." | lungs | no | RV: The priority concerns recovery, not its cause, a find or HP change. |  |  |
+| RV-C-02 | Gear obsession | M | `{location}` | "Recovery at {location} leaves my nerves on a quieter setting." | - | no | RV: The imagined setting describes recovery, not its cause or medical treatment. |  |  |
+| RV-C-03 | Overconfidence | O | - | "These lungs can handle a breathing break without an announcement." | lungs | no | RV: The understated boast concerns recovery, not its cause, healing or a completed journey. |  |  |
+| RV-C-04 | Genre tension | J | `{location}` | "My chest gets a quiet word during recovery at {location}." | chest | no | RV: The imagined conversation concerns recovery, without asserting its cause or injury. |  |  |
 
 ### Gadgeteer
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| RV-G-01 | Genre tension | J | `{location}` | "After that contest, even my lungs demand a pause at {location}." | lungs | no | RV: Catching breath follows the contest without asserting a victory or HP gain. |  |  |
-| RV-G-02 | Genre tension | M | `{location}` | "After that contest, my lungs at {location} recommend low-power mode." | lungs | no | RV: A pause to catch breath inspires the lungs' imagined advice, not an injury. |  |  |
+| RV-G-01 | Genre tension | J | `{location}` | "Recovery gives my lungs a technical objection at {location}." | lungs | no | RV: The imagined objection concerns recovery without asserting its cause or HP gain. |  |  |
+| RV-G-02 | Genre tension | M | `{location}` | "During recovery at {location}, my lungs recommend low-power mode." | lungs | no | RV: Recovery inspires the lungs' imagined advice, not its cause or an injury. |  |  |
 | RV-G-03 | Overconfidence | O | - | "I can catch my breath without replacing an imaginary fuse." | - | no | RV: The technical metaphor describes catching breath, not physical repair or healing. |  |  |
-| RV-G-04 | Gear obsession | J | `{location}` | "My ribs need a maintenance pause after that contest at {location}." | ribs | no | RV: The body's imagined maintenance is breathing room, not actual repair, injury or healing. |  |  |
+| RV-G-04 | Gear obsession | J | `{location}` | "My ribs call recovery a maintenance cycle at {location}." | ribs | no | RV: The imagined cycle concerns recovery, not its cause, actual repair, injury or healing. |  |  |
 
 ### Hoarder
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| RV-H-01 | Loot greed | J | `{location}` | "After the contest, my lungs can have some precious breathing room at {location}." | lungs | no | RV: Catching breath after the contest is valued like a possession, not an HP restoration. |  |  |
-| RV-H-02 | Genre tension | M | `{location}` | "After competing at {location}, my chest gets breathing room no collection can improve." | chest | no | RV: A pause to recover after the contest is not a collectible item, victory or injury. |  |  |
-| RV-H-03 | Gear obsession | O | - | "Even my hunger has to let my breathing equipment cool down after the contest." | - | no | RV: Imagined breathing equipment gets a pause after the contest, not a repair or health effect. |  |  |
-| RV-H-04 | Overconfidence | J | `{location}` | "After that contest, my ribs have earned a quiet moment at {location}." | ribs | no | RV: The boast values a pause after the contest without claiming healing or victory. |  |  |
+| RV-H-01 | Loot greed | J | `{location}` | "My lungs can borrow some precious recovery time at {location}." | lungs | no | RV: Recovery time is valued like a possession, without asserting its cause or HP restoration. |  |  |
+| RV-H-02 | Genre tension | M | `{location}` | "Recovery at {location} offers my chest breathing room no collection can improve." | chest | no | RV: Recovery is not a collectible item, and its cause or injury is not asserted. |  |  |
+| RV-H-03 | Gear obsession | O | - | "Even my hunger admits breathing deserves a turn." | - | no | RV: The imagined turn concerns recovery, not its cause, a repair or health effect. |  |  |
+| RV-H-04 | Overconfidence | J | `{location}` | "My ribs have earned a valuable recovery at {location}." | ribs | no | RV: The boast values recovery without claiming its cause, healing or victory. |  |  |
 
 ## DN — Downed
 
@@ -1864,7 +2030,7 @@ receipt's `Reason`; source extraction and selection are not implemented.
 | DN-G-01 | Genre tension | J | `{location}` | "My plan for staying upright has met the ground at {location}." | ground | no | DN: The downed perspective disputes the imagined plan, without claiming recovery. |  |  |
 | DN-G-02 | Genre tension | M | `{source}` | "The impact of {source} has put my posture in low-power mode." | `{source}` | no | DN: The committed damage source caused the downed state, not a separate device failure or rescue. |  |  |
 | DN-G-03 | Overconfidence | O | - | "I can analyze being down without calling it a design feature." | - | no | DN: The boast concerns the Raider's downed state, not an equipment feature or completed recovery. |  |  |
-| DN-G-04 | Loot greed | J | `{location}` | "Being downed hasn't dampened my ground-level appetite for components at {location}." | ground | no | DN: Appetite persists despite the downed state, not a lost component or recovery. |  |  |
+| DN-G-04 | Loot greed | J | `{location}` | "Being downed hasn't dampened my ground-level interest in components at {location}." | ground | no | DN: Curiosity persists despite the downed state, not a lost component or recovery. |  |  |
 
 ### Hoarder
 
@@ -1890,7 +2056,7 @@ reasons exclude those variants.
 | KO-B-01 | Genre tension | J | `{source}` | "The knockout has given my glare a specific target: {source}." | `{source}` | no | KO: This settled knockout's committed cause inspires a figurative glare, not another fight. |  |  |
 | KO-B-02 | Overconfidence | M | `{source}` | "The reason is '{source}'; my pride refuses to make a speech." | `{source}` | no | KO: The settled knockout's committed cause leaves pride figuratively speechless, not acting later. |  |  |
 | KO-B-03 | Gear obsession | O | - | "Even the sturdiest helmet can't negotiate away a knockout." | helmet | no | KO: The hypothetical helmet cannot undo this settled knockout; no equipment or recovery is claimed. |  |  |
-| KO-B-04 | Loot greed | J | `{source}` | "Even my appetite has harsh words for this knockout's cause: {source}." | `{source}` | no | KO: Appetite objects to the committed knockout cause, not a lost or saved item. |  |  |
+| KO-B-04 | Loot greed | J | `{source}` | "My objections to this knockout are aimed at {source}." | `{source}` | no | KO: The complaint concerns the committed knockout cause, not a lost or saved item. |  |  |
 
 ### Cautious
 
@@ -1915,7 +2081,7 @@ reasons exclude those variants.
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
 | KO-H-01 | Loot greed | J | `{source}` | "A knockout is one experience I didn't want to collect: {source}." | `{source}` | no | KO: The settled knockout's committed cause is an unwanted experience, not a transaction or salvage. |  |  |
-| KO-H-02 | Genre tension | M | `{source}` | "The reason is '{source}'; I object to adding that knockout to my history." | `{source}` | no | KO: The settled knockout's committed cause gets an objection, not a later recovery. |  |  |
+| KO-H-02 | Genre tension | M | `{source}` | "For '{source}', I object to adding that knockout to my history." | `{source}` | no | KO: The settled knockout's committed cause gets an objection, not a later recovery. |  |  |
 | KO-H-03 | Gear obsession | O | - | "Not even a secret pocket can stow away being out cold." | pocket | no | KO: The imagined use of the secret pocket reacts to this settled knockout without claiming salvage. |  |  |
 | KO-H-04 | Loot greed | J | `{source}` | "I can't add this knockout's cause to anything worth keeping: {source}." | `{source}` | no | KO: The collector rejects the committed knockout cause, not a claimed item or extraction. |  |  |
 
@@ -1931,7 +2097,7 @@ successful extraction; no ownership details or later recovery are implied.
 | DL-B-01 | Overconfidence | J | `{location}` | "The deadline's clock has terrible manners at {location}." | clock | no | DL: The figurative clock marks the expired deadline, not a successful extraction. |  |  |
 | DL-B-02 | Genre tension | M | `{location}` | "At {location}, time ran out and stole my preferred finale." | - | no | DL: Figurative theft makes the expired deadline an unwanted ending without claiming item loss. |  |  |
 | DL-B-03 | Gear obsession | O | - | "That expired deadline earned the stopwatch in my head a glare." | stopwatch | no | DL: The imagined timer marks the expired deadline without altering its outcome. |  |  |
-| DL-B-04 | Loot greed | J | `{location}` | "Not even my appetite can squeeze another minute from the deadline's stopped clock at {location}." | clock | no | DL: The expired deadline defeats the appetite for more time, not an actual extraction. |  |  |
+| DL-B-04 | Loot greed | J | `{location}` | "No amount of shouting can bully another minute from the deadline's clock at {location}." | clock | no | DL: The expired deadline defeats desire for more time, not an actual extraction. |  |  |
 
 ### Cautious
 
@@ -1949,13 +2115,13 @@ successful extraction; no ownership details or later recovery are implied.
 | DL-G-01 | Gear obsession | J | `{location}` | "The deadline timer in my head has an unfriendly conclusion at {location}." | timer | no | DL: The imagined timer marks the deadline loss without implying a rescue. |  |  |
 | DL-G-02 | Genre tension | M | `{location}` | "At {location}, the deadline has all the charm of a stopwatch at zero." | stopwatch | no | DL: The timer comparison concerns an expired deadline, not an actual instrument or extraction. |  |  |
 | DL-G-03 | Overconfidence | O | - | "An expired time limit refuses to negotiate with arithmetic." | - | no | DL: The arithmetic joke concerns the expired deadline, not an actual negotiation or changed time. |  |  |
-| DL-G-04 | Loot greed | J | `{location}` | "The deadline's hourglass leaves my appetite no sand to collect at {location}." | hourglass | no | DL: The imagined timer reflects the expired deadline, not an actual acquisition or recovery. |  |  |
+| DL-G-04 | Loot greed | J | `{location}` | "The deadline's hourglass leaves my calculations no spare sand at {location}." | hourglass | no | DL: The imagined timer reflects the expired deadline, not an actual acquisition or recovery. |  |  |
 
 ### Hoarder
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
-| DL-H-01 | Loot greed | J | `{location}` | "The deadline's clock ran out before my appetite for more at {location}." | clock | no | DL: The figurative clock sets the expired deadline against desire, not item loss or extraction. |  |  |
+| DL-H-01 | Loot greed | J | `{location}` | "The deadline's clock ran out before my desire for more at {location}." | clock | no | DL: The figurative clock sets the expired deadline against desire, not item loss or extraction. |  |  |
 | DL-H-02 | Genre tension | M | `{location}` | "At {location}, my hunger watches the last grain fall from the deadline's hourglass." | hourglass | no | DL: The expired deadline cuts off desire without claiming cargo or a later outcome. |  |  |
 | DL-H-03 | Gear obsession | O | - | "Even an hourglass can't turn back an expired limit." | hourglass | no | DL: The imagined timer reflects the expired deadline, not an acquired object. |  |  |
 | DL-H-04 | Overconfidence | J | `{location}` | "Even I can't coax another minute from the expired deadline at {location}." | - | no | DL: The boast acknowledges the expired deadline without implying an actual purchase or extraction. |  |  |
@@ -1996,7 +2162,7 @@ names select a different row or fallback. No new extractor or loader exists.
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
 | HS-G-01 | Gear obsession | J | `{item}` | "Elegant containment has one successful specimen: {item}." | `{item}` | no | HS: The containment metaphor refers to this exact item being preserved in the pocket. |  |  |
-| HS-G-02 | Loot greed | M | `{item}` | "The pocket spared {item}; my collector's instincts can relax." | `{item}` | no | HS: The pocket spared this preserved item, not the Raider from knockout. |  |  |
+| HS-G-02 | Loot greed | M | `{item}` | "The pocket spared {item}; my containment theory gets one point." | `{item}` | no | HS: The pocket spared this preserved item, not the Raider from knockout. |  |  |
 | HS-G-03 | Overconfidence | O | - | "Left Boot survived in tiny storage; clearly, my taste in hiding places is excellent." | Left Boot | no | HS: Left Boot only; the preserved item illustrates the hidden pocket without implying a pair. |  |  |
 | HS-G-04 | Gear obsession | J | `{item}` | "My storage obsession has a successful demonstration: {item}." | `{item}` | no | HS: This item's preservation demonstrates the secret pocket without adding capacity. |  |  |
 
@@ -2019,16 +2185,16 @@ invents a saved item, transfer, or other settlement outcome.
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
 | HE-B-01 | Overconfidence | J | `{location}` | "That pocket has a lot of nerve being empty at {location}." | pocket | no | HE: The boast protests the hidden pocket being empty, not a lost or saved item. |  |  |
-| HE-B-02 | Genre tension | M | `{location}` | "The hidden compartment at {location} declined to produce a heroic cameo." | compartment | no | HE: The imagined cameo refers to the empty hidden pocket, not a recovered object. |  |  |
+| HE-B-02 | Genre tension | M | `{location}` | "The secret compartment at {location} declined to produce a heroic cameo." | compartment | no | HE: The imagined cameo refers to the empty hidden pocket, not a recovered object. |  |  |
 | HE-B-03 | Gear obsession | O | - | "The hidden compartment put up a very poor defense against emptiness." | compartment | no | HE: The defensive metaphor describes the hidden pocket being empty, not a fight. |  |  |
-| HE-B-04 | Loot greed | J | `{location}` | "The secret pocket returned no souvenir for my appetite at {location}." | pocket | no | HE: The appetite reacts to the empty hidden pocket without inventing a saved item. |  |  |
+| HE-B-04 | Loot greed | J | `{location}` | "The secret pocket returned no prize for my trouble at {location}." | pocket | no | HE: The Raider reacts to the empty hidden pocket without inventing a saved item. |  |  |
 
 ### Cautious
 
 | ID | Mode | Shape | Slots | Candidate line | Concrete | Office | Draft fact and event-specific check | Decision | Reviewer note |
 |---|---|---|---|---|---|---|---|---|
 | HE-C-01 | Genre tension | J | `{location}` | "My hidden pocket has cast absence in the starring role at {location}." | pocket | no | HE: The theatrical absence is the committed empty pocket, not a saved item. |  |  |
-| HE-C-02 | Loot greed | M | `{location}` | "The compartment at {location} has offered my appetite precisely nothing." | compartment | no | HE: Appetite reacts to the empty hidden pocket without claiming a transfer. |  |  |
+| HE-C-02 | Loot greed | M | `{location}` | "The compartment at {location} has offered precisely nothing worth saving." | compartment | no | HE: The Raider reacts to the empty hidden pocket without claiming a transfer. |  |  |
 | HE-C-03 | Overconfidence | O | - | "The empty pocket is no reason to panic about my secret storage." | pocket | no | HE: The understatement concerns the empty hidden pocket without asserting an item. |  |  |
 | HE-C-04 | Gear obsession | J | `{location}` | "There's no saved prize hiding behind that seam at {location}." | seam | no | HE: The seam metaphor describes the hidden pocket's emptiness, not an item recovered later. |  |  |
 
@@ -2039,7 +2205,7 @@ invents a saved item, transfer, or other settlement outcome.
 | HE-G-01 | Gear obsession | J | `{location}` | "That compartment has optimized itself for emptiness at {location}." | compartment | no | HE: The optimization joke describes the empty hidden pocket, not an item saved. |  |  |
 | HE-G-02 | Genre tension | M | `{location}` | "The hidden pocket at {location} has achieved a beautifully uninformative result: nothing." | pocket | no | HE: The technical understatement refers to the empty secret pocket, not a discovery. |  |  |
 | HE-G-03 | Overconfidence | O | - | "Even an empty seam can disappoint with impressive precision." | seam | no | HE: The boast concerns the hidden pocket being empty, not a saved item. |  |  |
-| HE-G-04 | Loot greed | J | `{location}` | "Even a meticulous collector can't coax anything from that vacant pocket at {location}." | pocket | no | HE: The boast reacts to the empty hidden pocket without claiming an acquisition. |  |  |
+| HE-G-04 | Loot greed | J | `{location}` | "Even containment theory can't invent cargo for an empty pocket at {location}." | pocket | no | HE: The boast reacts to the empty hidden pocket without claiming an acquisition. |  |  |
 
 ### Hoarder
 
