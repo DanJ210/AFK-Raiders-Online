@@ -4,8 +4,14 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using AFKRaiders.Server.AI;
+using AFKRaiders.Server.Content;
 using AFKRaiders.Server.Domain;
 
+if (args is ["--slots"])
+{
+    SlotCoverage.Write();
+    return;
+}
 if (args is ["--compare", var before, var after])
 {
     DiaryAuditReport.Write(before, after);

@@ -16,6 +16,7 @@ Reference repo: https://github.com/DanJ210/AFK-Raiders-Online (branch main). Rea
 | [WORLD_ACTIVITY_PROPOSAL.md](WORLD_ACTIVITY_PROPOSAL.md) | **Proposal, awaiting approval:** crossing metrics, ambient/solo events, maps, and AI activity options. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/WORLD_ACTIVITY_PROPOSAL.md) |
 | [DIARY_VARIETY_PROPOSAL.md](DIARY_VARIETY_PROPOSAL.md) | Original proposal; slice 1 Parts A/B authorized, Part C gated on designer review. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/DIARY_VARIETY_PROPOSAL.md) |
 | [DIARY_VARIETY_AUDIT.md](DIARY_VARIETY_AUDIT.md) | Slice 1 audit, before/after per-trait/kind/pool measurements, preserved outcomes and Part B review gate. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/DIARY_VARIETY_AUDIT.md) |
+| [DIARY_SELECTION_DESIGN.md](DIARY_SELECTION_DESIGN.md) | D1 narration slot sources, privacy rules, and proposed opportunity display mapping. | [GitHub](https://github.com/DanJ210/AFK-Raiders-Online/blob/main/docs/DIARY_SELECTION_DESIGN.md) |
 
 ### docs/balance/
 
